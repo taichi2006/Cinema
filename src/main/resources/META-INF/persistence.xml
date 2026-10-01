@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<persistence xmlns="https://jakarta.ee/xml/ns/persistence"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xsi:schemaLocation="
+                 https://jakarta.ee/xml/ns/persistence
+                 https://jakarta.ee/xml/ns/persistence/persistence_3_1.xsd"
+             version="3.1">
+
+    <persistence-unit
+            name="cinemaPU"
+            transaction-type="RESOURCE_LOCAL">
+
+        <provider>
+            org.hibernate.jpa.HibernatePersistenceProvider
+        </provider>
+        <class>com.cinema.Model.Entity.Movie</class>
+
+        <properties>
+
+            <property
+                    name="jakarta.persistence.jdbc.driver"
+                    value="org.postgresql.Driver"/>
+
+            <property
+                    name="jakarta.persistence.jdbc.url"
+                    value="jdbc:postgresql://ep-solitary-sky-b34q0u44-pooler.c-4.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&amp;channelBinding=require"/>
+
+            <property
+                    name="jakarta.persistence.jdbc.user"
+                    value="neondb_owner"/>
+
+            <property
+                    name="jakarta.persistence.jdbc.password"
+                    value="npg_Lf1dXoHc8tyM"/>
+
+            <property
+                    name="hibernate.dialect"
+                    value="org.hibernate.dialect.PostgreSQLDialect"/>
+            <property
+                    name="hibernate.default_schema"
+                    value="cinema"/>
+
+            <property
+                    name="hibernate.show_sql"
+                    value="true"/>
+
+        </properties>
+
+    </persistence-unit>
+
+</persistence>
