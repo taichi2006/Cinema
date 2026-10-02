@@ -11,23 +11,23 @@ public class MovieService {
         movieDAO = new MovieDAO();
     }
 
-    public List<MovieDTO> getAllMovies() {
+    public List<MovieResponse> getAllMovies() {
 
         List<Movie> movies = movieDAO.findAll();
 
-        List<MovieDTO> movieDTOs = new ArrayList<>();
+        List<MovieResponse> movieResponses = new ArrayList<>();
 
         for (Movie movie : movies) {
 
-            MovieDTO movieDTO = new MovieDTO(
+            MovieResponse movieResponse = new MovieResponse(
                     movie.getMovieId(),
                     movie.getTitle(),
                     movie.getDurationMinutes()
             );
 
-            movieDTOs.add(movieDTO);
+            movieResponses.add(movieResponse);
         }
 
-        return movieDTOs;
+        return movieResponses;
     }
 }

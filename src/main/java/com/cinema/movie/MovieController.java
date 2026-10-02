@@ -25,7 +25,7 @@ public class MovieController extends HttpServlet {
         response.setContentType("application/json;charset=UTF-8");
 
         try {
-            List<MovieDTO> movies =
+            List<MovieResponse> movies =
                     movieService.getAllMovies();
 
             objectMapper.writeValue(

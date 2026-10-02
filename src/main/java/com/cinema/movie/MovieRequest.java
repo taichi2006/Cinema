@@ -1,26 +1,19 @@
 package com.cinema.movie;
 
-public class MovieDTO {
+public class MovieRequest {
 
-    private Long movieId;
     private String title;
     private Integer durationMinutes;
 
-    public MovieDTO() {
+    public MovieRequest() {
     }
 
-    public MovieDTO(
-            Long movieId,
+    public MovieRequest(
             String title,
             Integer durationMinutes
     ) {
-        this.movieId = movieId;
         this.title = title;
         this.durationMinutes = durationMinutes;
-    }
-
-    public Long getMovieId() {
-        return movieId;
     }
 
     public String getTitle() {
