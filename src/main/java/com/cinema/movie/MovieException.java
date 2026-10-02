@@ -1,4 +1,4 @@
-package com.cinema.Model.Exception;
+package com.cinema.movie;
 
 public class MovieException extends RuntimeException {
 

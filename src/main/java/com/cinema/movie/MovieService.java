@@ -1,8 +1,4 @@
-package com.cinema.Model.Service;
-
-import com.cinema.Model.DAO.MovieDAO;
-import com.cinema.Model.DTO.MovieDTO;
-import com.cinema.Model.Entity.Movie;
+package com.cinema.movie;
 
 import java.util.ArrayList;
 import java.util.List;

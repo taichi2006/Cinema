@@ -1,6 +1,5 @@
-package com.cinema.Model.DAO;
+package com.cinema.movie;
 
-import com.cinema.Model.Entity.Movie;
 import com.cinema.Util.JPAUtil;
 
 import jakarta.persistence.EntityManager;
