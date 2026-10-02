@@ -1,4 +1,4 @@
-package com.cinema.Model.DTO;
+package com.cinema.movie;
 
 public class MovieDTO {
 

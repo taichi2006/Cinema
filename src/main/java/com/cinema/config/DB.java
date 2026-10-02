@@ -1,4 +1,4 @@
-package com.cinema.Util;
+package com.cinema.config;
 
 import io.github.cdimascio.dotenv.Dotenv;
 

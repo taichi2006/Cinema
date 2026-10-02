@@ -1,7 +1,5 @@
-package com.cinema.Controller;
+package com.cinema.movie;
 
-import com.cinema.Model.DTO.MovieDTO;
-import com.cinema.Model.Service.MovieService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import jakarta.servlet.annotation.WebServlet;
