@@ -1,4 +1,4 @@
-package com.cinema.Util;
+package com.cinema.common.util;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
