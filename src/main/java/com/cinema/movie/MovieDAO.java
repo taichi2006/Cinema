@@ -1,6 +1,6 @@
 package com.cinema.movie;
 
-import com.cinema.Util.JPAUtil;
+import com.cinema.common.util.JPAUtil;
 
 import jakarta.persistence.EntityManager;
 
