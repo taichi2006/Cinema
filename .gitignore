@@ -39,3 +39,17 @@ build/
 .DS_Store
 
 .env
+
+# Markdown, giữ README
+*.[mM][dD]
+![rR][eE][aA][dD][mM][eE].[mM][dD]
+
+# Postman
+.postman/
+[Pp]ostman/
+*.postman_collection.json
+*.postman_environment.json
+*.postman_globals.json
+
+#SQL
+*.[sS][qQ][lL]

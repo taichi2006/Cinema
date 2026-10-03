@@ -16,7 +16,7 @@ public class ApiPrefixFilter implements Filter {
         String path = httpRequest.getRequestURI().substring(httpRequest.getContextPath().length());
 
         if (path.startsWith("/api/")) {
-            // Loại bỏ chuỗi "/api" ra khỏi path để forward tới các Servlet thực tế (ví dụ: "/movies")
+            // Loại bỏ chuỗi "/api" ra khỏi path để forward tới các Servlet thực tế (ví dụ: "/movie")
             String targetPath = path.substring(4); 
             request.getRequestDispatcher(targetPath).forward(request, response);
         } else {
