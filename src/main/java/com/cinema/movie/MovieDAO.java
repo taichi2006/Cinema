@@ -23,7 +23,7 @@ public class MovieDAO {
         }
     }
 
-    public List<Movie> findMovies(MovieFilter filter) {
+    public List<Movie> findMovies(MovieRequest filter) {
         EntityManager entityManager = JPAUtil.getEntityManager();
         try {
             // Bước 1: Truy vấn phân trang lấy danh sách phim (không fetch collection genres)
@@ -102,7 +102,7 @@ public class MovieDAO {
         }
     }
 
-    public long countMovies(MovieFilter filter) {
+    public long countMovies(MovieRequest filter) {
         EntityManager entityManager = JPAUtil.getEntityManager();
         try {
             StringBuilder jpql = new StringBuilder("SELECT COUNT(DISTINCT m) FROM Movie m ");

@@ -18,18 +18,9 @@ public class MovieController extends HttpServlet {
     @Override
     protected void doGet(
             HttpServletRequest request,
-            HttpServletResponse response
-    ) throws IOException {
+            HttpServletResponse response) throws IOException {
 
         response.setContentType("application/json;charset=UTF-8");
-
-        String traceId = request.getHeader("X-Trace-Id");
-        if (traceId == null || traceId.trim().isEmpty()) {
-            traceId = request.getHeader("X-Request-Id");
-        }
-        if (traceId == null || traceId.trim().isEmpty()) {
-            traceId = java.util.UUID.randomUUID().toString();
-        }
 
         try {
             String q = request.getParameter("q");
@@ -57,28 +48,22 @@ public class MovieController extends HttpServlet {
                 }
             }
 
-            MovieFilter filter = new MovieFilter(q, genre, status, page, size, sort);
-            SuccessEnvelope<List<MovieSummary>> result = movieService.getMovies(filter, traceId);
+            MovieRequest movieRequest = new MovieRequest(q, genre, status, page, size, sort);
+            SuccessEnvelope<List<MovieResponse>> result = movieService.getMovies(movieRequest);
 
             response.setStatus(HttpServletResponse.SC_OK);
             objectMapper.writeValue(response.getWriter(), result);
 
         } catch (InvalidFilterException exception) {
             response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-            List<ErrorResponse.FieldError> fieldErrors = null;
-            if (exception.getField() != null) {
-                fieldErrors = List.of(new ErrorResponse.FieldError(exception.getField(), exception.getMessage()));
-            }
             objectMapper.writeValue(
                     response.getWriter(),
-                    new ErrorResponse("INVALID_FILTER", exception.getMessage(), fieldErrors, traceId)
-            );
+                    new ErrorResponse("INVALID_FILTER", exception.getMessage()));
         } catch (Exception exception) {
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             objectMapper.writeValue(
                     response.getWriter(),
-                    new ErrorResponse("INTERNAL_SERVER_ERROR", "Đã có lỗi xảy ra trên hệ thống.", traceId)
-            );
+                    new ErrorResponse("INTERNAL_SERVER_ERROR", "Đã có lỗi xảy ra trên hệ thống."));
         }
     }
 }

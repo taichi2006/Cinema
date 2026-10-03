@@ -33,12 +33,12 @@ public class MovieServiceTest {
         }
 
         @Override
-        public List<Movie> findMovies(MovieFilter filter) {
+        public List<Movie> findMovies(MovieRequest request) {
             return stubMovies;
         }
 
         @Override
-        public long countMovies(MovieFilter filter) {
+        public long countMovies(MovieRequest request) {
             return stubCount;
         }
     }
@@ -55,11 +55,11 @@ public class MovieServiceTest {
     @DisplayName("Ném InvalidFilterException khi q vượt quá 100 ký tự")
     void testQueryTooLong() {
         String longQuery = "a".repeat(101);
-        MovieFilter filter = new MovieFilter(longQuery, null, null, 0, 20, "releaseDate,desc");
+        MovieRequest request = new MovieRequest(longQuery, null, null, 0, 20, "releaseDate,desc");
 
         InvalidFilterException exception = assertThrows(
                 InvalidFilterException.class,
-                () -> movieService.getMovies(filter)
+                () -> movieService.getMovies(request)
         );
         assertEquals("Từ khóa tìm kiếm 'q' không được vượt quá 100 ký tự.", exception.getMessage());
     }
@@ -67,11 +67,11 @@ public class MovieServiceTest {
     @Test
     @DisplayName("Ném InvalidFilterException khi status không hợp lệ")
     void testInvalidStatus() {
-        MovieFilter filter = new MovieFilter(null, null, "INVALID_STATUS", 0, 20, "releaseDate,desc");
+        MovieRequest request = new MovieRequest(null, null, "INVALID_STATUS", 0, 20, "releaseDate,desc");
 
         InvalidFilterException exception = assertThrows(
                 InvalidFilterException.class,
-                () -> movieService.getMovies(filter)
+                () -> movieService.getMovies(request)
         );
         assertEquals(
                 "Trạng thái 'status' không hợp lệ: INVALID_STATUS. Các giá trị hợp lệ: [NOW_SHOWING, COMING_SOON, ENDED]",
@@ -82,11 +82,11 @@ public class MovieServiceTest {
     @Test
     @DisplayName("Ném InvalidFilterException khi sort không hợp lệ")
     void testInvalidSort() {
-        MovieFilter filter = new MovieFilter(null, null, null, 0, 20, "unknown_field,asc");
+        MovieRequest request = new MovieRequest(null, null, null, 0, 20, "unknown_field,asc");
 
         InvalidFilterException exception = assertThrows(
                 InvalidFilterException.class,
-                () -> movieService.getMovies(filter)
+                () -> movieService.getMovies(request)
         );
         assertEquals(
                 "Tham số 'sort' không hợp lệ: unknown_field,asc. Các giá trị hợp lệ: [releaseDate,asc, releaseDate,desc, title,asc, title,desc]",
@@ -97,11 +97,11 @@ public class MovieServiceTest {
     @Test
     @DisplayName("Ném InvalidFilterException khi page < 0")
     void testInvalidPage() {
-        MovieFilter filter = new MovieFilter(null, null, null, -1, 20, "releaseDate,desc");
+        MovieRequest request = new MovieRequest(null, null, null, -1, 20, "releaseDate,desc");
 
         InvalidFilterException exception = assertThrows(
                 InvalidFilterException.class,
-                () -> movieService.getMovies(filter)
+                () -> movieService.getMovies(request)
         );
         assertEquals("Số trang 'page' phải lớn hơn hoặc bằng 0.", exception.getMessage());
     }
@@ -109,33 +109,33 @@ public class MovieServiceTest {
     @Test
     @DisplayName("Ném InvalidFilterException khi size < 1 hoặc > 50")
     void testInvalidSize() {
-        MovieFilter filterNegativeSize = new MovieFilter(null, null, null, 0, 0, "releaseDate,desc");
+        MovieRequest requestNegativeSize = new MovieRequest(null, null, null, 0, 0, "releaseDate,desc");
         assertThrows(
                 InvalidFilterException.class,
-                () -> movieService.getMovies(filterNegativeSize)
+                () -> movieService.getMovies(requestNegativeSize)
         );
 
-        MovieFilter filterTooLargeSize = new MovieFilter(null, null, null, 0, 51, "releaseDate,desc");
+        MovieRequest requestTooLargeSize = new MovieRequest(null, null, null, 0, 51, "releaseDate,desc");
         assertThrows(
                 InvalidFilterException.class,
-                () -> movieService.getMovies(filterTooLargeSize)
+                () -> movieService.getMovies(requestTooLargeSize)
         );
     }
 
     @Test
     @DisplayName("Ném InvalidFilterException khi page=2147483647&size=50 gây tràn số offset")
     void testPageMaxIntOverflow() {
-        MovieFilter filter = new MovieFilter(null, null, null, 2147483647, 50, "releaseDate,desc");
+        MovieRequest request = new MovieRequest(null, null, null, 2147483647, 50, "releaseDate,desc");
 
         InvalidFilterException exception = assertThrows(
                 InvalidFilterException.class,
-                () -> movieService.getMovies(filter)
+                () -> movieService.getMovies(request)
         );
         assertEquals("Vị trí phân trang vượt quá giới hạn cho phép.", exception.getMessage());
     }
 
     @Test
-    @DisplayName("JSON hoàn chỉnh khớp 100% schema: success, data với id string, averageRating, reviewCount, meta, traceId")
+    @DisplayName("JSON hoàn chỉnh khớp 100% schema: success, data với id string, averageRating, reviewCount, meta (không có traceId)")
     void testJsonMatchesExactSchema() throws Exception {
         Movie movie = new Movie();
         movie.setMovieId(1L);
@@ -148,8 +148,8 @@ public class MovieServiceTest {
 
         stubDAO.setStubData(List.of(movie), 1L);
 
-        MovieFilter filter = new MovieFilter(null, null, null, 0, 20, null);
-        SuccessEnvelope<List<MovieSummary>> response = movieService.getMovies(filter, "test-trace-id-123");
+        MovieRequest request = new MovieRequest(null, null, null, 0, 20, null);
+        SuccessEnvelope<List<MovieResponse>> response = movieService.getMovies(request);
 
         String json = objectMapper.writeValueAsString(response);
         JsonNode root = objectMapper.readTree(json);
@@ -157,8 +157,7 @@ public class MovieServiceTest {
         // Kiểm tra root
         assertTrue(root.has("success"), "Phải có thuộc tính success");
         assertTrue(root.get("success").asBoolean(), "success phải là true");
-        assertTrue(root.has("traceId"), "Phải có thuộc tính traceId");
-        assertEquals("test-trace-id-123", root.get("traceId").asText());
+        assertFalse(root.has("traceId"), "Không được có thuộc tính traceId");
 
         // Kiểm tra meta
         JsonNode meta = root.get("meta");
@@ -201,13 +200,13 @@ public class MovieServiceTest {
 
         stubDAO.setStubData(List.of(movie), 1L);
 
-        MovieFilter filter = new MovieFilter(null, "Khoa học viễn tưởng", null, 0, 20, null);
-        SuccessEnvelope<List<MovieSummary>> response = movieService.getMovies(filter);
+        MovieRequest request = new MovieRequest(null, "Khoa học viễn tưởng", null, 0, 20, null);
+        SuccessEnvelope<List<MovieResponse>> response = movieService.getMovies(request);
 
         assertEquals(1, response.getData().size());
-        MovieSummary summary = response.getData().get(0);
-        assertEquals(2, summary.getGenres().size(), "Các thể loại trùng lặp phải được lọc sạch");
-        assertEquals(List.of("Khoa học viễn tưởng", "Hành động"), summary.getGenres());
+        MovieResponse movieResponse = response.getData().get(0);
+        assertEquals(2, movieResponse.getGenres().size(), "Các thể loại trùng lặp phải được lọc sạch");
+        assertEquals(List.of("Khoa học viễn tưởng", "Hành động"), movieResponse.getGenres());
     }
 
     @Test
@@ -215,9 +214,9 @@ public class MovieServiceTest {
     void testNoResultsFound() {
         stubDAO.setStubData(Collections.emptyList(), 0L);
 
-        MovieFilter filter = new MovieFilter("KhongTonTai123456", null, null, 0, 20, null);
-        SuccessEnvelope<List<MovieSummary>> response = assertDoesNotThrow(
-                () -> movieService.getMovies(filter)
+        MovieRequest request = new MovieRequest("KhongTonTai123456", null, null, 0, 20, null);
+        SuccessEnvelope<List<MovieResponse>> response = assertDoesNotThrow(
+                () -> movieService.getMovies(request)
         );
 
         assertNotNull(response);
@@ -228,32 +227,19 @@ public class MovieServiceTest {
     }
 
     @Test
-    @DisplayName("ErrorResponse JSON khớp 100% schema: success=false, error object (code, message, fieldErrors), traceId")
+    @DisplayName("ErrorResponse JSON khớp schema: error và message")
     void testErrorResponseJsonStructure() throws Exception {
-        String code = "INVALID_FILTER";
+        String error = "INVALID_FILTER";
         String message = "Kích thước trang 'size' phải nằm trong khoảng từ 1 đến 50.";
-        List<ErrorResponse.FieldError> fieldErrors = List.of(
-                new ErrorResponse.FieldError("size", message)
-        );
-        String traceId = "test-error-trace-456";
 
-        ErrorResponse errorResponse = new ErrorResponse(code, message, fieldErrors, traceId);
+        ErrorResponse errorResponse = new ErrorResponse(error, message);
 
         String json = objectMapper.writeValueAsString(errorResponse);
         JsonNode root = objectMapper.readTree(json);
 
-        assertFalse(root.get("success").asBoolean(), "success phải là false");
-        assertEquals("test-error-trace-456", root.get("traceId").asText());
-
-        JsonNode errorNode = root.get("error");
-        assertNotNull(errorNode, "Phải có đối tượng error");
-        assertEquals("INVALID_FILTER", errorNode.get("code").asText());
-        assertEquals(message, errorNode.get("message").asText());
-
-        JsonNode fieldErrorsNode = errorNode.get("fieldErrors");
-        assertNotNull(fieldErrorsNode, "Phải có mảng fieldErrors");
-        assertEquals(1, fieldErrorsNode.size());
-        assertEquals("size", fieldErrorsNode.get(0).get("field").asText());
-        assertEquals(message, fieldErrorsNode.get(0).get("message").asText());
+        assertTrue(root.has("error"), "Phải có thuộc tính error");
+        assertEquals("INVALID_FILTER", root.get("error").asText());
+        assertTrue(root.has("message"), "Phải có thuộc tính message");
+        assertEquals(message, root.get("message").asText());
     }
 }
