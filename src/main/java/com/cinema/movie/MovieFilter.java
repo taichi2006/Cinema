@@ -5,8 +5,8 @@ public class MovieFilter {
     private String q;
     private String genre;
     private String status;
-    private int page = 1;
-    private int size = 10;
+    private int page = 0;
+    private int size = 20;
     private String sort = "releaseDate,desc";
 
     public MovieFilter() {

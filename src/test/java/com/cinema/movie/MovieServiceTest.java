@@ -7,7 +7,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -56,7 +55,7 @@ public class MovieServiceTest {
     @DisplayName("Ném InvalidFilterException khi q vượt quá 100 ký tự")
     void testQueryTooLong() {
         String longQuery = "a".repeat(101);
-        MovieFilter filter = new MovieFilter(longQuery, null, null, 1, 10, "releaseDate,desc");
+        MovieFilter filter = new MovieFilter(longQuery, null, null, 0, 20, "releaseDate,desc");
 
         InvalidFilterException exception = assertThrows(
                 InvalidFilterException.class,
@@ -68,7 +67,7 @@ public class MovieServiceTest {
     @Test
     @DisplayName("Ném InvalidFilterException khi status không hợp lệ")
     void testInvalidStatus() {
-        MovieFilter filter = new MovieFilter(null, null, "INVALID_STATUS", 1, 10, "releaseDate,desc");
+        MovieFilter filter = new MovieFilter(null, null, "INVALID_STATUS", 0, 20, "releaseDate,desc");
 
         InvalidFilterException exception = assertThrows(
                 InvalidFilterException.class,
@@ -83,7 +82,7 @@ public class MovieServiceTest {
     @Test
     @DisplayName("Ném InvalidFilterException khi sort không hợp lệ")
     void testInvalidSort() {
-        MovieFilter filter = new MovieFilter(null, null, null, 1, 10, "unknown_field,asc");
+        MovieFilter filter = new MovieFilter(null, null, null, 0, 20, "unknown_field,asc");
 
         InvalidFilterException exception = assertThrows(
                 InvalidFilterException.class,
@@ -96,27 +95,27 @@ public class MovieServiceTest {
     }
 
     @Test
-    @DisplayName("Ném InvalidFilterException khi page < 1")
+    @DisplayName("Ném InvalidFilterException khi page < 0")
     void testInvalidPage() {
-        MovieFilter filter = new MovieFilter(null, null, null, 0, 10, "releaseDate,desc");
+        MovieFilter filter = new MovieFilter(null, null, null, -1, 20, "releaseDate,desc");
 
         InvalidFilterException exception = assertThrows(
                 InvalidFilterException.class,
                 () -> movieService.getMovies(filter)
         );
-        assertEquals("Số trang 'page' phải lớn hơn hoặc bằng 1.", exception.getMessage());
+        assertEquals("Số trang 'page' phải lớn hơn hoặc bằng 0.", exception.getMessage());
     }
 
     @Test
     @DisplayName("Ném InvalidFilterException khi size < 1 hoặc > 50")
     void testInvalidSize() {
-        MovieFilter filterNegativeSize = new MovieFilter(null, null, null, 1, 0, "releaseDate,desc");
+        MovieFilter filterNegativeSize = new MovieFilter(null, null, null, 0, 0, "releaseDate,desc");
         assertThrows(
                 InvalidFilterException.class,
                 () -> movieService.getMovies(filterNegativeSize)
         );
 
-        MovieFilter filterTooLargeSize = new MovieFilter(null, null, null, 1, 51, "releaseDate,desc");
+        MovieFilter filterTooLargeSize = new MovieFilter(null, null, null, 0, 51, "releaseDate,desc");
         assertThrows(
                 InvalidFilterException.class,
                 () -> movieService.getMovies(filterTooLargeSize)
@@ -136,27 +135,52 @@ public class MovieServiceTest {
     }
 
     @Test
-    @DisplayName("JSON hợp lệ và không có thuộc tính rawReleaseDate")
-    void testJsonNoRawReleaseDate() throws Exception {
+    @DisplayName("JSON hoàn chỉnh khớp 100% schema: success, data với id string, averageRating, reviewCount, meta, traceId")
+    void testJsonMatchesExactSchema() throws Exception {
         Movie movie = new Movie();
         movie.setMovieId(1L);
         movie.setTitle("Mai");
+        movie.setPosterUrl("https://example.com/poster.jpg");
         movie.setDurationMinutes(120);
-        movie.setReleaseDate(LocalDate.of(2024, 2, 10));
+        movie.setReleaseDate(LocalDate.of(2026, 10, 3));
         movie.setStatus("NOW_SHOWING");
+        movie.setAgeRating("T18");
 
         stubDAO.setStubData(List.of(movie), 1L);
 
-        MovieFilter filter = new MovieFilter(null, null, null, 1, 10, null);
-        SuccessEnvelope<List<MovieSummary>> response = movieService.getMovies(filter);
+        MovieFilter filter = new MovieFilter(null, null, null, 0, 20, null);
+        SuccessEnvelope<List<MovieSummary>> response = movieService.getMovies(filter, "test-trace-id-123");
 
         String json = objectMapper.writeValueAsString(response);
         JsonNode root = objectMapper.readTree(json);
-        JsonNode firstMovie = root.get("data").get(0);
 
-        assertTrue(firstMovie.has("releaseDate"), "Phải có thuộc tính releaseDate");
-        assertEquals("2024-02-10", firstMovie.get("releaseDate").asText());
-        assertFalse(firstMovie.has("rawReleaseDate"), "Tuyệt đối không có thuộc tính rawReleaseDate");
+        // Kiểm tra root
+        assertTrue(root.has("success"), "Phải có thuộc tính success");
+        assertTrue(root.get("success").asBoolean(), "success phải là true");
+        assertTrue(root.has("traceId"), "Phải có thuộc tính traceId");
+        assertEquals("test-trace-id-123", root.get("traceId").asText());
+
+        // Kiểm tra meta
+        JsonNode meta = root.get("meta");
+        assertEquals(0, meta.get("page").asInt());
+        assertEquals(20, meta.get("size").asInt());
+        assertEquals(1, meta.get("totalElements").asLong());
+        assertEquals(1, meta.get("totalPages").asInt());
+
+        // Kiểm tra data item
+        JsonNode firstMovie = root.get("data").get(0);
+        assertEquals("1", firstMovie.get("id").asText(), "id phải là kiểu chuỗi String");
+        assertEquals("Mai", firstMovie.get("title").asText());
+        assertEquals("https://example.com/poster.jpg", firstMovie.get("posterUrl").asText());
+        assertEquals(120, firstMovie.get("durationMinutes").asInt());
+        assertEquals("2026-10-03", firstMovie.get("releaseDate").asText());
+        assertEquals("NOW_SHOWING", firstMovie.get("status").asText());
+        assertEquals("T18", firstMovie.get("ageRating").asText());
+        assertEquals(0.0, firstMovie.get("averageRating").asDouble());
+        assertEquals(0, firstMovie.get("reviewCount").asInt());
+
+        assertFalse(firstMovie.has("trailerUrl"), "Không được có thuộc tính trailerUrl");
+        assertFalse(firstMovie.has("rawReleaseDate"), "Không được có thuộc tính rawReleaseDate");
     }
 
     @Test
@@ -177,7 +201,7 @@ public class MovieServiceTest {
 
         stubDAO.setStubData(List.of(movie), 1L);
 
-        MovieFilter filter = new MovieFilter(null, "Khoa học viễn tưởng", null, 1, 10, null);
+        MovieFilter filter = new MovieFilter(null, "Khoa học viễn tưởng", null, 0, 20, null);
         SuccessEnvelope<List<MovieSummary>> response = movieService.getMovies(filter);
 
         assertEquals(1, response.getData().size());
@@ -191,7 +215,7 @@ public class MovieServiceTest {
     void testNoResultsFound() {
         stubDAO.setStubData(Collections.emptyList(), 0L);
 
-        MovieFilter filter = new MovieFilter("KhongTonTai123456", null, null, 1, 10, null);
+        MovieFilter filter = new MovieFilter("KhongTonTai123456", null, null, 0, 20, null);
         SuccessEnvelope<List<MovieSummary>> response = assertDoesNotThrow(
                 () -> movieService.getMovies(filter)
         );
@@ -201,5 +225,35 @@ public class MovieServiceTest {
         assertTrue(response.getData().isEmpty(), "data phải là mảng rỗng []");
         assertEquals(0L, response.getMeta().getTotalElements(), "tổng số phần tử bằng 0");
         assertEquals(0, response.getMeta().getTotalPages());
+    }
+
+    @Test
+    @DisplayName("ErrorResponse JSON khớp 100% schema: success=false, error object (code, message, fieldErrors), traceId")
+    void testErrorResponseJsonStructure() throws Exception {
+        String code = "INVALID_FILTER";
+        String message = "Kích thước trang 'size' phải nằm trong khoảng từ 1 đến 50.";
+        List<ErrorResponse.FieldError> fieldErrors = List.of(
+                new ErrorResponse.FieldError("size", message)
+        );
+        String traceId = "test-error-trace-456";
+
+        ErrorResponse errorResponse = new ErrorResponse(code, message, fieldErrors, traceId);
+
+        String json = objectMapper.writeValueAsString(errorResponse);
+        JsonNode root = objectMapper.readTree(json);
+
+        assertFalse(root.get("success").asBoolean(), "success phải là false");
+        assertEquals("test-error-trace-456", root.get("traceId").asText());
+
+        JsonNode errorNode = root.get("error");
+        assertNotNull(errorNode, "Phải có đối tượng error");
+        assertEquals("INVALID_FILTER", errorNode.get("code").asText());
+        assertEquals(message, errorNode.get("message").asText());
+
+        JsonNode fieldErrorsNode = errorNode.get("fieldErrors");
+        assertNotNull(fieldErrorsNode, "Phải có mảng fieldErrors");
+        assertEquals(1, fieldErrorsNode.size());
+        assertEquals("size", fieldErrorsNode.get(0).get("field").asText());
+        assertEquals(message, fieldErrorsNode.get(0).get("message").asText());
     }
 }

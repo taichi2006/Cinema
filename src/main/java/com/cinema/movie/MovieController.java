@@ -23,6 +23,14 @@ public class MovieController extends HttpServlet {
 
         response.setContentType("application/json;charset=UTF-8");
 
+        String traceId = request.getHeader("X-Trace-Id");
+        if (traceId == null || traceId.trim().isEmpty()) {
+            traceId = request.getHeader("X-Request-Id");
+        }
+        if (traceId == null || traceId.trim().isEmpty()) {
+            traceId = java.util.UUID.randomUUID().toString();
+        }
+
         try {
             String q = request.getParameter("q");
             String genre = request.getParameter("genre");
@@ -31,41 +39,45 @@ public class MovieController extends HttpServlet {
             String pageStr = request.getParameter("page");
             String sizeStr = request.getParameter("size");
 
-            int page = 1;
+            int page = 0;
             if (pageStr != null && !pageStr.trim().isEmpty()) {
                 try {
                     page = Integer.parseInt(pageStr.trim());
                 } catch (NumberFormatException exception) {
-                    throw new InvalidFilterException("Tham số 'page' phải là một số nguyên hợp lệ.");
+                    throw new InvalidFilterException("page", "Tham số 'page' phải là một số nguyên hợp lệ.");
                 }
             }
 
-            int size = 10;
+            int size = 20;
             if (sizeStr != null && !sizeStr.trim().isEmpty()) {
                 try {
                     size = Integer.parseInt(sizeStr.trim());
                 } catch (NumberFormatException exception) {
-                    throw new InvalidFilterException("Tham số 'size' phải là một số nguyên hợp lệ.");
+                    throw new InvalidFilterException("size", "Tham số 'size' phải là một số nguyên hợp lệ.");
                 }
             }
 
             MovieFilter filter = new MovieFilter(q, genre, status, page, size, sort);
-            SuccessEnvelope<List<MovieSummary>> result = movieService.getMovies(filter);
+            SuccessEnvelope<List<MovieSummary>> result = movieService.getMovies(filter, traceId);
 
             response.setStatus(HttpServletResponse.SC_OK);
             objectMapper.writeValue(response.getWriter(), result);
 
         } catch (InvalidFilterException exception) {
             response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            List<ErrorResponse.FieldError> fieldErrors = null;
+            if (exception.getField() != null) {
+                fieldErrors = List.of(new ErrorResponse.FieldError(exception.getField(), exception.getMessage()));
+            }
             objectMapper.writeValue(
                     response.getWriter(),
-                    new ErrorResponse("INVALID_FILTER", exception.getMessage())
+                    new ErrorResponse("INVALID_FILTER", exception.getMessage(), fieldErrors, traceId)
             );
         } catch (Exception exception) {
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             objectMapper.writeValue(
                     response.getWriter(),
-                    new ErrorResponse("INTERNAL_SERVER_ERROR", "Đã có lỗi xảy ra trên hệ thống.")
+                    new ErrorResponse("INTERNAL_SERVER_ERROR", "Đã có lỗi xảy ra trên hệ thống.", traceId)
             );
         }
     }

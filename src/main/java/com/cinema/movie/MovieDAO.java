@@ -63,7 +63,7 @@ public class MovieDAO {
                 query.setParameter("status", filter.getStatus().trim());
             }
 
-            int firstResult = (filter.getPage() - 1) * filter.getSize();
+            int firstResult = filter.getPage() * filter.getSize();
             query.setFirstResult(firstResult);
             query.setMaxResults(filter.getSize());
 
