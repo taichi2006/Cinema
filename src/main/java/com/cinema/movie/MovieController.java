@@ -70,7 +70,7 @@ public class MovieController extends HttpServlet {
             try {
                 page = Integer.parseInt(pageStr.trim());
             } catch (NumberFormatException exception) {
-                throw new InvalidFilterException("page", "Tham số 'page' phải là một số nguyên hợp lệ.");
+                throw ApiException.badRequest("Tham số 'page' phải là một số nguyên hợp lệ.");
             }
         }
 
@@ -79,7 +79,7 @@ public class MovieController extends HttpServlet {
             try {
                 size = Integer.parseInt(sizeStr.trim());
             } catch (NumberFormatException exception) {
-                throw new InvalidFilterException("size", "Tham số 'size' phải là một số nguyên hợp lệ.");
+                throw ApiException.badRequest("Tham số 'size' phải là một số nguyên hợp lệ.");
             }
         }
 
@@ -97,7 +97,30 @@ public class MovieController extends HttpServlet {
     }
 
     private void handleGetMovieShowtimes(HttpServletRequest request, HttpServletResponse response, String id) throws Exception {
-        ApiResponse<?> result = movieService.getMovieShowtimes(id);
+        String date = request.getParameter("date");
+        String cinemaId = request.getParameter("cinemaId");
+        String pageStr = request.getParameter("page");
+        String sizeStr = request.getParameter("size");
+
+        int page = 0;
+        if (pageStr != null && !pageStr.trim().isEmpty()) {
+            try {
+                page = Integer.parseInt(pageStr.trim());
+            } catch (NumberFormatException exception) {
+                throw ApiException.badRequest("Tham số 'page' phải là một số nguyên hợp lệ.");
+            }
+        }
+
+        int size = 20;
+        if (sizeStr != null && !sizeStr.trim().isEmpty()) {
+            try {
+                size = Integer.parseInt(sizeStr.trim());
+            } catch (NumberFormatException exception) {
+                throw ApiException.badRequest("Tham số 'size' phải là một số nguyên hợp lệ.");
+            }
+        }
+
+        Map<String, Object> result = movieService.getMovieShowtimes(id, date, cinemaId, page, size);
         response.setStatus(HttpServletResponse.SC_OK);
         objectMapper.writeValue(response.getWriter(), result);
     }

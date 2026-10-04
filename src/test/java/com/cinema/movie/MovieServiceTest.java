@@ -57,6 +57,24 @@ public class MovieServiceTest {
         public long countMovies(MovieRequest request) {
             return stubCount;
         }
+
+        private List<ShowtimeResponse> stubShowtimes = Collections.emptyList();
+        private long stubShowtimeCount = 0L;
+
+        public void setStubShowtimeData(List<ShowtimeResponse> showtimes, long count) {
+            this.stubShowtimes = showtimes;
+            this.stubShowtimeCount = count;
+        }
+
+        @Override
+        public List<ShowtimeResponse> findShowtimes(Long movieId, LocalDate date, Long cinemaId, int page, int size) {
+            return stubShowtimes;
+        }
+
+        @Override
+        public long countShowtimes(Long movieId, LocalDate date, Long cinemaId) {
+            return stubShowtimeCount;
+        }
     }
 
     private StubMovieDAO stubDAO;
@@ -68,27 +86,29 @@ public class MovieServiceTest {
     }
 
     @Test
-    @DisplayName("Ném InvalidFilterException khi q vượt quá 100 ký tự")
+    @DisplayName("Ném ApiException 400 khi q vượt quá 100 ký tự")
     void testQueryTooLong() {
         String longQuery = "a".repeat(101);
         MovieRequest request = new MovieRequest(longQuery, null, null, 0, 20, "releaseDate,desc");
 
-        InvalidFilterException exception = assertThrows(
-                InvalidFilterException.class,
+        ApiException exception = assertThrows(
+                ApiException.class,
                 () -> movieService.getMovies(request)
         );
+        assertEquals(400, exception.getStatus());
         assertEquals("Từ khóa tìm kiếm 'q' không được vượt quá 100 ký tự.", exception.getMessage());
     }
 
     @Test
-    @DisplayName("Ném InvalidFilterException khi status không hợp lệ")
+    @DisplayName("Ném ApiException 400 khi status không hợp lệ")
     void testInvalidStatus() {
         MovieRequest request = new MovieRequest(null, null, "INVALID_STATUS", 0, 20, "releaseDate,desc");
 
-        InvalidFilterException exception = assertThrows(
-                InvalidFilterException.class,
+        ApiException exception = assertThrows(
+                ApiException.class,
                 () -> movieService.getMovies(request)
         );
+        assertEquals(400, exception.getStatus());
         assertEquals(
                 "Trạng thái 'status' không hợp lệ: INVALID_STATUS. Các giá trị hợp lệ: [NOW_SHOWING, COMING_SOON, ENDED]",
                 exception.getMessage()
@@ -96,14 +116,15 @@ public class MovieServiceTest {
     }
 
     @Test
-    @DisplayName("Ném InvalidFilterException khi sort không hợp lệ")
+    @DisplayName("Ném ApiException 400 khi sort không hợp lệ")
     void testInvalidSort() {
         MovieRequest request = new MovieRequest(null, null, null, 0, 20, "unknown_field,asc");
 
-        InvalidFilterException exception = assertThrows(
-                InvalidFilterException.class,
+        ApiException exception = assertThrows(
+                ApiException.class,
                 () -> movieService.getMovies(request)
         );
+        assertEquals(400, exception.getStatus());
         assertEquals(
                 "Tham số 'sort' không hợp lệ: unknown_field,asc. Các giá trị hợp lệ: [releaseDate,asc, releaseDate,desc, title,asc, title,desc]",
                 exception.getMessage()
@@ -111,42 +132,46 @@ public class MovieServiceTest {
     }
 
     @Test
-    @DisplayName("Ném InvalidFilterException khi page < 0")
+    @DisplayName("Ném ApiException 400 khi page < 0")
     void testInvalidPage() {
         MovieRequest request = new MovieRequest(null, null, null, -1, 20, "releaseDate,desc");
 
-        InvalidFilterException exception = assertThrows(
-                InvalidFilterException.class,
+        ApiException exception = assertThrows(
+                ApiException.class,
                 () -> movieService.getMovies(request)
         );
+        assertEquals(400, exception.getStatus());
         assertEquals("Số trang 'page' phải lớn hơn hoặc bằng 0.", exception.getMessage());
     }
 
     @Test
-    @DisplayName("Ném InvalidFilterException khi size < 1 hoặc > 50")
+    @DisplayName("Ném ApiException 400 khi size < 1 hoặc > 50")
     void testInvalidSize() {
         MovieRequest requestNegativeSize = new MovieRequest(null, null, null, 0, 0, "releaseDate,desc");
-        assertThrows(
-                InvalidFilterException.class,
+        ApiException exNeg = assertThrows(
+                ApiException.class,
                 () -> movieService.getMovies(requestNegativeSize)
         );
+        assertEquals(400, exNeg.getStatus());
 
         MovieRequest requestTooLargeSize = new MovieRequest(null, null, null, 0, 51, "releaseDate,desc");
-        assertThrows(
-                InvalidFilterException.class,
+        ApiException exLarge = assertThrows(
+                ApiException.class,
                 () -> movieService.getMovies(requestTooLargeSize)
         );
+        assertEquals(400, exLarge.getStatus());
     }
 
     @Test
-    @DisplayName("Ném InvalidFilterException khi page=2147483647&size=50 gây tràn số offset")
+    @DisplayName("Ném ApiException 400 khi page=2147483647&size=50 gây tràn số offset")
     void testPageMaxIntOverflow() {
         MovieRequest request = new MovieRequest(null, null, null, 2147483647, 50, "releaseDate,desc");
 
-        InvalidFilterException exception = assertThrows(
-                InvalidFilterException.class,
+        ApiException exception = assertThrows(
+                ApiException.class,
                 () -> movieService.getMovies(request)
         );
+        assertEquals(400, exception.getStatus());
         assertEquals("Vị trí phân trang vượt quá giới hạn cho phép.", exception.getMessage());
     }
 
@@ -250,14 +275,10 @@ public class MovieServiceTest {
     }
 
     @Test
-    @DisplayName("InvalidFilterException là ApiException với HTTP status 400 và message chuẩn")
-    void testInvalidFilterExceptionIsApiException() {
-        InvalidFilterException exception = new InvalidFilterException(
-                "size",
-                "Kích thước trang 'size' phải nằm trong khoảng từ 1 đến 50."
-        );
+    @DisplayName("ApiException.badRequest tạo ngoại lệ với HTTP status 400 và message chuẩn")
+    void testApiExceptionBadRequest() {
+        ApiException exception = ApiException.badRequest("Kích thước trang 'size' phải nằm trong khoảng từ 1 đến 50.");
         assertEquals(400, exception.getStatus());
-        assertEquals("size", exception.getField());
         assertEquals("Kích thước trang 'size' phải nằm trong khoảng từ 1 đến 50.", exception.getMessage());
     }
 
@@ -347,5 +368,114 @@ public class MovieServiceTest {
                 () -> movieService.getMovieById("   ")
         );
         assertEquals(400, exBlank.getStatus());
+    }
+
+    @Test
+    @DisplayName("Lấy danh sách suất chiếu thành công: trả 200, success, data showtimes và meta")
+    void testGetMovieShowtimes_Success() throws Exception {
+        Movie movie = new Movie();
+        movie.setMovieId(1L);
+        stubDAO.setStubData(List.of(movie), 1L);
+
+        ShowtimeResponse st = new ShowtimeResponse(
+                "101", "1", "1", "Galaxy Nguyễn Du",
+                "5", "Cinema 1", "2026-10-05T14:30:00Z", "2026-10-05T16:30:00Z",
+                "2D", "VI", 95000L, "OPEN"
+        );
+        stubDAO.setStubShowtimeData(List.of(st), 1L);
+
+        Map<String, Object> result = movieService.getMovieShowtimes("1", "2026-10-05", "1", 0, 20);
+
+        assertNotNull(result);
+        assertEquals(true, result.get("success"));
+
+        String json = objectMapper.writeValueAsString(result);
+        JsonNode root = objectMapper.readTree(json);
+
+        assertTrue(root.has("success"));
+        assertTrue(root.get("success").asBoolean());
+        assertTrue(root.has("data"));
+        assertTrue(root.has("meta"));
+
+        JsonNode data = root.get("data");
+        assertEquals(1, data.size());
+        assertEquals("101", data.get(0).get("id").asText());
+        assertEquals("Galaxy Nguyễn Du", data.get(0).get("cinemaName").asText());
+        assertEquals("OPEN", data.get(0).get("status").asText());
+
+        JsonNode meta = root.get("meta");
+        assertEquals(0, meta.get("page").asInt());
+        assertEquals(20, meta.get("size").asInt());
+        assertEquals(1, meta.get("totalElements").asLong());
+        assertEquals(1, meta.get("totalPages").asInt());
+    }
+
+    @Test
+    @DisplayName("Lấy suất chiếu thiếu tham số date: ném ApiException 400")
+    void testGetMovieShowtimes_MissingDate() {
+        Movie movie = new Movie();
+        movie.setMovieId(1L);
+        stubDAO.setStubData(List.of(movie), 1L);
+
+        ApiException exNull = assertThrows(
+                ApiException.class,
+                () -> movieService.getMovieShowtimes("1", null, null, 0, 20)
+        );
+        assertEquals(400, exNull.getStatus());
+        assertTrue(exNull.getMessage().contains("date"));
+
+        ApiException exBlank = assertThrows(
+                ApiException.class,
+                () -> movieService.getMovieShowtimes("1", "   ", null, 0, 20)
+        );
+        assertEquals(400, exBlank.getStatus());
+    }
+
+    @Test
+    @DisplayName("Lấy suất chiếu sai định dạng date: ném ApiException 400")
+    void testGetMovieShowtimes_InvalidDateFormat() {
+        Movie movie = new Movie();
+        movie.setMovieId(1L);
+        stubDAO.setStubData(List.of(movie), 1L);
+
+        ApiException ex = assertThrows(
+                ApiException.class,
+                () -> movieService.getMovieShowtimes("1", "2026/10/05", null, 0, 20)
+        );
+        assertEquals(400, ex.getStatus());
+        assertTrue(ex.getMessage().contains("YYYY-MM-DD"));
+    }
+
+    @Test
+    @DisplayName("Lấy suất chiếu phim không tồn tại: ném ApiException 404")
+    void testGetMovieShowtimes_MovieNotFound() {
+        stubDAO.setStubData(Collections.emptyList(), 0L);
+
+        ApiException ex = assertThrows(
+                ApiException.class,
+                () -> movieService.getMovieShowtimes("9999", "2026-10-05", null, 0, 20)
+        );
+        assertEquals(404, ex.getStatus());
+        assertEquals("Không tìm thấy phim", ex.getMessage());
+    }
+
+    @Test
+    @DisplayName("Lấy suất chiếu cinemaId không hợp lệ: ném ApiException 400")
+    void testGetMovieShowtimes_InvalidCinemaId() {
+        Movie movie = new Movie();
+        movie.setMovieId(1L);
+        stubDAO.setStubData(List.of(movie), 1L);
+
+        ApiException exStr = assertThrows(
+                ApiException.class,
+                () -> movieService.getMovieShowtimes("1", "2026-10-05", "abc", 0, 20)
+        );
+        assertEquals(400, exStr.getStatus());
+
+        ApiException exNeg = assertThrows(
+                ApiException.class,
+                () -> movieService.getMovieShowtimes("1", "2026-10-05", "-1", 0, 20)
+        );
+        assertEquals(400, exNeg.getStatus());
     }
 }

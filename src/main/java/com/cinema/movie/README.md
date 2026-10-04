@@ -10,12 +10,12 @@ Tài liệu kỹ thuật mô tả kiến trúc, endpoint API, cấu trúc dữ l
 com.cinema.movie/
 ├── MovieController.java        # Servlet tiếp nhận HTTP GET /movie
 ├── MovieService.java           # Xử lý validation, phân trang và mapping DTO
-├── MovieDAO.java               # Truy vấn CSDL JPA/Hibernate (Two-Step Fetch & Single Fetch)
+├── MovieDAO.java               # Truy vấn CSDL JPA/Hibernate & Native SQL
 ├── Movie.java                  # Entity ánh xạ bảng cinema.movies
 ├── Genre.java                  # Entity ánh xạ bảng cinema.genres (Many-to-Many)
 ├── MovieRequest.java           # DTO đóng gói tham số query & pagination
 ├── MovieResponse.java          # DTO dữ liệu phim trả về client
-├── InvalidFilterException.java # Exception nghiệp vụ (kế thừa ApiException, HTTP 400)
+├── ShowtimeResponse.java       # DTO dữ liệu suất chiếu trả về client
 └── README.md                   # Tài liệu kỹ thuật module
 ```
 
@@ -87,7 +87,7 @@ Cục Success (`success`, `data`) ở trên và `meta` ([`CommonDTO.PageMeta`](f
 }
 ```
 
-- Lỗi tham số: Ném `InvalidFilterException` (kế thừa `ApiException` với status 400).
+- Lỗi tham số: Ném `ApiException.badRequest(...)` (HTTP status 400).
 - Lỗi không xác định: Trả về HTTP status 500.
 
 ---
@@ -198,6 +198,118 @@ GET /api/movie
  ├── /                          ──> handleGetMovies()          [Danh sách phim phân trang]
  └── /{id}
       ├── (không có hậu tố)     ──> handleGetMovieDetail(id)   [Chi tiết 1 bộ phim]
-      ├── /showtime             ──> handleGetMovieShowtimes(id)[Lịch chiếu (Khung sẵn sàng)]
+      ├── /showtime             ──> handleGetMovieShowtimes(id)[Danh sách suất chiếu theo ngày & rạp]
       └── /review               ──> handleGetMovieReviews(id)  [Đánh giá (Khung sẵn sàng)]
+```
+
+---
+
+## 6. Đặc Tả API: Danh Sách Suất Chiếu Của Phim
+
+- **Endpoint:** `GET /api/movie/{id}/showtime`
+- **Servlet Mapping:** `@WebServlet(urlPatterns = {"/movie", "/movie/*"})` (chuyển tiếp qua `ApiPrefixFilter`)
+- **Quyền truy cập:** Public
+- **Content-Type:** `application/json;charset=UTF-8`
+
+### 6.1. Tham Số Yêu Cầu
+
+| Tham số | Vị trí | Kiểu | Bắt buộc | Mặc định | Ràng buộc kỹ thuật |
+| :--- | :--- | :--- | :---: | :---: | :--- |
+| `id` | Path | `String` / `Long` | **Có** | - | Mã phim. Phải là số nguyên dương $\ge 1$. |
+| `date` | Query | `String` (`date`) | **Có** | - | Ngày chiếu định dạng `YYYY-MM-DD`. Thiếu hoặc sai định dạng ném lỗi 400. |
+| `cinemaId` | Query | `String` / `Long` | Không | `null` | Lọc theo cụm rạp. Nếu có, phải là số nguyên dương $\ge 1$. |
+| `page` | Query | `int` | Không | `0` | Chỉ số trang, $\ge 0$. |
+| `size` | Query | `int` | Không | `20` | Số lượng bản ghi trên một trang, trong khoảng $[1, 50]$. |
+
+### 6.2. Phản Hồi Thành Công (HTTP 200 OK)
+
+Cục Success (`success`, `data`) ở trên và `meta` ([`CommonDTO.PageMeta`](file:///c:/Users/khong/Desktop/TaiLieuHocTap/HK5_Nam3/WebProgramming/Cinema/src/main/java/com/cinema/common/dto/CommonDTO.java#L39)) ở dưới:
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "101",
+      "movieId": "1",
+      "cinemaId": "1",
+      "cinemaName": "Galaxy Nguyễn Du",
+      "roomId": "5",
+      "roomName": "Cinema 1",
+      "startsAt": "2026-10-05T14:30:00Z",
+      "endsAt": "2026-10-05T16:30:00Z",
+      "format": "2D",
+      "language": "VI",
+      "basePrice": 95000,
+      "status": "OPEN"
+    }
+  ],
+  "meta": {
+    "page": 0,
+    "size": 20,
+    "totalElements": 1,
+    "totalPages": 1
+  }
+}
+```
+
+- `data`: Mảng danh sách các suất chiếu (`ShowtimeResponse`). Chỉ lấy các suất chiếu đang mở bán (`status = 'OPEN'`) của ngày được chọn.
+- `startsAt`, `endsAt`: Định dạng chuỗi thời gian chuẩn ISO-8601.
+- `meta`: Thông tin phân trang dùng chung `CommonDTO.PageMeta`.
+
+### 6.3. Phản Hồi Lỗi
+
+Xử lý tập trung qua `com.cinema.common.exception.ErrorHandler`:
+
+- **Thiếu tham số `date` (HTTP 400 Bad Request):**
+  ```json
+  {
+    "success": false,
+    "status": 400,
+    "error": "Thiếu tham số bắt buộc: date"
+  }
+  ```
+- **Sai định dạng `date` (HTTP 400 Bad Request):**
+  ```json
+  {
+    "success": false,
+    "status": 400,
+    "error": "Định dạng ngày 'date' không hợp lệ (yêu cầu: YYYY-MM-DD): 2026/10/05"
+  }
+  ```
+- **Phim không tồn tại (HTTP 404 Not Found):**
+  ```json
+  {
+    "success": false,
+    "status": 404,
+    "error": "Không tìm thấy phim"
+  }
+  ```
+- **Mã rạp hoặc phân trang không hợp lệ (HTTP 400 Bad Request):**
+  ```json
+  {
+    "success": false,
+    "status": 400,
+    "error": "Mã rạp 'cinemaId' phải là số nguyên dương."
+  }
+  ```
+
+### 6.4. Kỹ Thuật Truy Vấn CSDL: `findShowtimes` (`MovieDAO.java`)
+
+`MovieDAO` sử dụng câu truy vấn Native SQL kết hợp 3 bảng `showtimes`, `rooms` và `cinemas`:
+
+```sql
+SELECT 
+    s.showtime_id, s.movie_id, c.cinema_id, c.cinema_name,
+    r.room_id, r.room_name, s.starts_at, s.ends_at,
+    s.format, s.language, s.base_price, s.status
+FROM cinema.showtimes s
+JOIN cinema.rooms r ON s.room_id = r.room_id
+JOIN cinema.cinemas c ON r.cinema_id = c.cinema_id
+WHERE s.movie_id = :movieId
+  AND s.status = 'OPEN'
+  AND CAST(s.starts_at AS date) = CAST(:showDate AS date)
+  [AND c.cinema_id = :cinemaId]
+ORDER BY s.starts_at ASC
+LIMIT :size OFFSET :offset
 ```
