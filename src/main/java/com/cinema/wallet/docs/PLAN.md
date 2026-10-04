@@ -18,20 +18,16 @@ src/main/java/com/cinema/
     ├── docs/
     │   └── PLAN.md                ← file kế hoạch này
     ├── dto/
-    │   ├── envelope/              ← 1. Envelope chuẩn Swagger
-    │   │   ├── SuccessEnvelope.java
-    │   │   ├── ErrorEnvelope.java
-    │   │   ├── PageMeta.java
-    │   │   └── FieldError.java
-    │   ├── request/               ← 2. Request DTOs
+    │   ├── request/               ← 1. Request DTOs
     │   │   ├── TopUpRequest.java
     │   │   └── AdminConfirmRequest.java
-    │   └── response/              ← 3. Response DTOs
+    │   └── response/              ← 2. Response DTOs
     │       ├── WalletResponse.java
     │       ├── TopUpResponse.java
     │       ├── TransactionItemResponse.java
     │       ├── AdminPendingItemResponse.java
     │       └── AdminConfirmResponse.java
+    │   (Tái sử dụng CommonDTO.ApiResponse & CommonDTO.PageMeta từ module common)
     ├── Wallet.java                ← JPA Entity (bảng cinema.wallets theo chuẩn UML)
     ├── WalletTransaction.java     ← JPA Entity (bảng cinema.wallet_transactions theo chuẩn UML)
     ├── TransactionType.java       ← Enum: TOP_UP | PAYMENT | REFUND

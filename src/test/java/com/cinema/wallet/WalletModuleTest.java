@@ -1,14 +1,18 @@
 package com.cinema.wallet;
 
+import com.cinema.common.dto.CommonDTO.ApiResponse;
+import com.cinema.common.dto.CommonDTO.ErrorResponse;
+import com.cinema.common.dto.CommonDTO.PageMeta;
 import com.cinema.user.User;
-import com.cinema.wallet.dto.envelope.ErrorEnvelope;
-import com.cinema.wallet.dto.envelope.SuccessEnvelope;
 import com.cinema.wallet.dto.response.WalletResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -51,7 +55,7 @@ public class WalletModuleTest {
     }
 
     @Test
-    void testWalletDTOEnvelopeSerialization() throws Exception {
+    void testWalletDTOApiResponseSerialization() throws Exception {
         WalletResponse walletResp = new WalletResponse(
                 "1",
                 new BigDecimal("150000.00"),
@@ -59,28 +63,44 @@ public class WalletModuleTest {
                 Instant.now().toString()
         );
 
-        SuccessEnvelope<WalletResponse> envelope =
-                SuccessEnvelope.of(walletResp, "req-test-trace-id");
+        ApiResponse<WalletResponse> response = ApiResponse.ok(walletResp);
 
-        String jsonStr = json.writeValueAsString(envelope);
+        String jsonStr = json.writeValueAsString(response);
         assertTrue(jsonStr.contains("\"success\":true"));
         assertTrue(jsonStr.contains("\"currency\":\"VND\""));
-        assertTrue(jsonStr.contains("\"traceId\":\"req-test-trace-id\""));
+        assertTrue(jsonStr.contains("\"balance\":150000.00"));
     }
 
     @Test
-    void testWalletDTOErrorEnvelope() throws Exception {
-        WalletException ex = WalletException.idempotencyKeyRequired();
-        ErrorEnvelope errEnv = ErrorEnvelope.of(
-                ex.getCode(),
-                ex.getMessage(),
-                ex.getFieldErrors(),
-                "req-err-trace"
+    void testWalletPaginationSerialization() throws Exception {
+        WalletResponse walletResp = new WalletResponse(
+                "1",
+                new BigDecimal("150000.00"),
+                "VND",
+                Instant.now().toString()
         );
 
-        String jsonStr = json.writeValueAsString(errEnv);
+        PageMeta meta = new PageMeta(0, 20, 1L, 1);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("success", true);
+        result.put("data", List.of(walletResp));
+        result.put("meta", meta);
+
+        String jsonStr = json.writeValueAsString(result);
+        assertTrue(jsonStr.contains("\"success\":true"));
+        assertTrue(jsonStr.contains("\"page\":0"));
+        assertTrue(jsonStr.contains("\"totalElements\":1"));
+    }
+
+    @Test
+    void testWalletErrorResponseSerialization() throws Exception {
+        WalletException ex = WalletException.idempotencyKeyRequired();
+        ErrorResponse errResp = new ErrorResponse(ex.getStatus(), ex.getMessage());
+
+        String jsonStr = json.writeValueAsString(errResp);
         assertTrue(jsonStr.contains("\"success\":false"));
-        assertTrue(jsonStr.contains("\"code\":\"IDEMPOTENCY_KEY_REQUIRED\""));
-        assertTrue(jsonStr.contains("idempotencyKey"));
+        assertTrue(jsonStr.contains("\"status\":400"));
+        assertTrue(jsonStr.contains("Idempotency-Key"));
     }
 }
+
