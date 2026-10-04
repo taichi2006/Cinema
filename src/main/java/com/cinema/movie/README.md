@@ -13,9 +13,13 @@ com.cinema.movie/
 ├── MovieDAO.java               # Truy vấn CSDL JPA/Hibernate & Native SQL
 ├── Movie.java                  # Entity ánh xạ bảng cinema.movies
 ├── Genre.java                  # Entity ánh xạ bảng cinema.genres (Many-to-Many)
-├── MovieRequest.java           # DTO đóng gói tham số query & pagination
-├── MovieResponse.java          # DTO dữ liệu phim trả về client
-├── ShowtimeResponse.java       # DTO dữ liệu suất chiếu trả về client
+├── DTO/
+│   ├── Request/
+│   │   └── MovieRequest.java       # DTO đóng gói tham số query & pagination
+│   └── Response/
+│       ├── MovieResponse.java      # DTO dữ liệu phim trả về client
+│       ├── ShowtimeResponse.java   # DTO dữ liệu suất chiếu trả về client
+│       └── ReviewResponse.java     # DTO dữ liệu đánh giá phim trả về client
 └── README.md                   # Tài liệu kỹ thuật module
 ```
 
@@ -199,7 +203,7 @@ GET /api/movie
  └── /{id}
       ├── (không có hậu tố)     ──> handleGetMovieDetail(id)   [Chi tiết 1 bộ phim]
       ├── /showtime             ──> handleGetMovieShowtimes(id)[Danh sách suất chiếu theo ngày & rạp]
-      └── /review               ──> handleGetMovieReviews(id)  [Đánh giá (Khung sẵn sàng)]
+      └── /review               ──> handleGetMovieReviews(id)  [Đọc đánh giá công khai của phim]
 ```
 
 ---
@@ -313,3 +317,142 @@ WHERE s.movie_id = :movieId
 ORDER BY s.starts_at ASC
 LIMIT :size OFFSET :offset
 ```
+
+---
+
+## 7. Đặc Tả API: Đánh Giá Công Khai Của Phim
+
+- **Endpoint:** `GET /api/movie/{id}/review`
+- **Servlet Mapping:** `@WebServlet(urlPatterns = {"/movie", "/movie/*"})` (chuyển tiếp qua `ApiPrefixFilter`)
+- **Quyền truy cập:** Public
+- **Content-Type:** `application/json;charset=UTF-8`
+
+### 7.1. Tham Số Yêu Cầu
+
+| Tham số | Vị trí | Kiểu | Bắt buộc | Mặc định | Ràng buộc kỹ thuật |
+| :--- | :--- | :--- | :---: | :---: | :--- |
+| `id` | Path | `String` / `Long` | **Có** | - | Mã phim. Phải là số nguyên dương $\ge 1$. Nếu không tìm thấy phim ném 404. |
+| `sort` | Query | `String` | Không | `createdAt,desc` | Thứ tự sắp xếp. Các giá trị hợp lệ: `createdAt,desc`, `createdAt,asc`, `rating,desc`, `rating,asc`. Giá trị khác ném lỗi 400. |
+| `page` | Query | `int` | Không | `0` | Chỉ số trang, $\ge 0$. Sai kiểu hoặc âm ném lỗi 400. |
+| `size` | Query | `int` | Không | `20` | Kích thước trang, $[1, 50]$. Ngoài khoảng ném lỗi 400. |
+
+### 7.2. Phản Hồi Thành Công (HTTP 200 OK)
+
+Cấu trúc flat JSON chuẩn hóa với `meta` ([`CommonDTO.PageMeta`](file:///c:/Users/khong/Desktop/TaiLieuHocTap/HK5_Nam3/WebProgramming/Cinema/src/main/java/com/cinema/common/dto/CommonDTO.java#L39)):
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "10",
+      "movieId": "1",
+      "authorDisplayName": "Nguyễn Văn A",
+      "rating": 5,
+      "comment": "Phim rất hay, cảm động!",
+      "version": 1,
+      "createdAt": "2026-10-04T08:08:17.626Z",
+      "updatedAt": "2026-10-04T08:08:17.626Z"
+    }
+  ],
+  "meta": {
+    "page": 0,
+    "size": 20,
+    "totalElements": 1,
+    "totalPages": 1
+  }
+}
+```
+
+- `data`: Mảng danh sách đánh giá (`ReviewResponse`).
+  - `id`: Mã định danh review (`ur.review_id`).
+  - `movieId`: Mã phim (`s.movie_id`).
+  - `authorDisplayName`: Tên hiển thị của tác giả đánh giá, trích xuất từ `u.full_name` qua liên kết với bảng `cinema.users`.
+  - `rating`: Số sao đánh giá từ 1 đến 5 (`ur.rating`).
+  - `comment`: Nội dung nhận xét của khán giả (`ur.comment`).
+  - `version`: Phiên bản đánh giá (`ur.version`).
+  - `createdAt`, `updatedAt`: Chuỗi thời gian định dạng ISO-8601.
+- `meta`: Thông tin phân trang dùng chung `CommonDTO.PageMeta` (`page`, `size`, `totalElements`, `totalPages`).
+
+### 7.3. Phản Hồi Lỗi
+
+Xử lý tập trung qua `com.cinema.common.exception.ErrorHandler`:
+
+- **Phim không tồn tại (HTTP 404 Not Found):**
+  ```json
+  {
+    "success": false,
+    "status": 404,
+    "error": "Không tìm thấy phim"
+  }
+  ```
+- **Tham số `sort` không hợp lệ (HTTP 400 Bad Request):**
+  ```json
+  {
+    "success": false,
+    "status": 400,
+    "error": "Tham số 'sort' không hợp lệ: invalid. Các giá trị hợp lệ: [createdAt,asc, createdAt,desc, rating,asc, rating,desc]"
+  }
+  ```
+- **Phân trang hoặc `id` không hợp lệ (HTTP 400 Bad Request):**
+  ```json
+  {
+    "success": false,
+    "status": 400,
+    "error": "Kích thước trang 'size' phải nằm trong khoảng từ 1 đến 50."
+  }
+  ```
+
+### 7.4. Kỹ Thuật Truy Vấn CSDL: `findReviews` & `countReviews` (`MovieDAO.java`)
+
+Trong CSDL PostgreSQL, bảng `cinema.user_reviews` gắn với đơn đặt vé `cinema.bookings`, qua đó suy ra `cinema.showtimes` (chứa `movie_id`) và `cinema.users` (chứa tên tác giả `full_name`).
+
+`MovieDAO` sử dụng Native SQL kết hợp 4 bảng để truy vấn trực tiếp mà không cần khởi tạo Entity JPA mới ngoài module `movie`:
+
+```sql
+SELECT 
+    ur.review_id,
+    s.movie_id,
+    u.full_name,
+    ur.rating,
+    ur.comment,
+    ur.version,
+    ur.created_at,
+    ur.updated_at
+FROM cinema.user_reviews ur
+JOIN cinema.bookings b ON ur.booking_id = b.booking_id
+JOIN cinema.showtimes s ON b.showtime_id = s.showtime_id
+JOIN cinema.users u ON b.user_id = u.user_id
+WHERE s.movie_id = :movieId
+ORDER BY ...
+LIMIT :size OFFSET :offset
+```
+
+- **Sắp xếp linh hoạt:**
+  - `createdAt,desc` $\rightarrow$ `ORDER BY ur.created_at DESC`
+  - `createdAt,asc` $\rightarrow$ `ORDER BY ur.created_at ASC`
+  - `rating,desc` $\rightarrow$ `ORDER BY ur.rating DESC, ur.created_at DESC`
+  - `rating,asc` $\rightarrow$ `ORDER BY ur.rating ASC, ur.created_at DESC`
+
+- **Truy vấn đếm tổng (`countReviews`):**
+```sql
+SELECT COUNT(*)
+FROM cinema.user_reviews ur
+JOIN cinema.bookings b ON ur.booking_id = b.booking_id
+JOIN cinema.showtimes s ON b.showtime_id = s.showtime_id
+WHERE s.movie_id = :movieId
+```
+
+---
+
+## 8. Kiểm Thử Đơn Vị (Unit Testing)
+
+Tất cả các kịch bản nghiệp vụ của module `movie` được kiểm thử tự động trong `MovieServiceTest.java` thông qua kỹ thuật mock DAO (`StubMovieDAO`):
+
+- **Tổng số tests:** 24 test cases.
+- **Tỷ lệ vượt qua:** 100% PASS (`BUILD SUCCESS`).
+- **Phạm vi kiểm thử:**
+  1. `getMovies`: Tìm kiếm `q`, lọc theo `genre`, `status`, sắp xếp `sort`, phân trang `page`/`size`, xử lý tràn số `offset`, gán mặc định `releaseDate,desc`, map danh sách thể loại không trùng lặp.
+  2. `getMovieById`: Thành công, chi tiết phim đủ trường, phim không tồn tại (404), ID âm / chứa ký tự / để trống (400).
+  3. `getMovieShowtimes`: Lọc theo `date`, lọc theo `cinemaId`, phân trang `page`/`size`, validate định dạng `date`, validate `cinemaId`, phim không tồn tại (404).
+  4. `getMovieReviews`: Lấy danh sách đánh giá thành công, kiểm tra các trường `ReviewResponse`, kiểm tra `PageMeta`, validate các kiểu `sort`, validate `page`/`size`, phim không tồn tại (404), danh sách đánh giá rỗng (`totalElements = 0`).

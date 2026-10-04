@@ -3,6 +3,8 @@ package com.cinema.movie;
 import com.cinema.common.dto.CommonDTO.ApiResponse;
 import com.cinema.common.exception.ApiException;
 import com.cinema.common.exception.ErrorHandler;
+import com.cinema.movie.DTO.Request.MovieRequest;
+import com.cinema.movie.DTO.Response.MovieResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
@@ -126,7 +128,29 @@ public class MovieController extends HttpServlet {
     }
 
     private void handleGetMovieReviews(HttpServletRequest request, HttpServletResponse response, String id) throws Exception {
-        ApiResponse<?> result = movieService.getMovieReviews(id);
+        String sort = request.getParameter("sort");
+        String pageStr = request.getParameter("page");
+        String sizeStr = request.getParameter("size");
+
+        int page = 0;
+        if (pageStr != null && !pageStr.trim().isEmpty()) {
+            try {
+                page = Integer.parseInt(pageStr.trim());
+            } catch (NumberFormatException exception) {
+                throw ApiException.badRequest("Tham số 'page' phải là một số nguyên hợp lệ.");
+            }
+        }
+
+        int size = 20;
+        if (sizeStr != null && !sizeStr.trim().isEmpty()) {
+            try {
+                size = Integer.parseInt(sizeStr.trim());
+            } catch (NumberFormatException exception) {
+                throw ApiException.badRequest("Tham số 'size' phải là một số nguyên hợp lệ.");
+            }
+        }
+
+        Map<String, Object> result = movieService.getMovieReviews(id, sort, page, size);
         response.setStatus(HttpServletResponse.SC_OK);
         objectMapper.writeValue(response.getWriter(), result);
     }

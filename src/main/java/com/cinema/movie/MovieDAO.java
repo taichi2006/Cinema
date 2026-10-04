@@ -1,6 +1,9 @@
 package com.cinema.movie;
 
 import com.cinema.common.util.JPAUtil;
+import com.cinema.movie.DTO.Request.MovieRequest;
+import com.cinema.movie.DTO.Response.ReviewResponse;
+import com.cinema.movie.DTO.Response.ShowtimeResponse;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.TypedQuery;
@@ -125,6 +128,85 @@ public class MovieDAO {
             if (cinemaId != null) {
                 query.setParameter("cinemaId", cinemaId);
             }
+
+            Object result = query.getSingleResult();
+            return result != null ? ((Number) result).longValue() : 0L;
+        } finally {
+            entityManager.close();
+        }
+    }
+
+    public List<ReviewResponse> findReviews(Long movieId, String sort, int page, int size) {
+        EntityManager entityManager = JPAUtil.getEntityManager();
+        try {
+            StringBuilder sql = new StringBuilder(
+                    "SELECT " +
+                    "ur.review_id, " +
+                    "s.movie_id, " +
+                    "u.full_name, " +
+                    "ur.rating, " +
+                    "ur.comment, " +
+                    "ur.version, " +
+                    "ur.created_at, " +
+                    "ur.updated_at " +
+                    "FROM cinema.user_reviews ur " +
+                    "JOIN cinema.bookings b ON ur.booking_id = b.booking_id " +
+                    "JOIN cinema.showtimes s ON b.showtime_id = s.showtime_id " +
+                    "JOIN cinema.users u ON b.user_id = u.user_id " +
+                    "WHERE s.movie_id = :movieId "
+            );
+
+            if ("createdAt,asc".equals(sort)) {
+                sql.append("ORDER BY ur.created_at ASC");
+            } else if ("rating,desc".equals(sort)) {
+                sql.append("ORDER BY ur.rating DESC, ur.created_at DESC");
+            } else if ("rating,asc".equals(sort)) {
+                sql.append("ORDER BY ur.rating ASC, ur.created_at DESC");
+            } else {
+                sql.append("ORDER BY ur.created_at DESC");
+            }
+
+            var query = entityManager.createNativeQuery(sql.toString());
+            query.setParameter("movieId", movieId);
+
+            int offset = Math.max(0, page) * Math.max(1, size);
+            query.setFirstResult(offset);
+            query.setMaxResults(size);
+
+            List<?> rawResults = query.getResultList();
+            List<ReviewResponse> responses = new ArrayList<>();
+            for (Object rowObj : rawResults) {
+                Object[] row = (Object[]) rowObj;
+                String reviewId = row[0] != null ? row[0].toString() : null;
+                String mId = row[1] != null ? row[1].toString() : null;
+                String authorName = row[2] != null ? row[2].toString() : null;
+                Integer rating = row[3] != null ? ((Number) row[3]).intValue() : null;
+                String comment = row[4] != null ? row[4].toString() : null;
+                Integer version = row[5] != null ? ((Number) row[5]).intValue() : null;
+                String createdAt = formatTimestamp(row[6]);
+                String updatedAt = formatTimestamp(row[7]);
+
+                responses.add(new ReviewResponse(
+                        reviewId, mId, authorName, rating, comment, version, createdAt, updatedAt
+                ));
+            }
+            return responses;
+        } finally {
+            entityManager.close();
+        }
+    }
+
+    public long countReviews(Long movieId) {
+        EntityManager entityManager = JPAUtil.getEntityManager();
+        try {
+            String sql = "SELECT COUNT(*) " +
+                    "FROM cinema.user_reviews ur " +
+                    "JOIN cinema.bookings b ON ur.booking_id = b.booking_id " +
+                    "JOIN cinema.showtimes s ON b.showtime_id = s.showtime_id " +
+                    "WHERE s.movie_id = :movieId";
+
+            var query = entityManager.createNativeQuery(sql);
+            query.setParameter("movieId", movieId);
 
             Object result = query.getSingleResult();
             return result != null ? ((Number) result).longValue() : 0L;

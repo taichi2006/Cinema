@@ -3,6 +3,10 @@ package com.cinema.movie;
 import com.cinema.common.dto.CommonDTO.ApiResponse;
 import com.cinema.common.dto.CommonDTO.PageMeta;
 import com.cinema.common.exception.ApiException;
+import com.cinema.movie.DTO.Request.MovieRequest;
+import com.cinema.movie.DTO.Response.MovieResponse;
+import com.cinema.movie.DTO.Response.ReviewResponse;
+import com.cinema.movie.DTO.Response.ShowtimeResponse;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
@@ -19,6 +23,10 @@ public class MovieService {
     private static final Set<String> ALLOWED_SORTS = Set.of(
             "releaseDate,asc", "releaseDate,desc",
             "title,asc", "title,desc"
+    );
+    private static final Set<String> ALLOWED_REVIEW_SORTS = Set.of(
+            "createdAt,asc", "createdAt,desc",
+            "rating,asc", "rating,desc"
     );
 
     private final MovieDAO movieDAO;
@@ -119,11 +127,43 @@ public class MovieService {
         return result;
     }
 
-    public ApiResponse<List<?>> getMovieReviews(String idStr) {
+    public Map<String, Object> getMovieReviews(String idStr, String sort, int page, int size) {
         Long movieId = parseAndValidateMovieId(idStr);
         movieDAO.findById(movieId)
                 .orElseThrow(() -> ApiException.notFound("Không tìm thấy phim"));
-        return ApiResponse.ok(List.of());
+
+        if (sort != null && !sort.trim().isEmpty()) {
+            if (!ALLOWED_REVIEW_SORTS.contains(sort.trim())) {
+                throw ApiException.badRequest(
+                        "Tham số 'sort' không hợp lệ: " + sort +
+                                ". Các giá trị hợp lệ: [createdAt,asc, createdAt,desc, rating,asc, rating,desc]"
+                );
+            }
+        } else {
+            sort = "createdAt,desc";
+        }
+
+        if (page < 0) {
+            throw ApiException.badRequest("Số trang 'page' phải lớn hơn hoặc bằng 0.");
+        }
+        if (size < 1 || size > 50) {
+            throw ApiException.badRequest("Kích thước trang 'size' phải nằm trong khoảng từ 1 đến 50.");
+        }
+
+        List<ReviewResponse> reviews = movieDAO.findReviews(movieId, sort.trim(), page, size);
+        long totalElements = movieDAO.countReviews(movieId);
+        int totalPages = size > 0 ? (int) Math.ceil((double) totalElements / size) : 0;
+
+        PageMeta meta = new PageMeta(page, size, totalElements, totalPages);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("success", true);
+        result.put("data", reviews);
+        result.put("meta", meta);
+        return result;
+    }
+
+    public Map<String, Object> getMovieReviews(String idStr) {
+        return getMovieReviews(idStr, "createdAt,desc", 0, 20);
     }
 
     private Long parseAndValidateMovieId(String idStr) {

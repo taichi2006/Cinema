@@ -3,6 +3,10 @@ package com.cinema.movie;
 import com.cinema.common.dto.CommonDTO.ApiResponse;
 import com.cinema.common.dto.CommonDTO.PageMeta;
 import com.cinema.common.exception.ApiException;
+import com.cinema.movie.DTO.Request.MovieRequest;
+import com.cinema.movie.DTO.Response.MovieResponse;
+import com.cinema.movie.DTO.Response.ReviewResponse;
+import com.cinema.movie.DTO.Response.ShowtimeResponse;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -74,6 +78,24 @@ public class MovieServiceTest {
         @Override
         public long countShowtimes(Long movieId, LocalDate date, Long cinemaId) {
             return stubShowtimeCount;
+        }
+
+        private List<ReviewResponse> stubReviews = Collections.emptyList();
+        private long stubReviewCount = 0L;
+
+        public void setStubReviewData(List<ReviewResponse> reviews, long count) {
+            this.stubReviews = reviews;
+            this.stubReviewCount = count;
+        }
+
+        @Override
+        public List<ReviewResponse> findReviews(Long movieId, String sort, int page, int size) {
+            return stubReviews;
+        }
+
+        @Override
+        public long countReviews(Long movieId) {
+            return stubReviewCount;
         }
     }
 
@@ -477,5 +499,160 @@ public class MovieServiceTest {
                 () -> movieService.getMovieShowtimes("1", "2026-10-05", "-1", 0, 20)
         );
         assertEquals(400, exNeg.getStatus());
+    }
+
+    @Test
+    @DisplayName("Lấy đánh giá thành công: trả về danh sách ReviewResponse và meta chuẩn")
+    void testGetMovieReviews_Success() throws Exception {
+        Movie movie = new Movie();
+        movie.setMovieId(1L);
+        stubDAO.setStubData(List.of(movie), 1L);
+
+        ReviewResponse review = new ReviewResponse(
+                "10",
+                "1",
+                "Nguyễn Văn A",
+                5,
+                "Phim xuất sắc vượt kỳ vọng!",
+                1,
+                "2026-10-04T08:08:17.626Z",
+                "2026-10-04T08:08:17.626Z"
+        );
+        stubDAO.setStubReviewData(List.of(review), 1L);
+
+        Map<String, Object> result = movieService.getMovieReviews("1", "createdAt,desc", 0, 20);
+
+        assertTrue((Boolean) result.get("success"));
+        assertNotNull(result.get("data"));
+        assertNotNull(result.get("meta"));
+
+        @SuppressWarnings("unchecked")
+        List<ReviewResponse> data = (List<ReviewResponse>) result.get("data");
+        assertEquals(1, data.size());
+        ReviewResponse item = data.get(0);
+        assertEquals("10", item.getId());
+        assertEquals("1", item.getMovieId());
+        assertEquals("Nguyễn Văn A", item.getAuthorDisplayName());
+        assertEquals(5, item.getRating());
+        assertEquals("Phim xuất sắc vượt kỳ vọng!", item.getComment());
+        assertEquals(1, item.getVersion());
+        assertEquals("2026-10-04T08:08:17.626Z", item.getCreatedAt());
+        assertEquals("2026-10-04T08:08:17.626Z", item.getUpdatedAt());
+
+        PageMeta meta = (PageMeta) result.get("meta");
+        assertEquals(0, meta.getPage());
+        assertEquals(20, meta.getSize());
+        assertEquals(1, meta.getTotalElements());
+        assertEquals(1, meta.getTotalPages());
+
+        String json = objectMapper.writeValueAsString(result);
+        JsonNode jsonNode = objectMapper.readTree(json);
+        assertTrue(jsonNode.get("success").asBoolean());
+        assertEquals("10", jsonNode.get("data").get(0).get("id").asText());
+        assertEquals("Nguyễn Văn A", jsonNode.get("data").get(0).get("authorDisplayName").asText());
+        assertEquals(5, jsonNode.get("data").get(0).get("rating").asInt());
+        assertEquals(1, jsonNode.get("meta").get("totalElements").asInt());
+    }
+
+    @Test
+    @DisplayName("Lấy đánh giá với sort không hợp lệ: ném ApiException 400")
+    void testGetMovieReviews_InvalidSort() {
+        Movie movie = new Movie();
+        movie.setMovieId(1L);
+        stubDAO.setStubData(List.of(movie), 1L);
+
+        ApiException ex = assertThrows(
+                ApiException.class,
+                () -> movieService.getMovieReviews("1", "invalid_sort", 0, 20)
+        );
+        assertEquals(400, ex.getStatus());
+        assertTrue(ex.getMessage().contains("sort"));
+    }
+
+    @Test
+    @DisplayName("Lấy đánh giá với page hoặc size không hợp lệ: ném ApiException 400")
+    void testGetMovieReviews_InvalidPageAndSize() {
+        Movie movie = new Movie();
+        movie.setMovieId(1L);
+        stubDAO.setStubData(List.of(movie), 1L);
+
+        ApiException exPage = assertThrows(
+                ApiException.class,
+                () -> movieService.getMovieReviews("1", "createdAt,desc", -1, 20)
+        );
+        assertEquals(400, exPage.getStatus());
+
+        ApiException exSizeZero = assertThrows(
+                ApiException.class,
+                () -> movieService.getMovieReviews("1", "createdAt,desc", 0, 0)
+        );
+        assertEquals(400, exSizeZero.getStatus());
+
+        ApiException exSizeLarge = assertThrows(
+                ApiException.class,
+                () -> movieService.getMovieReviews("1", "createdAt,desc", 0, 51)
+        );
+        assertEquals(400, exSizeLarge.getStatus());
+    }
+
+    @Test
+    @DisplayName("Lấy đánh giá khi phim không tồn tại: ném ApiException 404")
+    void testGetMovieReviews_MovieNotFound() {
+        stubDAO.setStubData(Collections.emptyList(), 0L);
+
+        ApiException ex = assertThrows(
+                ApiException.class,
+                () -> movieService.getMovieReviews("9999", "createdAt,desc", 0, 20)
+        );
+        assertEquals(404, ex.getStatus());
+        assertEquals("Không tìm thấy phim", ex.getMessage());
+    }
+
+    @Test
+    @DisplayName("Lấy đánh giá khi movieId không hợp lệ: ném ApiException 400")
+    void testGetMovieReviews_InvalidMovieId() {
+        ApiException exNull = assertThrows(
+                ApiException.class,
+                () -> movieService.getMovieReviews(null, "createdAt,desc", 0, 20)
+        );
+        assertEquals(400, exNull.getStatus());
+
+        ApiException exEmpty = assertThrows(
+                ApiException.class,
+                () -> movieService.getMovieReviews("   ", "createdAt,desc", 0, 20)
+        );
+        assertEquals(400, exEmpty.getStatus());
+
+        ApiException exNegative = assertThrows(
+                ApiException.class,
+                () -> movieService.getMovieReviews("-5", "createdAt,desc", 0, 20)
+        );
+        assertEquals(400, exNegative.getStatus());
+
+        ApiException exAlpha = assertThrows(
+                ApiException.class,
+                () -> movieService.getMovieReviews("abc", "createdAt,desc", 0, 20)
+        );
+        assertEquals(400, exAlpha.getStatus());
+    }
+
+    @Test
+    @DisplayName("Lấy đánh giá khi phim chưa có đánh giá nào: trả về data rỗng, totalElements 0")
+    void testGetMovieReviews_EmptyResults() {
+        Movie movie = new Movie();
+        movie.setMovieId(1L);
+        stubDAO.setStubData(List.of(movie), 1L);
+        stubDAO.setStubReviewData(Collections.emptyList(), 0L);
+
+        Map<String, Object> result = movieService.getMovieReviews("1", "rating,desc", 0, 20);
+
+        assertTrue((Boolean) result.get("success"));
+        @SuppressWarnings("unchecked")
+        List<ReviewResponse> data = (List<ReviewResponse>) result.get("data");
+        assertTrue(data.isEmpty());
+
+        PageMeta meta = (PageMeta) result.get("meta");
+        assertEquals(0, meta.getTotalElements());
+        assertEquals(0, meta.getTotalPages());
     }
 }
