@@ -3,12 +3,11 @@ package com.cinema.wallet;
 import com.cinema.user.User;
 import jakarta.persistence.*;
 
-import java.math.BigDecimal;
 import java.time.Instant;
 
 /**
- * Thực thể Ví người dùng (Mapping bảng cinema.wallets theo chuẩn UML).
- * Quản lý số dư và trạng thái ví của từng tài khoản người dùng.
+ * Thực thể Ví người dùng (Mapping bảng cinema.wallets).
+ * Quản lý số dư (Long - VND) và trạng thái ví của từng tài khoản người dùng.
  */
 @Entity
 @Table(name = "wallets", schema = "cinema")
@@ -23,8 +22,11 @@ public class Wallet {
     @JoinColumn(name = "user_id", unique = true, nullable = false)
     private User user;
 
-    @Column(nullable = false, precision = 15, scale = 2)
-    private BigDecimal balance = BigDecimal.ZERO;
+    @Column(nullable = false)
+    private Long balance = 0L;
+
+    @Column(length = 3, nullable = false)
+    private String currency = "VND";
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -40,7 +42,8 @@ public class Wallet {
 
     public Wallet(User user) {
         this.user = user;
-        this.balance = BigDecimal.ZERO;
+        this.balance = 0L;
+        this.currency = "VND";
         this.status = WalletStatus.ACTIVE;
     }
 
@@ -60,12 +63,20 @@ public class Wallet {
         this.user = user;
     }
 
-    public BigDecimal getBalance() {
+    public Long getBalance() {
         return balance;
     }
 
-    public void setBalance(BigDecimal balance) {
+    public void setBalance(Long balance) {
         this.balance = balance;
+    }
+
+    public String getCurrency() {
+        return currency;
+    }
+
+    public void setCurrency(String currency) {
+        this.currency = currency;
     }
 
     public WalletStatus getStatus() {
@@ -92,3 +103,4 @@ public class Wallet {
         this.updatedAt = updatedAt;
     }
 }
+

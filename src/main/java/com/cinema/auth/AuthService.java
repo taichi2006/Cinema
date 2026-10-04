@@ -4,7 +4,7 @@ import com.cinema.common.exception.ApiException;
 import com.cinema.common.util.JPAUtil;
 import com.cinema.user.Role;
 import com.cinema.user.User;
-import com.cinema.wallet.Wallet; // Module Wallet: Tự tạo ví cho user mới
+import com.cinema.wallet.Wallet; 
 
 import jakarta.persistence.EntityManager;
 import org.mindrot.jbcrypt.BCrypt;
@@ -44,7 +44,7 @@ public class AuthService {
             em.getTransaction().begin();
             em.persist(u);
 
-            // [Wallet Module] Tự động khởi tạo ví rỗng (balance = 0.00, status = ACTIVE) cho user mới
+            // Tự động khởi tạo ví rỗng (balance = 0.00, status = ACTIVE) cho user mới
             Wallet wallet = new Wallet(u);
             em.persist(wallet);
 

@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Data Access Object cho thực thể WalletTransaction.
+ * Data Access Object cho thực thể WalletTransaction (bảng cinema.wallet_transactions).
  */
 public class WalletTransactionDAO {
 
@@ -53,17 +53,16 @@ public class WalletTransactionDAO {
     }
 
     /**
-     * Lấy lịch sử giao dịch đã thành công (SUCCEEDED hoặc SUCCESSFUL) của một ví, có hỗ trợ lọc và phân trang.
+     * Lấy lịch sử bút toán của một ví, có hỗ trợ lọc theo loại và khoảng thời gian, phân trang mới nhất trước.
      */
-    public List<WalletTransaction> findHistory(long walletId, TransactionType type, Instant from, Instant to, int page, int size) {
+    public List<WalletTransaction> findHistory(long walletId, String type, Instant from, Instant to, int page, int size) {
         EntityManager em = JPAUtil.getEntityManager();
         try {
             StringBuilder jpql = new StringBuilder(
-                    "SELECT tx FROM WalletTransaction tx WHERE tx.wallet.id = :walletId " +
-                    "AND tx.status IN (com.cinema.wallet.TransactionStatus.SUCCEEDED, com.cinema.wallet.TransactionStatus.SUCCESSFUL) "
+                    "SELECT tx FROM WalletTransaction tx WHERE tx.wallet.id = :walletId "
             );
 
-            if (type != null) {
+            if (type != null && !type.isBlank()) {
                 jpql.append("AND tx.transactionType = :type ");
             }
             if (from != null) {
@@ -78,8 +77,8 @@ public class WalletTransactionDAO {
             TypedQuery<WalletTransaction> query = em.createQuery(jpql.toString(), WalletTransaction.class)
                     .setParameter("walletId", walletId);
 
-            if (type != null) {
-                query.setParameter("type", type);
+            if (type != null && !type.isBlank()) {
+                query.setParameter("type", type.toUpperCase());
             }
             if (from != null) {
                 query.setParameter("from", from);
@@ -98,17 +97,16 @@ public class WalletTransactionDAO {
     }
 
     /**
-     * Đếm tổng số giao dịch thành công theo điều kiện lọc để tính PageMeta.
+     * Đếm tổng số bút toán theo điều kiện lọc để tính PageMeta.
      */
-    public long countHistory(long walletId, TransactionType type, Instant from, Instant to) {
+    public long countHistory(long walletId, String type, Instant from, Instant to) {
         EntityManager em = JPAUtil.getEntityManager();
         try {
             StringBuilder jpql = new StringBuilder(
-                    "SELECT count(tx) FROM WalletTransaction tx WHERE tx.wallet.id = :walletId " +
-                    "AND tx.status IN (com.cinema.wallet.TransactionStatus.SUCCEEDED, com.cinema.wallet.TransactionStatus.SUCCESSFUL) "
+                    "SELECT count(tx) FROM WalletTransaction tx WHERE tx.wallet.id = :walletId "
             );
 
-            if (type != null) {
+            if (type != null && !type.isBlank()) {
                 jpql.append("AND tx.transactionType = :type ");
             }
             if (from != null) {
@@ -121,8 +119,8 @@ public class WalletTransactionDAO {
             TypedQuery<Long> query = em.createQuery(jpql.toString(), Long.class)
                     .setParameter("walletId", walletId);
 
-            if (type != null) {
-                query.setParameter("type", type);
+            if (type != null && !type.isBlank()) {
+                query.setParameter("type", type.toUpperCase());
             }
             if (from != null) {
                 query.setParameter("from", from);
@@ -132,46 +130,6 @@ public class WalletTransactionDAO {
             }
 
             return query.getSingleResult();
-        } finally {
-            em.close();
-        }
-    }
-
-    /**
-     * Lấy danh sách các yêu cầu nạp tiền đang ở trạng thái PENDING cho Admin duyệt.
-     */
-    public List<WalletTransaction> findPendingTopUps(int page, int size) {
-        EntityManager em = JPAUtil.getEntityManager();
-        try {
-            String jpql = "SELECT tx FROM WalletTransaction tx " +
-                    "JOIN FETCH tx.wallet w " +
-                    "JOIN FETCH w.user u " +
-                    "WHERE tx.transactionType = :type AND tx.status = :status " +
-                    "ORDER BY tx.createdAt ASC, tx.id ASC";
-
-            return em.createQuery(jpql, WalletTransaction.class)
-                    .setParameter("type", TransactionType.TOP_UP)
-                    .setParameter("status", TransactionStatus.PENDING)
-                    .setFirstResult(page * size)
-                    .setMaxResults(size)
-                    .getResultList();
-        } finally {
-            em.close();
-        }
-    }
-
-    /**
-     * Đếm tổng số yêu cầu nạp tiền PENDING.
-     */
-    public long countPendingTopUps() {
-        EntityManager em = JPAUtil.getEntityManager();
-        try {
-            return em.createQuery(
-                    "SELECT count(tx) FROM WalletTransaction tx " +
-                    "WHERE tx.transactionType = :type AND tx.status = :status", Long.class)
-                    .setParameter("type", TransactionType.TOP_UP)
-                    .setParameter("status", TransactionStatus.PENDING)
-                    .getSingleResult();
         } finally {
             em.close();
         }

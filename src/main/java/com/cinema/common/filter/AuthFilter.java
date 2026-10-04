@@ -13,7 +13,6 @@ import jakarta.servlet.http.HttpServletResponse;
 
 import java.io.IOException;
 
-// Bổ sung /wallet và /wallet/* để bảo vệ các API liên quan đến Ví người dùng
 @WebFilter(urlPatterns = {"/user/*", "/booking/*", "/admin/*", "/wallet", "/wallet/*"}, dispatcherTypes = {DispatcherType.REQUEST, DispatcherType.FORWARD})
 public class AuthFilter implements Filter {
 

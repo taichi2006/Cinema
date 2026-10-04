@@ -1,7 +1,5 @@
 package com.cinema.wallet.dto.response;
 
-import java.math.BigDecimal;
-
 /**
  * Response schema cho danh sách yêu cầu nạp tiền chờ duyệt của Admin (GET /wallet/top-up/pending).
  */
@@ -11,7 +9,7 @@ public class AdminPendingItemResponse {
     private Long walletId;
     private Long userId;
     private String userEmail;
-    private BigDecimal amount;
+    private Long amount;
     private String currency;
     private String method;
     private String status;
@@ -21,7 +19,7 @@ public class AdminPendingItemResponse {
 
     public AdminPendingItemResponse() {}
 
-    public AdminPendingItemResponse(String id, Long walletId, Long userId, String userEmail, BigDecimal amount,
+    public AdminPendingItemResponse(String id, Long walletId, Long userId, String userEmail, Long amount,
                                    String currency, String method, String status, String description,
                                    String createdAt, String expiresAt) {
         this.id = id;
@@ -69,11 +67,11 @@ public class AdminPendingItemResponse {
         this.userEmail = userEmail;
     }
 
-    public BigDecimal getAmount() {
+    public Long getAmount() {
         return amount;
     }
 
-    public void setAmount(BigDecimal amount) {
+    public void setAmount(Long amount) {
         this.amount = amount;
     }
 

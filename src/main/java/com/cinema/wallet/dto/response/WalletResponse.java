@@ -1,20 +1,18 @@
 package com.cinema.wallet.dto.response;
 
-import java.math.BigDecimal;
-
 /**
  * Response schema cho thông tin số dư ví (GET /wallet).
  */
 public class WalletResponse {
 
     private String id;
-    private BigDecimal balance;
+    private Long balance;
     private String currency;
     private String updatedAt;
 
     public WalletResponse() {}
 
-    public WalletResponse(String id, BigDecimal balance, String currency, String updatedAt) {
+    public WalletResponse(String id, Long balance, String currency, String updatedAt) {
         this.id = id;
         this.balance = balance;
         this.currency = currency;
@@ -29,11 +27,11 @@ public class WalletResponse {
         this.id = id;
     }
 
-    public BigDecimal getBalance() {
+    public Long getBalance() {
         return balance;
     }
 
-    public void setBalance(BigDecimal balance) {
+    public void setBalance(Long balance) {
         this.balance = balance;
     }
 
@@ -53,3 +51,4 @@ public class WalletResponse {
         this.updatedAt = updatedAt;
     }
 }
+

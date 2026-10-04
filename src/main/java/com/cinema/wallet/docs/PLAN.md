@@ -28,13 +28,15 @@ src/main/java/com/cinema/
     │       ├── AdminPendingItemResponse.java
     │       └── AdminConfirmResponse.java
     │   (Tái sử dụng CommonDTO.ApiResponse & CommonDTO.PageMeta từ module common)
-    ├── Wallet.java                ← JPA Entity (bảng cinema.wallets theo chuẩn UML)
-    ├── WalletTransaction.java     ← JPA Entity (bảng cinema.wallet_transactions theo chuẩn UML)
+    ├── Wallet.java                ← JPA Entity (bảng cinema.wallets)
+    ├── WalletTopup.java           ← JPA Entity (bảng cinema.wallet_topups)
+    ├── WalletTransaction.java     ← JPA Entity (bảng cinema.wallet_transactions)
     ├── TransactionType.java       ← Enum: TOP_UP | PAYMENT | REFUND
     ├── TransactionStatus.java     ← Enum: PENDING | SUCCEEDED | FAILED | ...
     ├── WalletStatus.java          ← Enum: ACTIVE | SUSPENDED
-    ├── WalletException.java       ← Exception nghiệp vụ ví chuẩn Swagger
+    ├── WalletException.java       ← Exception nghiệp vụ ví kế thừa ApiException
     ├── WalletDAO.java             ← Truy vấn CSDL cho Wallet
+    ├── WalletTopupDAO.java        ← Truy vấn CSDL cho WalletTopup
     ├── WalletTransactionDAO.java  ← Truy vấn CSDL cho WalletTransaction
     ├── WalletService.java         ← Logic nghiệp vụ & Data Mapping
     └── WalletController.java      ← Servlet @WebServlet(urlPatterns = {"/wallet", "/wallet/*"})
@@ -42,42 +44,64 @@ src/main/java/com/cinema/
 
 ---
 
-## 2. Thiết kế cơ sở dữ liệu (Tinh gọn, đúng chuẩn UML)
-
-CSDL chỉ lưu trữ dữ liệu cốt lõi, không nhồi nhét các trường hiển thị không cần thiết. Các trường hiển thị như `currency`, `direction`, `id` (dạng chuỗi), `checkoutUrl`... sẽ do tầng Service/DTO đảm nhiệm.
+## 2. Thiết kế cơ sở dữ liệu (Khớp 100% với PostgreSQL Neon)
 
 ### Bảng `cinema.wallets`
 
 | Cột | Kiểu | Ràng buộc | Ghi chú |
 |-----|------|-----------|---------|
-| `wallet_id` | `SERIAL` | PK | Khóa chính tự tăng |
-| `user_id` | `INT` | FK → `users.user_id`, UNIQUE, NOT NULL | Mỗi user có đúng 1 ví |
-| `balance` | `NUMERIC(15,2)` | NOT NULL, DEFAULT 0.00, CHECK ≥ 0 | Sử dụng BigDecimal tránh sai số tài chính |
-| `status` | `VARCHAR(20)` | NOT NULL, DEFAULT `'ACTIVE'` | Enum `WalletStatus`: `ACTIVE` \| `SUSPENDED` |
-| `created_at` | `TIMESTAMPTZ` | NOT NULL, DEFAULT `now()` | |
-| `updated_at` | `TIMESTAMPTZ` | NOT NULL, DEFAULT `now()` | Tự cập nhật khi số dư thay đổi |
+| `wallet_id` | `int8` | PK, Identity | Khóa chính |
+| `user_id` | `int8` | FK → `users.user_id`, UNIQUE, NOT NULL | Mỗi user có đúng 1 ví |
+| `balance` | `int8` | NOT NULL, DEFAULT 0 | Số dư nguyên VND (Long) |
+| `currency` | `bpchar(3)` | NOT NULL, DEFAULT `'VND'` | Đơn vị tiền tệ |
+| `status` | `varchar(20)` | NOT NULL, DEFAULT `'ACTIVE'` | `ACTIVE` \| `SUSPENDED` |
+| `created_at` | `timestamptz` | NOT NULL, DEFAULT `now()` | |
+| `updated_at` | `timestamptz` | NOT NULL, DEFAULT `now()` | |
 
 ---
 
-### Bảng `cinema.wallet_transactions`
+### Bảng `cinema.wallet_topups`
 
 | Cột | Kiểu | Ràng buộc | Ghi chú |
 |-----|------|-----------|---------|
-| `transaction_id` | `SERIAL` | PK | Khóa chính tự tăng |
-| `wallet_id` | `INT` | FK → `wallets.wallet_id`, NOT NULL | Ví liên quan |
-| `amount` | `NUMERIC(15,2)` | NOT NULL, CHECK > 0 | Số tiền giao dịch (luôn dương) |
-| `balance_after` | `NUMERIC(15,2)` | NULLABLE | Số dư ví ngay sau khi hoàn tất bút toán |
-| `transaction_type` | `VARCHAR(20)` | NOT NULL | Enum: `TOP_UP`, `PAYMENT`, `REFUND` |
-| `status` | `VARCHAR(20)` | NOT NULL, DEFAULT `'PENDING'` | Enum: `PENDING`, `SUCCESSFUL`, `FAILED` |
-| `reference_id` | `VARCHAR(100)` | NULLABLE | Mã booking hoặc mã giao dịch ngân hàng ngoài |
-| `created_at` | `TIMESTAMPTZ` | NOT NULL, DEFAULT `now()` | Thời điểm tạo giao dịch |
+| `topup_id` | `int8` | PK, Identity | Khóa chính |
+| `wallet_id` | `int8` | FK → `wallets.wallet_id`, NOT NULL | Ví liên quan |
+| `amount` | `int8` | NOT NULL, CHECK > 0 | Số tiền nạp VND |
+| `currency` | `bpchar(3)` | NOT NULL, DEFAULT `'VND'` | |
+| `status` | `varchar(25)` | NOT NULL, DEFAULT `'PENDING'` | `PENDING`, `SUCCESSFUL`, `FAILED`, `EXPIRED` |
+| `checkout_url` | `text` | NULLABLE | URL thanh toán |
+| `failure_code` | `varchar(80)` | NULLABLE | Mã lỗi nếu thất bại |
+| `created_at` | `timestamptz` | NOT NULL, DEFAULT `now()` | |
+| `expires_at` | `timestamptz` | NULLABLE | Thời điểm hết hạn (sau 15 phút) |
+| `completed_at` | `timestamptz` | NULLABLE | Thời điểm hoàn tất/duyệt |
+
+---
+
+### Bảng `cinema.wallet_transactions` (Sổ cái Ledger)
+
+| Cột | Kiểu | Ràng buộc | Ghi chú |
+|-----|------|-----------|---------|
+| `wallet_transaction_id` | `int8` | PK, Identity | Khóa chính |
+| `wallet_id` | `int8` | FK → `wallets.wallet_id`, NOT NULL | Ví liên quan |
+| `transaction_type` | `varchar(10)` | NOT NULL | `TOP_UP`, `PAYMENT`, `REFUND` |
+| `direction` | `varchar(6)` | NOT NULL | `IN` (cộng tiền) \| `OUT` (trừ tiền) |
+| `amount` | `int8` | NOT NULL, CHECK > 0 | Số tiền biến động VND |
+| `balance_after` | `int8` | NOT NULL | Số dư ví ngay sau giao dịch |
+| `currency` | `bpchar(3)` | NOT NULL, DEFAULT `'VND'` | |
+| `topup_id` | `int8` | NULLABLE | Khóa liên kết bảng `wallet_topups` |
+| `payment_id` | `int8` | NULLABLE | Khóa liên kết bảng `payments` |
+| `refund_id` | `int8` | NULLABLE | Khóa liên kết bảng `refunds` |
+| `description` | `text` | NULLABLE | Ghi chú biến động số dư |
+| `created_at` | `timestamptz` | NOT NULL, DEFAULT `now()` | |
 
 ---
 
 ### Quan hệ thực thể
 ```
 users (1) ──────── (1) wallets
+wallets (1) ─────── (0..*) wallet_topups
 wallets (1) ─────── (0..*) wallet_transactions
+wallet_topups (1) ─ (0..1) wallet_transactions (qua topup_id)
 ```
 
 ---

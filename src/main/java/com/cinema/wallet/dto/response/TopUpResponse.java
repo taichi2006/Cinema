@@ -1,14 +1,12 @@
 package com.cinema.wallet.dto.response;
 
-import java.math.BigDecimal;
-
 /**
  * Response schema cho kết quả tạo/theo dõi yêu cầu nạp tiền (POST /wallet/top-up, GET /wallet/top-up/{id}).
  */
 public class TopUpResponse {
 
     private String id;
-    private BigDecimal amount;
+    private Long amount;
     private String currency;
     private String method;
     private String status;
@@ -20,7 +18,7 @@ public class TopUpResponse {
 
     public TopUpResponse() {}
 
-    public TopUpResponse(String id, BigDecimal amount, String currency, String method, String status,
+    public TopUpResponse(String id, Long amount, String currency, String method, String status,
                          String checkoutUrl, String expiresAt, String createdAt, String completedAt, String failureCode) {
         this.id = id;
         this.amount = amount;
@@ -42,13 +40,14 @@ public class TopUpResponse {
         this.id = id;
     }
 
-    public BigDecimal getAmount() {
+    public Long getAmount() {
         return amount;
     }
 
-    public void setAmount(BigDecimal amount) {
+    public void setAmount(Long amount) {
         this.amount = amount;
     }
+
 
     public String getCurrency() {
         return currency;

@@ -1,27 +1,25 @@
 package com.cinema.wallet.dto.request;
 
-import java.math.BigDecimal;
-
 /**
  * Request body cho API nạp tiền (POST /wallet/top-up).
  */
 public class TopUpRequest {
 
-    private BigDecimal amount;
+    private Long amount;
     private String method;
 
     public TopUpRequest() {}
 
-    public TopUpRequest(BigDecimal amount, String method) {
+    public TopUpRequest(Long amount, String method) {
         this.amount = amount;
         this.method = method;
     }
 
-    public BigDecimal getAmount() {
+    public Long getAmount() {
         return amount;
     }
 
-    public void setAmount(BigDecimal amount) {
+    public void setAmount(Long amount) {
         this.amount = amount;
     }
 
@@ -33,3 +31,4 @@ public class TopUpRequest {
         this.method = method;
     }
 }
+

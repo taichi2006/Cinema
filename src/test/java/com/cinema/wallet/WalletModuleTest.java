@@ -8,7 +8,6 @@ import com.cinema.wallet.dto.response.WalletResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
-import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -27,9 +26,27 @@ public class WalletModuleTest {
         user.setEmail("test@cinema.com");
 
         Wallet wallet = new Wallet(user);
-        assertEquals(BigDecimal.ZERO, wallet.getBalance());
+        assertEquals(0L, wallet.getBalance());
+        assertEquals("VND", wallet.getCurrency());
         assertEquals(WalletStatus.ACTIVE, wallet.getStatus());
         assertEquals(user, wallet.getUser());
+    }
+
+    @Test
+    void testWalletTopupEntity() {
+        Wallet wallet = new Wallet();
+        wallet.setId(1L);
+
+        WalletTopup topup = new WalletTopup();
+        topup.setWallet(wallet);
+        topup.setAmount(100000L);
+        topup.setCurrency("VND");
+        topup.setStatus("PENDING");
+
+        assertEquals(100000L, topup.getAmount());
+        assertEquals("VND", topup.getCurrency());
+        assertEquals("PENDING", topup.getStatus());
+        assertEquals(wallet, topup.getWallet());
     }
 
     @Test
@@ -39,26 +56,27 @@ public class WalletModuleTest {
 
         WalletTransaction tx = new WalletTransaction();
         tx.setWallet(wallet);
-        tx.setAmount(new BigDecimal("50000.00"));
-        tx.setTransactionType(TransactionType.TOP_UP);
-        tx.setStatus(TransactionStatus.PENDING);
-        tx.setReferenceId("key-1234567890123456");
+        tx.setTransactionType("TOP_UP");
+        tx.setDirection("IN");
+        tx.setAmount(50000L);
+        tx.setBalanceAfter(50000L);
+        tx.setCurrency("VND");
+        tx.setTopupId(10L);
         tx.setDescription("Nạp tiền ví");
 
-        assertEquals(TransactionType.TOP_UP, tx.getTransactionType());
-        assertEquals(TransactionStatus.PENDING, tx.getStatus());
-        assertEquals("key-1234567890123456", tx.getReferenceId());
-        assertFalse(tx.getStatus().isSuccessful());
-
-        tx.setStatus(TransactionStatus.SUCCEEDED);
-        assertTrue(tx.getStatus().isSuccessful());
+        assertEquals("TOP_UP", tx.getTransactionType());
+        assertEquals("IN", tx.getDirection());
+        assertEquals(50000L, tx.getAmount());
+        assertEquals(50000L, tx.getBalanceAfter());
+        assertEquals(10L, tx.getTopupId());
+        assertEquals("VND", tx.getCurrency());
     }
 
     @Test
     void testWalletDTOApiResponseSerialization() throws Exception {
         WalletResponse walletResp = new WalletResponse(
                 "1",
-                new BigDecimal("150000.00"),
+                150000L,
                 "VND",
                 Instant.now().toString()
         );
@@ -68,14 +86,14 @@ public class WalletModuleTest {
         String jsonStr = json.writeValueAsString(response);
         assertTrue(jsonStr.contains("\"success\":true"));
         assertTrue(jsonStr.contains("\"currency\":\"VND\""));
-        assertTrue(jsonStr.contains("\"balance\":150000.00"));
+        assertTrue(jsonStr.contains("\"balance\":150000"));
     }
 
     @Test
     void testWalletPaginationSerialization() throws Exception {
         WalletResponse walletResp = new WalletResponse(
                 "1",
-                new BigDecimal("150000.00"),
+                150000L,
                 "VND",
                 Instant.now().toString()
         );
@@ -103,4 +121,3 @@ public class WalletModuleTest {
         assertTrue(jsonStr.contains("Idempotency-Key"));
     }
 }
-

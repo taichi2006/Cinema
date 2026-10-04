@@ -1,7 +1,5 @@
 package com.cinema.wallet.dto.response;
 
-import java.math.BigDecimal;
-
 /**
  * Response schema sau khi Admin duyệt nạp tiền (POST /wallet/top-up/{id}/confirm).
  */
@@ -9,16 +7,16 @@ public class AdminConfirmResponse {
 
     private String id;
     private Long walletId;
-    private BigDecimal amount;
+    private Long amount;
     private String currency;
     private String status;
-    private BigDecimal newBalance;
+    private Long newBalance;
     private String completedAt;
 
     public AdminConfirmResponse() {}
 
-    public AdminConfirmResponse(String id, Long walletId, BigDecimal amount, String currency, String status,
-                                BigDecimal newBalance, String completedAt) {
+    public AdminConfirmResponse(String id, Long walletId, Long amount, String currency, String status,
+                                Long newBalance, String completedAt) {
         this.id = id;
         this.walletId = walletId;
         this.amount = amount;
@@ -44,11 +42,11 @@ public class AdminConfirmResponse {
         this.walletId = walletId;
     }
 
-    public BigDecimal getAmount() {
+    public Long getAmount() {
         return amount;
     }
 
-    public void setAmount(BigDecimal amount) {
+    public void setAmount(Long amount) {
         this.amount = amount;
     }
 
@@ -68,11 +66,11 @@ public class AdminConfirmResponse {
         this.status = status;
     }
 
-    public BigDecimal getNewBalance() {
+    public Long getNewBalance() {
         return newBalance;
     }
 
-    public void setNewBalance(BigDecimal newBalance) {
+    public void setNewBalance(Long newBalance) {
         this.newBalance = newBalance;
     }
 
@@ -84,3 +82,4 @@ public class AdminConfirmResponse {
         this.completedAt = completedAt;
     }
 }
+

@@ -4,7 +4,6 @@ import com.cinema.common.util.JPAUtil;
 import com.cinema.user.User;
 import jakarta.persistence.EntityManager;
 
-import java.math.BigDecimal;
 import java.util.Optional;
 
 /**
@@ -59,9 +58,11 @@ public class WalletDAO {
      */
     public Wallet createDefaultWallet(User user, EntityManager em) {
         Wallet wallet = new Wallet(user);
-        wallet.setBalance(BigDecimal.ZERO);
+        wallet.setBalance(0L);
+        wallet.setCurrency("VND");
         wallet.setStatus(WalletStatus.ACTIVE);
         em.persist(wallet);
         return wallet;
     }
 }
+

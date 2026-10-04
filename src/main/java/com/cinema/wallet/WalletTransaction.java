@@ -1,13 +1,11 @@
 package com.cinema.wallet;
 
 import jakarta.persistence.*;
-
-import java.math.BigDecimal;
 import java.time.Instant;
 
 /**
- * Thực thể Bút toán giao dịch ví (Mapping bảng cinema.wallet_transactions theo chuẩn UML).
- * Lưu vết mọi biến động số dư: Nạp tiền (TOP_UP), Thanh toán vé (PAYMENT), Hoàn tiền (REFUND).
+ * Thực thể Bút toán giao dịch ví (Mapping bảng cinema.wallet_transactions).
+ * Sổ cái biến động số dư: Nạp tiền (TOP_UP), Thanh toán vé (PAYMENT), Hoàn tiền (REFUND).
  */
 @Entity
 @Table(name = "wallet_transactions", schema = "cinema")
@@ -15,35 +13,42 @@ public class WalletTransaction {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "transaction_id")
+    @Column(name = "wallet_transaction_id")
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "wallet_id", nullable = false)
     private Wallet wallet;
 
-    @Column(nullable = false, precision = 15, scale = 2)
-    private BigDecimal amount;
+    @Column(name = "transaction_type", nullable = false, length = 10)
+    private String transactionType;
 
-    @Column(name = "balance_after", precision = 15, scale = 2)
-    private BigDecimal balanceAfter;
+    @Column(nullable = false, length = 6)
+    private String direction; // "IN" hoặc "OUT"
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "transaction_type", nullable = false, length = 20)
-    private TransactionType transactionType;
+    @Column(nullable = false)
+    private Long amount;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    private TransactionStatus status = TransactionStatus.PENDING;
+    @Column(name = "balance_after", nullable = false)
+    private Long balanceAfter;
 
-    @Column(name = "reference_id", length = 100)
-    private String referenceId;
+    @Column(length = 3, nullable = false)
+    private String currency = "VND";
 
-    @Column(name = "description", columnDefinition = "TEXT")
+    @Column(name = "topup_id")
+    private Long topupId;
+
+    @Column(name = "payment_id")
+    private Long paymentId;
+
+    @Column(name = "refund_id")
+    private Long refundId;
+
+    @Column(name = "description", columnDefinition = "text")
     private String description;
 
-    @Column(name = "created_at", insertable = false, updatable = false)
-    private Instant createdAt;
+    @Column(name = "created_at")
+    private Instant createdAt = Instant.now();
 
     public WalletTransaction() {}
 
@@ -63,44 +68,68 @@ public class WalletTransaction {
         this.wallet = wallet;
     }
 
-    public BigDecimal getAmount() {
-        return amount;
-    }
-
-    public void setAmount(BigDecimal amount) {
-        this.amount = amount;
-    }
-
-    public BigDecimal getBalanceAfter() {
-        return balanceAfter;
-    }
-
-    public void setBalanceAfter(BigDecimal balanceAfter) {
-        this.balanceAfter = balanceAfter;
-    }
-
-    public TransactionType getTransactionType() {
+    public String getTransactionType() {
         return transactionType;
     }
 
-    public void setTransactionType(TransactionType transactionType) {
+    public void setTransactionType(String transactionType) {
         this.transactionType = transactionType;
     }
 
-    public TransactionStatus getStatus() {
-        return status;
+    public String getDirection() {
+        return direction;
     }
 
-    public void setStatus(TransactionStatus status) {
-        this.status = status;
+    public void setDirection(String direction) {
+        this.direction = direction;
     }
 
-    public String getReferenceId() {
-        return referenceId;
+    public Long getAmount() {
+        return amount;
     }
 
-    public void setReferenceId(String referenceId) {
-        this.referenceId = referenceId;
+    public void setAmount(Long amount) {
+        this.amount = amount;
+    }
+
+    public Long getBalanceAfter() {
+        return balanceAfter;
+    }
+
+    public void setBalanceAfter(Long balanceAfter) {
+        this.balanceAfter = balanceAfter;
+    }
+
+    public String getCurrency() {
+        return currency;
+    }
+
+    public void setCurrency(String currency) {
+        this.currency = currency;
+    }
+
+    public Long getTopupId() {
+        return topupId;
+    }
+
+    public void setTopupId(Long topupId) {
+        this.topupId = topupId;
+    }
+
+    public Long getPaymentId() {
+        return paymentId;
+    }
+
+    public void setPaymentId(Long paymentId) {
+        this.paymentId = paymentId;
+    }
+
+    public Long getRefundId() {
+        return refundId;
+    }
+
+    public void setRefundId(Long refundId) {
+        this.refundId = refundId;
     }
 
     public String getDescription() {
@@ -119,3 +148,4 @@ public class WalletTransaction {
         this.createdAt = createdAt;
     }
 }
+
