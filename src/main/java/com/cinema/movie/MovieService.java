@@ -1,5 +1,7 @@
 package com.cinema.movie;
 
+import com.cinema.common.dto.CommonDTO.PageMeta;
+
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;

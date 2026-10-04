@@ -1,5 +1,6 @@
 package com.cinema.movie;
 
+import com.cinema.common.exception.ErrorHandler;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
@@ -9,7 +10,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
 
-@WebServlet("/movie")
+@WebServlet(urlPatterns = {"/movie", "/movies"})
 public class MovieController extends HttpServlet {
 
     private final MovieService movieService = new MovieService();
@@ -54,16 +55,8 @@ public class MovieController extends HttpServlet {
             response.setStatus(HttpServletResponse.SC_OK);
             objectMapper.writeValue(response.getWriter(), result);
 
-        } catch (InvalidFilterException exception) {
-            response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-            objectMapper.writeValue(
-                    response.getWriter(),
-                    new ErrorResponse("INVALID_FILTER", exception.getMessage()));
-        } catch (Exception exception) {
-            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-            objectMapper.writeValue(
-                    response.getWriter(),
-                    new ErrorResponse("INTERNAL_SERVER_ERROR", "Đã có lỗi xảy ra trên hệ thống."));
+        } catch (Exception ex) {
+            ErrorHandler.handle(response, ex);
         }
     }
 }

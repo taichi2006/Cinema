@@ -1,15 +1,17 @@
 package com.cinema.movie;
 
-public class InvalidFilterException extends RuntimeException {
+import com.cinema.common.exception.ApiException;
+
+public class InvalidFilterException extends ApiException {
 
     private String field;
 
     public InvalidFilterException(String message) {
-        super(message);
+        super(400, message);
     }
 
     public InvalidFilterException(String field, String message) {
-        super(message);
+        super(400, message);
         this.field = field;
     }
 

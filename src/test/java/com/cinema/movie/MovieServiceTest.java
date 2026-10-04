@@ -1,5 +1,6 @@
 package com.cinema.movie;
 
+import com.cinema.common.dto.CommonDTO.PageMeta;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -227,19 +228,14 @@ public class MovieServiceTest {
     }
 
     @Test
-    @DisplayName("ErrorResponse JSON khớp schema: error và message")
-    void testErrorResponseJsonStructure() throws Exception {
-        String error = "INVALID_FILTER";
-        String message = "Kích thước trang 'size' phải nằm trong khoảng từ 1 đến 50.";
-
-        ErrorResponse errorResponse = new ErrorResponse(error, message);
-
-        String json = objectMapper.writeValueAsString(errorResponse);
-        JsonNode root = objectMapper.readTree(json);
-
-        assertTrue(root.has("error"), "Phải có thuộc tính error");
-        assertEquals("INVALID_FILTER", root.get("error").asText());
-        assertTrue(root.has("message"), "Phải có thuộc tính message");
-        assertEquals(message, root.get("message").asText());
+    @DisplayName("InvalidFilterException là ApiException với HTTP status 400 và message chuẩn")
+    void testInvalidFilterExceptionIsApiException() {
+        InvalidFilterException exception = new InvalidFilterException(
+                "size",
+                "Kích thước trang 'size' phải nằm trong khoảng từ 1 đến 50."
+        );
+        assertEquals(400, exception.getStatus());
+        assertEquals("size", exception.getField());
+        assertEquals("Kích thước trang 'size' phải nằm trong khoảng từ 1 đến 50.", exception.getMessage());
     }
 }

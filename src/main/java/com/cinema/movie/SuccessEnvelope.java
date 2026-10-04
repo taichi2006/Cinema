@@ -1,5 +1,6 @@
 package com.cinema.movie;
 
+import com.cinema.common.dto.CommonDTO.PageMeta;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 
 @JsonPropertyOrder({"success", "data", "meta"})
