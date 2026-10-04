@@ -39,3 +39,6 @@ build/
 .DS_Store
 
 .env
+
+UMLClassDiagram.drawio.png
+PROJECT_STRUCTURE.md
