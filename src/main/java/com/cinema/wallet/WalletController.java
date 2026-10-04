@@ -53,7 +53,7 @@ public class WalletController extends HttpServlet {
                 int size = parseQueryInt(req.getParameter("size"), 20);
 
                 var history = service.getTransactionHistory(userId, type, from, to, page, size);
-                writeJson(resp, HttpServletResponse.SC_OK, SuccessEnvelope.of(history.items(), history.meta(), traceId));
+                writeJson(resp, HttpServletResponse.SC_OK, SuccessEnvelope.of(history.getItems(), history.getMeta(), traceId));
                 return;
             }
 
@@ -64,7 +64,7 @@ public class WalletController extends HttpServlet {
                 int size = parseQueryInt(req.getParameter("size"), 20);
 
                 var pending = service.getPendingTopUps(page, size);
-                writeJson(resp, HttpServletResponse.SC_OK, SuccessEnvelope.of(pending.items(), pending.meta(), traceId));
+                writeJson(resp, HttpServletResponse.SC_OK, SuccessEnvelope.of(pending.getItems(), pending.getMeta(), traceId));
                 return;
             }
 

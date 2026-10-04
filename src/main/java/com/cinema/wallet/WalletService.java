@@ -86,10 +86,10 @@ public class WalletService {
         }
 
         // Validate số tiền nạp theo Swagger: tối thiểu 10,000 VND, tối đa 10,000,000 VND
-        if (req == null || req.amount() == null) {
+        if (req == null || req.getAmount() == null) {
             throw WalletException.invalidAmount("Số tiền nạp không được để trống");
         }
-        if (req.amount().compareTo(new BigDecimal("10000")) < 0 || req.amount().compareTo(new BigDecimal("10000000")) > 0) {
+        if (req.getAmount().compareTo(new BigDecimal("10000")) < 0 || req.getAmount().compareTo(new BigDecimal("10000000")) > 0) {
             throw WalletException.invalidAmount("Số tiền nạp tối thiểu là 10,000 VND và tối đa là 10,000,000 VND");
         }
 
@@ -103,7 +103,7 @@ public class WalletService {
         // Tạo bản ghi giao dịch nạp tiền ở trạng thái PENDING
         WalletTransaction tx = new WalletTransaction();
         tx.setWallet(wallet);
-        tx.setAmount(req.amount());
+        tx.setAmount(req.getAmount());
         tx.setTransactionType(TransactionType.TOP_UP);
         tx.setStatus(TransactionStatus.PENDING);
         tx.setReferenceId(idempotencyKey.trim());
@@ -118,7 +118,7 @@ public class WalletService {
                 String.valueOf(tx.getId()),
                 tx.getAmount(),
                 "VND",
-                (req.method() != null && !req.method().isBlank()) ? req.method() : "GATEWAY",
+                (req.getMethod() != null && !req.getMethod().isBlank()) ? req.getMethod() : "GATEWAY",
                 tx.getStatus().name(),
                 "/wallet/top-up/" + tx.getId(),
                 expiresAt.toString(),
@@ -228,7 +228,33 @@ public class WalletService {
         return new HistoryResult(items, meta);
     }
 
-    public record HistoryResult(List<TransactionItemResponse> items, PageMeta meta) {}
+    public static class HistoryResult {
+        private List<TransactionItemResponse> items;
+        private PageMeta meta;
+
+        public HistoryResult() {}
+
+        public HistoryResult(List<TransactionItemResponse> items, PageMeta meta) {
+            this.items = items;
+            this.meta = meta;
+        }
+
+        public List<TransactionItemResponse> getItems() {
+            return items;
+        }
+
+        public void setItems(List<TransactionItemResponse> items) {
+            this.items = items;
+        }
+
+        public PageMeta getMeta() {
+            return meta;
+        }
+
+        public void setMeta(PageMeta meta) {
+            this.meta = meta;
+        }
+    }
 
     // ==================== ADMIN OPERATIONS ====================
 
@@ -268,7 +294,33 @@ public class WalletService {
         return new PendingTopUpsResult(items, meta);
     }
 
-    public record PendingTopUpsResult(List<AdminPendingItemResponse> items, PageMeta meta) {}
+    public static class PendingTopUpsResult {
+        private List<AdminPendingItemResponse> items;
+        private PageMeta meta;
+
+        public PendingTopUpsResult() {}
+
+        public PendingTopUpsResult(List<AdminPendingItemResponse> items, PageMeta meta) {
+            this.items = items;
+            this.meta = meta;
+        }
+
+        public List<AdminPendingItemResponse> getItems() {
+            return items;
+        }
+
+        public void setItems(List<AdminPendingItemResponse> items) {
+            this.items = items;
+        }
+
+        public PageMeta getMeta() {
+            return meta;
+        }
+
+        public void setMeta(PageMeta meta) {
+            this.meta = meta;
+        }
+    }
 
     /**
      * 6. POST /wallet/top-up/{id}/confirm (ADMIN): Duyệt hoặc từ chối nạp tiền
@@ -287,7 +339,7 @@ public class WalletService {
                 throw ApiException.badRequest("Giao dịch #" + txId + " không ở trạng thái PENDING (hiện tại: " + tx.getStatus() + ")");
             }
 
-            boolean approve = req != null && Boolean.TRUE.equals(req.approve());
+            boolean approve = req != null && Boolean.TRUE.equals(req.getApprove());
             Wallet wallet = tx.getWallet();
             Instant now = Instant.now();
 
@@ -300,14 +352,14 @@ public class WalletService {
 
                 tx.setStatus(TransactionStatus.SUCCEEDED);
                 tx.setBalanceAfter(newBalance);
-                if (req.note() != null && !req.note().isBlank()) {
-                    tx.setDescription(tx.getDescription() + " | Admin: " + req.note().trim());
+                if (req.getNote() != null && !req.getNote().isBlank()) {
+                    tx.setDescription(tx.getDescription() + " | Admin: " + req.getNote().trim());
                 }
             } else {
                 // Từ chối nạp tiền
                 tx.setStatus(TransactionStatus.FAILED);
-                if (req != null && req.note() != null && !req.note().isBlank()) {
-                    tx.setDescription(tx.getDescription() + " | Từ chối: " + req.note().trim());
+                if (req != null && req.getNote() != null && !req.getNote().isBlank()) {
+                    tx.setDescription(tx.getDescription() + " | Từ chối: " + req.getNote().trim());
                 }
             }
 
