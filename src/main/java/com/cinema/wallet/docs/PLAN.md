@@ -5,25 +5,43 @@
 
 ---
 
-## 1. Vị trí trong dự án (Cấu trúc phẳng, tinh gọn)
+## 1. Vị trí trong dự án
 
-Không tạo thêm thư mục `dto/` riêng lẻ nhằm giữ đúng phong cách cấu trúc phẳng (`com.cinema.movie`, `com.cinema.user`, `com.cinema.auth`). Các request/response model được định nghĩa bằng Java `record` trong `WalletDTO.java`.
+Tổ chức thư mục `dto/` được phân tách khoa học thành 3 phần rõ ràng:
+1. `envelope/`: Các lớp Envelope chuẩn Swagger (`SuccessEnvelope`, `ErrorEnvelope`, `PageMeta`, `FieldError`)
+2. `request/`: Các lớp DTO đầu vào (`TopUpRequest`, `AdminConfirmRequest`)
+3. `response/`: Các lớp DTO đầu ra (`WalletResponse`, `TopUpResponse`, `TransactionItemResponse`, `AdminPendingItemResponse`, `AdminConfirmResponse`)
 
 ```
 src/main/java/com/cinema/
 └── wallet/
     ├── docs/
     │   └── PLAN.md                ← file kế hoạch này
+    ├── dto/
+    │   ├── envelope/              ← 1. Envelope chuẩn Swagger
+    │   │   ├── SuccessEnvelope.java
+    │   │   ├── ErrorEnvelope.java
+    │   │   ├── PageMeta.java
+    │   │   └── FieldError.java
+    │   ├── request/               ← 2. Request DTOs
+    │   │   ├── TopUpRequest.java
+    │   │   └── AdminConfirmRequest.java
+    │   └── response/              ← 3. Response DTOs
+    │       ├── WalletResponse.java
+    │       ├── TopUpResponse.java
+    │       ├── TransactionItemResponse.java
+    │       ├── AdminPendingItemResponse.java
+    │       └── AdminConfirmResponse.java
     ├── Wallet.java                ← JPA Entity (bảng cinema.wallets theo chuẩn UML)
     ├── WalletTransaction.java     ← JPA Entity (bảng cinema.wallet_transactions theo chuẩn UML)
     ├── TransactionType.java       ← Enum: TOP_UP | PAYMENT | REFUND
-    ├── TransactionStatus.java     ← Enum: PENDING | SUCCESSFUL | FAILED
+    ├── TransactionStatus.java     ← Enum: PENDING | SUCCEEDED | FAILED | ...
     ├── WalletStatus.java          ← Enum: ACTIVE | SUSPENDED
-    ├── WalletDTO.java             ← Các Java record Request & Response chuẩn theo contract nhóm
+    ├── WalletException.java       ← Exception nghiệp vụ ví chuẩn Swagger
     ├── WalletDAO.java             ← Truy vấn CSDL cho Wallet
     ├── WalletTransactionDAO.java  ← Truy vấn CSDL cho WalletTransaction
     ├── WalletService.java         ← Logic nghiệp vụ & Data Mapping
-    └── WalletController.java      ← Servlet @WebServlet("/wallet/*")
+    └── WalletController.java      ← Servlet @WebServlet(urlPatterns = {"/wallet", "/wallet/*"})
 ```
 
 ---
@@ -43,18 +61,6 @@ CSDL chỉ lưu trữ dữ liệu cốt lõi, không nhồi nhét các trường
 | `created_at` | `TIMESTAMPTZ` | NOT NULL, DEFAULT `now()` | |
 | `updated_at` | `TIMESTAMPTZ` | NOT NULL, DEFAULT `now()` | Tự cập nhật khi số dư thay đổi |
 
-**SQL tạo bảng**:
-```sql
-CREATE TABLE cinema.wallets (
-    wallet_id   SERIAL PRIMARY KEY,
-    user_id     INT            NOT NULL UNIQUE REFERENCES cinema.users(user_id),
-    balance     NUMERIC(15,2)  NOT NULL DEFAULT 0.00 CHECK (balance >= 0),
-    status      VARCHAR(20)    NOT NULL DEFAULT 'ACTIVE',
-    created_at  TIMESTAMPTZ    NOT NULL DEFAULT now(),
-    updated_at  TIMESTAMPTZ    NOT NULL DEFAULT now()
-);
-```
-
 ---
 
 ### Bảng `cinema.wallet_transactions`
@@ -68,28 +74,7 @@ CREATE TABLE cinema.wallets (
 | `transaction_type` | `VARCHAR(20)` | NOT NULL | Enum: `TOP_UP`, `PAYMENT`, `REFUND` |
 | `status` | `VARCHAR(20)` | NOT NULL, DEFAULT `'PENDING'` | Enum: `PENDING`, `SUCCESSFUL`, `FAILED` |
 | `reference_id` | `VARCHAR(100)` | NULLABLE | Mã booking hoặc mã giao dịch ngân hàng ngoài |
-| `description` | `TEXT` | NULLABLE | Ghi chú / mô tả nội dung giao dịch |
 | `created_at` | `TIMESTAMPTZ` | NOT NULL, DEFAULT `now()` | Thời điểm tạo giao dịch |
-
-**SQL tạo bảng**:
-```sql
-CREATE TABLE cinema.wallet_transactions (
-    transaction_id   SERIAL PRIMARY KEY,
-    wallet_id        INT            NOT NULL REFERENCES cinema.wallets(wallet_id),
-    amount           NUMERIC(15,2)  NOT NULL CHECK (amount > 0),
-    balance_after    NUMERIC(15,2),
-    transaction_type VARCHAR(20)    NOT NULL,
-    status           VARCHAR(20)    NOT NULL DEFAULT 'PENDING',
-    reference_id     VARCHAR(100),
-    description      TEXT,
-    created_at       TIMESTAMPTZ    NOT NULL DEFAULT now()
-);
-
--- Index tối ưu truy vấn
-CREATE INDEX idx_wallet_tx_wallet_id ON cinema.wallet_transactions(wallet_id);
-CREATE INDEX idx_wallet_tx_status ON cinema.wallet_transactions(status);
-CREATE INDEX idx_wallet_tx_created_at ON cinema.wallet_transactions(created_at DESC);
-```
 
 ---
 

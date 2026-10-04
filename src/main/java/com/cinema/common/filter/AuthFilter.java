@@ -13,7 +13,8 @@ import jakarta.servlet.http.HttpServletResponse;
 
 import java.io.IOException;
 
-@WebFilter(urlPatterns = {"/user/*", "/booking/*", "/admin/*"}, dispatcherTypes = {DispatcherType.REQUEST, DispatcherType.FORWARD})
+// Bổ sung /wallet và /wallet/* để bảo vệ các API liên quan đến Ví người dùng
+@WebFilter(urlPatterns = {"/user/*", "/booking/*", "/admin/*", "/wallet", "/wallet/*"}, dispatcherTypes = {DispatcherType.REQUEST, DispatcherType.FORWARD})
 public class AuthFilter implements Filter {
 
     @Override
@@ -23,7 +24,14 @@ public class AuthFilter implements Filter {
         HttpServletResponse resp = (HttpServletResponse) response;
 
         try {
+            // Đọc token từ Cookie hoặc từ header Authorization: Bearer <token> (chuẩn Swagger / Postman)
             String token = JwtUtil.readCookie(req, JwtUtil.COOKIE_ACCESS);
+            if (token == null) {
+                String authHeader = req.getHeader("Authorization");
+                if (authHeader != null && authHeader.startsWith("Bearer ")) {
+                    token = authHeader.substring(7).trim();
+                }
+            }
             if (token == null)
                 throw AuthException.unauthorized();
 
