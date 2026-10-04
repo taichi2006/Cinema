@@ -1,6 +1,7 @@
 package com.cinema.movie;
 
-import com.cinema.Util.JPAUtil;
+import com.cinema.common.util.JPAUtil;
+
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.TypedQuery;
 
@@ -26,7 +27,8 @@ public class MovieDAO {
     public List<Movie> findMovies(MovieRequest filter) {
         EntityManager entityManager = JPAUtil.getEntityManager();
         try {
-            // Bước 1: Truy vấn phân trang lấy danh sách phim (không fetch collection genres)
+            // Bước 1: Truy vấn phân trang lấy danh sách phim (không fetch collection
+            // genres)
             StringBuilder jpql = new StringBuilder("SELECT DISTINCT m FROM Movie m ");
             boolean hasGenre = filter.getGenre() != null && !filter.getGenre().trim().isEmpty();
             if (hasGenre) {
@@ -80,8 +82,7 @@ public class MovieDAO {
 
             List<Movie> moviesWithGenres = entityManager.createQuery(
                     "SELECT DISTINCT m FROM Movie m LEFT JOIN FETCH m.genres WHERE m.movieId IN :movieIds",
-                    Movie.class
-            ).setParameter("movieIds", movieIds).getResultList();
+                    Movie.class).setParameter("movieIds", movieIds).getResultList();
 
             // Bước 3: Giữ đúng thứ tự sắp xếp ban đầu của danh sách phân trang
             Map<Long, Movie> movieMap = new HashMap<>();
