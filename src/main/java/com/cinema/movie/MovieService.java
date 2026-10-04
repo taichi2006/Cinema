@@ -1,10 +1,14 @@
 package com.cinema.movie;
 
+import com.cinema.common.dto.CommonDTO.ApiResponse;
 import com.cinema.common.dto.CommonDTO.PageMeta;
+import com.cinema.common.exception.ApiException;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 public class MovieService {
@@ -25,7 +29,71 @@ public class MovieService {
         this.movieDAO = movieDAO;
     }
 
-    public SuccessEnvelope<List<MovieResponse>> getMovies(MovieRequest request) {
+    public ApiResponse<MovieResponse> getMovieById(String idStr) {
+        Long movieId = parseAndValidateMovieId(idStr);
+        Movie movie = movieDAO.findById(movieId)
+                .orElseThrow(() -> ApiException.notFound("Không tìm thấy phim"));
+
+        Set<String> genreNames = new LinkedHashSet<>();
+        if (movie.getGenres() != null) {
+            for (Genre genre : movie.getGenres()) {
+                if (genre.getGenreName() != null) {
+                    genreNames.add(genre.getGenreName());
+                }
+            }
+        }
+
+        MovieResponse response = new MovieResponse(
+                String.valueOf(movie.getMovieId()),
+                movie.getTitle(),
+                movie.getDescription(),
+                movie.getDurationMinutes(),
+                movie.getReleaseDate(),
+                movie.getPosterUrl(),
+                movie.getTrailerUrl(),
+                movie.getLanguage(),
+                movie.getDefaultFormat(),
+                movie.getAgeRating(),
+                movie.getAgeLimit(),
+                movie.getStatus(),
+                new ArrayList<>(genreNames),
+                0.0,
+                0
+        );
+
+        return ApiResponse.ok(response);
+    }
+
+    public ApiResponse<List<?>> getMovieShowtimes(String idStr) {
+        Long movieId = parseAndValidateMovieId(idStr);
+        movieDAO.findById(movieId)
+                .orElseThrow(() -> ApiException.notFound("Không tìm thấy phim"));
+        return ApiResponse.ok(List.of());
+    }
+
+    public ApiResponse<List<?>> getMovieReviews(String idStr) {
+        Long movieId = parseAndValidateMovieId(idStr);
+        movieDAO.findById(movieId)
+                .orElseThrow(() -> ApiException.notFound("Không tìm thấy phim"));
+        return ApiResponse.ok(List.of());
+    }
+
+    private Long parseAndValidateMovieId(String idStr) {
+        if (idStr == null || idStr.trim().isEmpty()) {
+            throw ApiException.badRequest("Mã phim 'id' không được để trống.");
+        }
+        try {
+            long id = Long.parseLong(idStr.trim());
+            if (id <= 0) {
+                throw ApiException.badRequest("Mã phim 'id' phải là số nguyên dương.");
+            }
+            return id;
+        } catch (NumberFormatException e) {
+            throw ApiException.badRequest("Mã phim 'id' không hợp lệ: " + idStr);
+        }
+    }
+
+    public Map<String, Object> getMovies(MovieRequest request) {
         validateRequest(request);
 
         List<Movie> movies = movieDAO.findMovies(request);
@@ -65,7 +133,11 @@ public class MovieService {
         }
 
         PageMeta meta = new PageMeta(request.getPage(), request.getSize(), totalElements, totalPages);
-        return new SuccessEnvelope<>(movieResponses, meta);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("success", true);
+        result.put("data", movieResponses);
+        result.put("meta", meta);
+        return result;
     }
 
     private void validateRequest(MovieRequest request) {

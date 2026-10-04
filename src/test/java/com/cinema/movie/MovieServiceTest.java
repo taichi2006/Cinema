@@ -1,6 +1,8 @@
 package com.cinema.movie;
 
+import com.cinema.common.dto.CommonDTO.ApiResponse;
 import com.cinema.common.dto.CommonDTO.PageMeta;
+import com.cinema.common.exception.ApiException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -10,11 +12,14 @@ import org.junit.jupiter.api.Test;
 import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -31,6 +36,16 @@ public class MovieServiceTest {
         public void setStubData(List<Movie> movies, long count) {
             this.stubMovies = movies;
             this.stubCount = count;
+        }
+
+        @Override
+        public Optional<Movie> findById(Long movieId) {
+            for (Movie movie : stubMovies) {
+                if (movie.getMovieId() != null && movie.getMovieId().equals(movieId)) {
+                    return Optional.of(movie);
+                }
+            }
+            return Optional.empty();
         }
 
         @Override
@@ -150,7 +165,7 @@ public class MovieServiceTest {
         stubDAO.setStubData(List.of(movie), 1L);
 
         MovieRequest request = new MovieRequest(null, null, null, 0, 20, null);
-        SuccessEnvelope<List<MovieResponse>> response = movieService.getMovies(request);
+        Map<String, Object> response = movieService.getMovies(request);
 
         String json = objectMapper.writeValueAsString(response);
         JsonNode root = objectMapper.readTree(json);
@@ -160,14 +175,15 @@ public class MovieServiceTest {
         assertTrue(root.get("success").asBoolean(), "success phải là true");
         assertFalse(root.has("traceId"), "Không được có thuộc tính traceId");
 
-        // Kiểm tra meta
+        // Kiểm tra meta ở root level (cục PageMeta ở dưới)
         JsonNode meta = root.get("meta");
+        assertNotNull(meta, "root phải chứa meta");
         assertEquals(0, meta.get("page").asInt());
         assertEquals(20, meta.get("size").asInt());
         assertEquals(1, meta.get("totalElements").asLong());
         assertEquals(1, meta.get("totalPages").asInt());
 
-        // Kiểm tra data item
+        // Kiểm tra data ở root level (cục Success ở trên - data là array trực tiếp)
         JsonNode firstMovie = root.get("data").get(0);
         assertEquals("1", firstMovie.get("id").asText(), "id phải là kiểu chuỗi String");
         assertEquals("Mai", firstMovie.get("title").asText());
@@ -202,10 +218,12 @@ public class MovieServiceTest {
         stubDAO.setStubData(List.of(movie), 1L);
 
         MovieRequest request = new MovieRequest(null, "Khoa học viễn tưởng", null, 0, 20, null);
-        SuccessEnvelope<List<MovieResponse>> response = movieService.getMovies(request);
+        Map<String, Object> response = movieService.getMovies(request);
 
-        assertEquals(1, response.getData().size());
-        MovieResponse movieResponse = response.getData().get(0);
+        @SuppressWarnings("unchecked")
+        List<MovieResponse> data = (List<MovieResponse>) response.get("data");
+        assertEquals(1, data.size());
+        MovieResponse movieResponse = data.get(0);
         assertEquals(2, movieResponse.getGenres().size(), "Các thể loại trùng lặp phải được lọc sạch");
         assertEquals(List.of("Khoa học viễn tưởng", "Hành động"), movieResponse.getGenres());
     }
@@ -216,15 +234,19 @@ public class MovieServiceTest {
         stubDAO.setStubData(Collections.emptyList(), 0L);
 
         MovieRequest request = new MovieRequest("KhongTonTai123456", null, null, 0, 20, null);
-        SuccessEnvelope<List<MovieResponse>> response = assertDoesNotThrow(
+        Map<String, Object> response = assertDoesNotThrow(
                 () -> movieService.getMovies(request)
         );
 
         assertNotNull(response);
-        assertNotNull(response.getData());
-        assertTrue(response.getData().isEmpty(), "data phải là mảng rỗng []");
-        assertEquals(0L, response.getMeta().getTotalElements(), "tổng số phần tử bằng 0");
-        assertEquals(0, response.getMeta().getTotalPages());
+        assertNotNull(response.get("data"));
+        @SuppressWarnings("unchecked")
+        List<MovieResponse> data = (List<MovieResponse>) response.get("data");
+        assertTrue(data.isEmpty(), "data phải là mảng rỗng []");
+        PageMeta meta = (PageMeta) response.get("meta");
+        assertNotNull(meta);
+        assertEquals(0L, meta.getTotalElements(), "tổng số phần tử bằng 0");
+        assertEquals(0, meta.getTotalPages());
     }
 
     @Test
@@ -237,5 +259,93 @@ public class MovieServiceTest {
         assertEquals(400, exception.getStatus());
         assertEquals("size", exception.getField());
         assertEquals("Kích thước trang 'size' phải nằm trong khoảng từ 1 đến 50.", exception.getMessage());
+    }
+
+    @Test
+    @DisplayName("Tìm chi tiết phim thành công: HTTP 200, đúng MovieDetail schema, JSON không chứa meta")
+    void testFindById_Success() throws Exception {
+        Movie movie = new Movie();
+        movie.setMovieId(1L);
+        movie.setTitle("Mai");
+        movie.setDescription("Phim tâm lý tình cảm Việt Nam");
+        movie.setDurationMinutes(120);
+        movie.setReleaseDate(LocalDate.of(2024, 2, 10));
+        movie.setPosterUrl("https://example.com/poster.jpg");
+        movie.setTrailerUrl("https://example.com/trailer.mp4");
+        movie.setLanguage("VI");
+        movie.setDefaultFormat("2D");
+        movie.setAgeRating("T18");
+        movie.setAgeLimit(18);
+        movie.setStatus("NOW_SHOWING");
+
+        Genre genre1 = new Genre(1L, "DRAMA", "Tâm lý");
+        Genre genre2 = new Genre(2L, "ROMANCE", "Lãng mạn");
+        movie.setGenres(List.of(genre1, genre2));
+
+        stubDAO.setStubData(List.of(movie), 1L);
+
+        ApiResponse<MovieResponse> response = movieService.getMovieById("1");
+
+        assertNotNull(response);
+        assertTrue(response.isSuccess());
+
+        MovieResponse detail = response.getData();
+        assertNotNull(detail);
+        assertEquals("1", detail.getId());
+        assertEquals("Mai", detail.getTitle());
+        assertEquals("Phim tâm lý tình cảm Việt Nam", detail.getDescription());
+        assertEquals(120, detail.getDurationMinutes());
+        assertEquals("2024-02-10", detail.getReleaseDate());
+        assertEquals("T18", detail.getAgeRating());
+        assertEquals(18, detail.getAgeLimit());
+        assertEquals(List.of("Tâm lý", "Lãng mạn"), detail.getGenres());
+        assertEquals(0.0, detail.getAverageRating());
+        assertEquals(0, detail.getReviewCount());
+
+        // Kiểm tra JSON serialize: ẩn meta khi null
+        String json = objectMapper.writeValueAsString(response);
+        JsonNode root = objectMapper.readTree(json);
+
+        assertTrue(root.has("success"));
+        assertTrue(root.get("success").asBoolean());
+        assertTrue(root.has("data"));
+        assertFalse(root.has("meta"), "JSON không được chứa trường meta");
+        assertEquals("1", root.get("data").get("id").asText());
+    }
+
+    @Test
+    @DisplayName("Tìm chi tiết phim không tồn tại: ném ApiException 404")
+    void testFindById_NotFound() {
+        stubDAO.setStubData(Collections.emptyList(), 0L);
+
+        ApiException ex = assertThrows(
+                ApiException.class,
+                () -> movieService.getMovieById("99999")
+        );
+
+        assertEquals(404, ex.getStatus());
+        assertEquals("Không tìm thấy phim", ex.getMessage());
+    }
+
+    @Test
+    @DisplayName("Tìm chi tiết phim với ID không hợp lệ: ném ApiException 400")
+    void testFindById_InvalidId() {
+        ApiException exString = assertThrows(
+                ApiException.class,
+                () -> movieService.getMovieById("abc")
+        );
+        assertEquals(400, exString.getStatus());
+
+        ApiException exNegative = assertThrows(
+                ApiException.class,
+                () -> movieService.getMovieById("-5")
+        );
+        assertEquals(400, exNegative.getStatus());
+
+        ApiException exBlank = assertThrows(
+                ApiException.class,
+                () -> movieService.getMovieById("   ")
+        );
+        assertEquals(400, exBlank.getStatus());
     }
 }

@@ -10,8 +10,26 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 public class MovieDAO {
+
+    public Optional<Movie> findById(Long movieId) {
+        if (movieId == null) {
+            return Optional.empty();
+        }
+        EntityManager entityManager = JPAUtil.getEntityManager();
+        try {
+            List<Movie> results = entityManager.createQuery(
+                    "SELECT DISTINCT m FROM Movie m LEFT JOIN FETCH m.genres WHERE m.movieId = :movieId",
+                    Movie.class
+            ).setParameter("movieId", movieId).getResultList();
+
+            return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
+        } finally {
+            entityManager.close();
+        }
+    }
 
     public List<Movie> findAll() {
         EntityManager entityManager = JPAUtil.getEntityManager();

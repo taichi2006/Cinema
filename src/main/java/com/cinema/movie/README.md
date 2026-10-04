@@ -8,14 +8,13 @@ Tài liệu kỹ thuật mô tả kiến trúc, endpoint API, cấu trúc dữ l
 
 ```text
 com.cinema.movie/
-├── MovieController.java        # Servlet tiếp nhận HTTP GET /movie và /movies
+├── MovieController.java        # Servlet tiếp nhận HTTP GET /movie
 ├── MovieService.java           # Xử lý validation, phân trang và mapping DTO
-├── MovieDAO.java               # Truy vấn CSDL JPA/Hibernate (Two-Step Fetch)
+├── MovieDAO.java               # Truy vấn CSDL JPA/Hibernate (Two-Step Fetch & Single Fetch)
 ├── Movie.java                  # Entity ánh xạ bảng cinema.movies
 ├── Genre.java                  # Entity ánh xạ bảng cinema.genres (Many-to-Many)
 ├── MovieRequest.java           # DTO đóng gói tham số query & pagination
-├── MovieResponse.java          # DTO dữ liệu từng bộ phim trả về client
-├── SuccessEnvelope.java        # Wrapper response thành công (success, data, meta)
+├── MovieResponse.java          # DTO dữ liệu phim trả về client
 ├── InvalidFilterException.java # Exception nghiệp vụ (kế thừa ApiException, HTTP 400)
 └── README.md                   # Tài liệu kỹ thuật module
 ```
@@ -24,8 +23,8 @@ com.cinema.movie/
 
 ## 2. Đặc Tả API: Lấy Danh Sách Phim
 
-- **Endpoint:** `GET /api/movie` hoặc `GET /api/movies`
-- **Servlet Mapping:** `@WebServlet(urlPatterns = {"/movie", "/movies"})` (chuyển tiếp qua `ApiPrefixFilter`)
+- **Endpoint:** `GET /api/movie`
+- **Servlet Mapping:** `@WebServlet(urlPatterns = {"/movie", "/movie/*"})` (chuyển tiếp qua `ApiPrefixFilter`)
 - **Quyền truy cập:** Public (không yêu cầu JWT token qua `AuthFilter`)
 - **Content-Type:** `application/json;charset=UTF-8`
 
@@ -44,7 +43,7 @@ com.cinema.movie/
 
 ### 2.2. Phản Hồi Thành Công (HTTP 200 OK)
 
-Đóng gói qua `SuccessEnvelope<List<MovieResponse>>` và `CommonDTO.PageMeta`:
+Cục Success (`success`, `data`) ở trên và `meta` ([`CommonDTO.PageMeta`](file:///c:/Users/khong/Desktop/TaiLieuHocTap/HK5_Nam3/WebProgramming/Cinema/src/main/java/com/cinema/common/dto/CommonDTO.java#L39)) ở dưới:
 
 ```json
 {
@@ -115,3 +114,90 @@ Khi thực hiện phân trang trên thực thể có quan hệ `@ManyToMany` (`M
    - Đưa kết quả bước 2 vào `Map<Long, Movie>` và sắp xếp lại theo đúng thứ tự của danh sách ID ở bước 1 trước khi trả về `MovieService`.
 4. **Truy vấn đếm tổng (`countMovies`):**
    - Chạy riêng `SELECT COUNT(DISTINCT m) FROM Movie m [JOIN m.genres g] WHERE ...` để lấy tổng số bản ghi phục vụ tính toán `totalPages`.
+
+---
+
+## 4. Đặc Tả API: Chi Tiết Một Phim
+
+- **Endpoint:** `GET /api/movie/{id}`
+- **Servlet Mapping:** `@WebServlet(urlPatterns = {"/movie", "/movie/*"})` (chuyển tiếp qua `ApiPrefixFilter`)
+- **Quyền truy cập:** Public
+- **Content-Type:** `application/json;charset=UTF-8`
+
+### 4.1. Path Parameters
+
+| Tham số | Kiểu dữ liệu | Bắt buộc | Ràng buộc kỹ thuật |
+| :--- | :--- | :--- | :--- |
+| `id` | `String` / `Long` | Có | Bắt buộc là số nguyên dương $\ge 1$. Sai định dạng ném lỗi 400. |
+
+### 4.2. Phản Hồi Thành Công (HTTP 200 OK)
+
+Đóng gói qua `CommonDTO.ApiResponse<MovieResponse>`:
+
+```json
+{
+  "success": true,
+  "message": null,
+  "data": {
+    "id": "1",
+    "title": "Mai",
+    "description": "Phim tâm lý tình cảm gia đình",
+    "durationMinutes": 120,
+    "releaseDate": "2024-02-10",
+    "posterUrl": "https://example.com/poster.jpg",
+    "trailerUrl": "https://example.com/trailer.mp4",
+    "language": "VI",
+    "defaultFormat": "2D",
+    "ageRating": "T18",
+    "ageLimit": 18,
+    "status": "NOW_SHOWING",
+    "genres": ["Tâm lý", "Hài"],
+    "averageRating": 0.0,
+    "reviewCount": 0
+  }
+}
+```
+
+### 4.3. Phản Hồi Lỗi
+
+Xử lý tập trung qua `com.cinema.common.exception.ErrorHandler`:
+
+- **Không tìm thấy phim (HTTP 404 Not Found):** Khi `id` không tồn tại trong CSDL.
+  ```json
+  {
+    "success": false,
+    "status": 404,
+    "error": "Không tìm thấy phim"
+  }
+  ```
+- **Mã ID không hợp lệ (HTTP 400 Bad Request):** Khi `id` là chữ (vd: `"abc"`), số âm hoặc để trống.
+  ```json
+  {
+    "success": false,
+    "status": 400,
+    "error": "Mã phim 'id' không hợp lệ: abc"
+  }
+  ```
+
+### 4.4. Kỹ Thuật Truy Vấn CSDL: `findById` (`MovieDAO.java`)
+
+Đối với truy vấn 1 bản ghi cụ thể theo ID, không bị ảnh hưởng bởi giới hạn phân trang bộ nhớ, `MovieDAO` sử dụng câu JPQL nạp kèm `genres` chỉ trong **1 câu truy vấn đơn**, giải quyết triệt để vấn đề N+1 query:
+
+```sql
+SELECT DISTINCT m FROM Movie m LEFT JOIN FETCH m.genres WHERE m.movieId = :movieId
+```
+
+---
+
+## 5. Kiến Trúc Định Tuyến Mở Rộng (URL Dispatcher)
+
+`MovieController` sử dụng cơ chế Dispatcher phân tích đường dẫn `pathInfo` theo các phân đoạn (segments), hỗ trợ đồng thời các endpoint hiện tại và chuẩn bị sẵn khung cho các tính năng tiếp theo:
+
+```text
+GET /api/movie
+ ├── /                          ──> handleGetMovies()          [Danh sách phim phân trang]
+ └── /{id}
+      ├── (không có hậu tố)     ──> handleGetMovieDetail(id)   [Chi tiết 1 bộ phim]
+      ├── /showtime             ──> handleGetMovieShowtimes(id)[Lịch chiếu (Khung sẵn sàng)]
+      └── /review               ──> handleGetMovieReviews(id)  [Đánh giá (Khung sẵn sàng)]
+```
