@@ -35,7 +35,13 @@ public class WalletTopupDAO {
     public Optional<WalletTopup> findById(Long id) {
         EntityManager em = JPAUtil.getEntityManager();
         try {
-            return Optional.ofNullable(em.find(WalletTopup.class, id));
+            List<WalletTopup> list = em.createQuery(
+                    "SELECT t FROM WalletTopup t JOIN FETCH t.wallet w JOIN FETCH w.user WHERE t.id = :id",
+                    WalletTopup.class
+            )
+            .setParameter("id", id)
+            .getResultList();
+            return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
         } finally {
             em.close();
         }

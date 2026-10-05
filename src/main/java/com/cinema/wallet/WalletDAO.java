@@ -4,6 +4,7 @@ import com.cinema.common.util.JPAUtil;
 import com.cinema.user.User;
 import jakarta.persistence.EntityManager;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -14,7 +15,7 @@ public class WalletDAO {
     public Optional<Wallet> findByUserId(long userId) {
         EntityManager em = JPAUtil.getEntityManager();
         try {
-            return em.createQuery("SELECT w FROM Wallet w WHERE w.user.id = :userId", Wallet.class)
+            return em.createQuery("SELECT w FROM Wallet w JOIN FETCH w.user WHERE w.user.id = :userId", Wallet.class)
                     .setParameter("userId", userId)
                     .getResultStream()
                     .findFirst();
@@ -26,7 +27,10 @@ public class WalletDAO {
     public Optional<Wallet> findById(long walletId) {
         EntityManager em = JPAUtil.getEntityManager();
         try {
-            return Optional.ofNullable(em.find(Wallet.class, walletId));
+            List<Wallet> list = em.createQuery("SELECT w FROM Wallet w JOIN FETCH w.user WHERE w.id = :walletId", Wallet.class)
+                    .setParameter("walletId", walletId)
+                    .getResultList();
+            return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
         } finally {
             em.close();
         }
