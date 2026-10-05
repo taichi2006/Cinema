@@ -9,8 +9,6 @@ import jakarta.servlet.http.*;
 
 import java.io.IOException;
 
-import static com.cinema.auth.AuthService.*;
-
 @WebServlet("/auth/*")
 public class AuthController extends HttpServlet {
 
@@ -48,15 +46,12 @@ public class AuthController extends HttpServlet {
 
     private void doLogin(HttpServletRequest req, HttpServletResponse resp) throws Exception {
         var body   = json.readValue(req.getInputStream(), LoginRequest.class);
-        LoginData result = service.login(body);
+        LoginResponse result = service.login(body);
         
-        // Cấp Access Token dài ngày
-        resp.addCookie(JwtUtil.buildCookie(JwtUtil.COOKIE_ACCESS, result.accessToken(), 7 * 24 * 3600));
         write(resp, ApiResponse.ok(result, "Đăng nhập thành công"));
     }
 
     private void doLogout(HttpServletRequest req, HttpServletResponse resp) throws Exception {
-        resp.addCookie(JwtUtil.buildCookie(JwtUtil.COOKIE_ACCESS, "", 0));
         write(resp, ApiResponse.success("Đăng xuất thành công"));
     }
 

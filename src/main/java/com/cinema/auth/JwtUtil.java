@@ -3,8 +3,6 @@ package com.cinema.auth;
 import io.github.cdimascio.dotenv.Dotenv;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
-import jakarta.servlet.http.*;
-
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -18,9 +16,6 @@ public class JwtUtil {
     private static final long ACCESS_TTL_MS  = 15 * 60 * 1_000L;
     private static final long REFRESH_TTL_MS = 7L * 24 * 60 * 60 * 1_000L;
     private static final long RESET_TTL_MS   = 60 * 60 * 1_000L;
-
-    public static final String COOKIE_ACCESS  = "access_token";
-    public static final String COOKIE_REFRESH = "refresh_token";
 
     private static final SecretKey KEY;
     private static final SecureRandom RNG = new SecureRandom();
@@ -36,11 +31,12 @@ public class JwtUtil {
 
     // ── Access Token ──────────────────────────────────────────────────────────
 
-    public static String generateAccessToken(long userId, String role) {
+    public static String generateAccessToken(long userId, String role, int authVersion) {
         Date now = new Date();
         return Jwts.builder()
                 .subject(String.valueOf(userId))
                 .claim("role", role)
+                .claim("authVersion", authVersion)
                 .issuedAt(now)
                 .expiration(new Date(now.getTime() + ACCESS_TTL_MS))
                 .signWith(KEY)
@@ -53,22 +49,16 @@ public class JwtUtil {
     }
 
 
-    // ── Cookie helpers (dùng chung) ───────────────────────────────────────────
+    public static String extractBearerToken(String authorizationHeader) {
+        if (authorizationHeader == null
+                || !authorizationHeader.regionMatches(true, 0, "Bearer ", 0, 7)) {
+            return null;
+        }
 
-    public static String readCookie(HttpServletRequest req, String name) {
-        Cookie[] cookies = req.getCookies();
-        if (cookies == null) return null;
-        for (Cookie c : cookies) if (name.equals(c.getName())) return c.getValue();
-        return null;
-    }
-
-    public static Cookie buildCookie(String name, String value, int maxAge) {
-        Cookie c = new Cookie(name, value);
-        c.setHttpOnly(true);
-        c.setSecure(false); // → true khi dùng HTTPS
-        c.setPath("/");
-        c.setMaxAge(maxAge);
-        c.setAttribute("SameSite", "Lax");
-        return c;
+        String token = authorizationHeader.substring(7).trim();
+        if (token.isEmpty() || token.chars().anyMatch(Character::isWhitespace)) {
+            return null;
+        }
+        return token;
     }
 }
