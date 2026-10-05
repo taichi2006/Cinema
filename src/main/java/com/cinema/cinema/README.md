@@ -8,16 +8,17 @@ Tài liệu kỹ thuật mô tả kiến trúc, endpoint API, cấu trúc dữ l
 
 ```text
 com.cinema.cinema/
-├── CinemaController.java         # Servlet tiếp nhận HTTP GET /cinema, điều phối URL Dispatcher
-├── CinemaService.java            # Xử lý validation, phân trang và mapping DTO
-├── CinemaDAO.java                # Tầng truy vấn CSDL JPA/Hibernate
-├── Cinema.java                   # Entity ánh xạ bảng cinema.cinemas
+├── CinemaController.java                 # Servlet tiếp nhận HTTP GET /cinema, điều phối URL Dispatcher
+├── CinemaService.java                    # Xử lý validation, phân trang và mapping DTO
+├── CinemaDAO.java                        # Tầng truy vấn CSDL JPA/Hibernate (JPQL & Native SQL)
+├── Cinema.java                           # Entity ánh xạ bảng cinema.cinemas
 ├── DTO/
 │   ├── Request/
-│   │   └── CinemaRequest.java    # DTO đóng gói tham số query & pagination
+│   │   └── CinemaRequest.java            # DTO đóng gói tham số query & pagination
 │   └── Response/
-│       └── CinemaResponse.java   # DTO dữ liệu rạp trả về client
-└── README.md                     # Tài liệu kỹ thuật module
+│       ├── CinemaResponse.java           # DTO dữ liệu rạp trả về client
+│       └── CinemaShowtimeResponse.java   # DTO dữ liệu lịch chiếu rạp (14 trường)
+└── README.md                             # Tài liệu kỹ thuật module
 ```
 
 ---
@@ -131,7 +132,7 @@ CREATE TABLE cinema.cinemas (
 
 ## 4. Kỹ Thuật Truy Vấn CSDL (`CinemaDAO.java`)
 
-`CinemaDAO` sử dụng câu truy vấn JPQL động kết hợp truyền tham số an toàn (tránh triệt để SQL Injection):
+`CinemaDAO` sử dụng kết hợp JPQL động cho tìm kiếm rạp và Native SQL tối ưu cho truy vấn lịch chiếu:
 
 ```sql
 SELECT c FROM Cinema c WHERE c.status = 'ACTIVE'
@@ -154,14 +155,14 @@ ORDER BY c.cinemaName ASC/DESC, c.cinemaId ASC
 
 ## 5. Kiến Trúc Định Tuyến Mở Rộng (URL Dispatcher)
 
-`CinemaController` phân tích `request.getPathInfo()` theo các phân đoạn (segments), hỗ trợ đồng thời endpoint hiện tại và chuẩn bị sẵn cấu trúc cho các tính năng tiếp theo:
+`CinemaController` phân tích `request.getPathInfo()` theo các phân đoạn (segments), hỗ trợ đầy đủ các endpoint theo thiết kế RESTful:
 
 ```text
 GET /api/cinema
- ├── /                          ──> handleGetCinemas()          [Danh sách & tìm kiếm rạp]
+ ├── /                          ──> handleGetCinemas()             [Danh sách & tìm kiếm rạp]
  └── /{id}
-      ├── (không có hậu tố)     ──> handleGetCinemaDetail(id)   [Chi tiết 1 rạp]
-      └── /showtime             ──> handleGetCinemaShowtimes(id)[Suất chiếu của rạp (Giai đoạn tiếp theo)]
+      ├── (không có hậu tố)     ──> handleGetCinemaDetail(id)      [Chi tiết 1 rạp]
+      └── /showtime             ──> handleGetCinemaShowtimes(id)   [Lịch chiếu của rạp theo ngày & phim]
 ```
 
 ---
@@ -227,11 +228,112 @@ Xử lý tập trung qua `com.cinema.common.exception.ErrorHandler`:
 
 ---
 
-## 7. Kiểm Thử Đơn Vị (Unit Testing)
+## 7. Đặc Tả API: Lịch Chiếu Đang Mở Bán Tại Rạp Theo Ngày Và Phim
+
+- **Endpoint:** `GET /api/cinema/{id}/showtime`
+- **Servlet Mapping:** `@WebServlet(urlPatterns = {"/cinema", "/cinema/*"})`
+- **Quyền truy cập:** Public
+- **Content-Type:** `application/json;charset=UTF-8`
+
+### 7.1. Tham Số Yêu Cầu
+
+| Tham số | Vị trí | Kiểu | Bắt buộc | Mặc định | Ràng buộc kỹ thuật |
+| :--- | :--- | :--- | :---: | :---: | :--- |
+| `id` | Path | `String` | **Có** | - | Mã rạp, số nguyên dương $\ge 1$. Rạp phải tồn tại và `status = 'ACTIVE'`. Không thỏa $\rightarrow$ lỗi 400 hoặc 404. |
+| `date` | Query | `String` | **Có** | - | Ngày chiếu cần tra cứu theo định dạng `YYYY-MM-DD` (ISO-8601). Thiếu hoặc sai định dạng $\rightarrow$ lỗi 400. |
+| `movieId` | Query | `String` | Không | `null` | Lọc suất chiếu của phim cụ thể. Phải là số nguyên dương $\ge 1$. Sai kiểu $\rightarrow$ lỗi 400. |
+| `page` | Query | `int` | Không | `0` | Chỉ số trang, $\ge 0$. Sai kiểu hoặc âm $\rightarrow$ lỗi 400. |
+| `size` | Query | `int` | Không | `20` | Số lượng suất chiếu trên mỗi trang, $[1, 50]$. Ngoài khoảng $\rightarrow$ lỗi 400. |
+
+### 7.2. Phản Hồi Thành Công (HTTP 200 OK)
+
+Cấu trúc flat JSON với đầy đủ 14 trường trong mỗi đối tượng `Showtime`:
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "101",
+      "movieId": "10",
+      "movieTitle": "Dune: Part Two",
+      "cinemaId": "1",
+      "cinemaName": "Galaxy Nguyễn Du",
+      "roomId": "5",
+      "roomName": "Cinema 1",
+      "startsAt": "2026-10-05T18:00:00+07:00",
+      "endsAt": "2026-10-05T20:30:00+07:00",
+      "format": "2D",
+      "language": "VietSub",
+      "minTicketPrice": 85000,
+      "currency": "VND",
+      "availableSeatCount": 95
+    }
+  ],
+  "meta": {
+    "page": 0,
+    "size": 20,
+    "totalElements": 1,
+    "totalPages": 1
+  }
+}
+```
+
+#### Giải thích các trường dữ liệu (`CinemaShowtimeResponse`):
+- `id`: Mã suất chiếu (`showtime_id`).
+- `movieId`: Mã phim (`movie_id`).
+- `movieTitle`: Tên phim (`title`).
+- `cinemaId`: Mã rạp (`cinema_id`).
+- `cinemaName`: Tên rạp (`cinema_name`).
+- `roomId`: Mã phòng chiếu (`room_id`).
+- `roomName`: Tên phòng chiếu (`room_name`).
+- `startsAt`: Thời gian bắt đầu chiếu (định dạng ISO-8601).
+- `endsAt`: Thời gian kết thúc chiếu (định dạng ISO-8601).
+- `format`: Định dạng chiếu (ví dụ: `2D`, `3D`, `IMAX`).
+- `language`: Ngôn ngữ / phụ đề (ví dụ: `VietSub`, `Dub`).
+- `minTicketPrice`: Giá vé thấp nhất khả dụng của suất chiếu (`Long`).
+  - Ưu tiên tính từ bảng `cinema.showtime_seats` với các ghế chưa bị khóa (`MIN(ss.price) WHERE ss.is_blocked = false`).
+  - Fallback về giá cơ sở `s.base_price` nếu chưa khởi tạo bảng ghế riêng.
+- `currency`: Đơn vị tiền tệ (mặc định `"VND"`).
+- `availableSeatCount`: Số lượng ghế còn trống có thể đặt (`Integer`).
+  - Khi đã có bảng ghế riêng: Đếm số ghế không bị khóa và không nằm trong đơn đặt vé có trạng thái `HELD` hoặc `BOOKED`.
+  - Khi chưa khởi tạo bảng ghế riêng: Tính từ `r.capacity - (số ghế đang HELD/BOOKED)`.
+- `meta`: Phân trang chuẩn hóa [`CommonDTO.PageMeta`](file:///c:/Users/khong/Desktop/TaiLieuHocTap/HK5_Nam3/WebProgramming/Cinema/src/main/java/com/cinema/common/dto/CommonDTO.java#L39).
+
+### 7.3. Phản Hồi Lỗi
+
+- **Thiếu tham số bắt buộc `date` (HTTP 400 Bad Request):**
+  ```json
+  {
+    "success": false,
+    "status": 400,
+    "error": "Tham số 'date' là bắt buộc (định dạng YYYY-MM-DD)."
+  }
+  ```
+- **Sai định dạng `date` (HTTP 400 Bad Request):**
+  ```json
+  {
+    "success": false,
+    "status": 400,
+    "error": "Tham số 'date' không hợp lệ hoặc sai định dạng YYYY-MM-DD: invalid-date"
+  }
+  ```
+- **Không tìm thấy rạp hoặc rạp không hoạt động (HTTP 404 Not Found):**
+  ```json
+  {
+    "success": false,
+    "status": 404,
+    "error": "Không tìm thấy rạp"
+  }
+  ```
+
+---
+
+## 8. Kiểm Thử Đơn Vị (Unit Testing)
 
 Tất cả các kịch bản nghiệp vụ của module `cinema` được kiểm thử tự động trong `CinemaServiceTest.java` thông qua kỹ thuật mock DAO (`StubCinemaDAO`):
 
-- **Tổng số tests:** 13 test cases.
+- **Tổng số tests:** 22 test cases (Toàn bộ dự án: 46 test cases).
 - **Tỷ lệ vượt qua:** 100% PASS (`BUILD SUCCESS`).
 - **Phạm vi kiểm thử:**
   1. `testGetCinemas_Success`: Trả về danh sách rạp đầy đủ trường, kiểm tra cấu trúc JSON và PageMeta.
@@ -247,3 +349,12 @@ Tất cả các kịch bản nghiệp vụ của module `cinema` được kiểm
   11. `testGetCinemaById_NotFound`: Bắt lỗi 404 khi rạp không tồn tại.
   12. `testGetCinemaById_InactiveCinema`: Bắt lỗi 404 khi rạp ở trạng thái `INACTIVE`.
   13. `testGetCinemaById_InvalidId`: Bắt lỗi 400 khi `id` null, trống, âm, số 0 hoặc chữ cái.
+  14. `testGetCinemaShowtimes_Success`: Lấy lịch chiếu của rạp thành công, kiểm tra đủ 14 trường và phân trang.
+  15. `testGetCinemaShowtimes_FilterByMovieId`: Lọc suất chiếu của rạp theo `movieId` thành công.
+  16. `testGetCinemaShowtimes_CinemaNotFound`: Bắt lỗi 404 khi rạp không tồn tại.
+  17. `testGetCinemaShowtimes_InactiveCinema`: Bắt lỗi 404 khi rạp ở trạng thái `INACTIVE`.
+  18. `testGetCinemaShowtimes_MissingDate`: Bắt lỗi 400 khi thiếu tham số bắt buộc `date` (null hoặc trống).
+  19. `testGetCinemaShowtimes_InvalidDateFormat`: Bắt lỗi 400 khi `date` sai định dạng `YYYY-MM-DD`.
+  20. `testGetCinemaShowtimes_InvalidMovieId`: Bắt lỗi 400 khi `movieId` âm, số 0 hoặc chữ cái.
+  21. `testGetCinemaShowtimes_InvalidPageAndSize`: Bắt lỗi 400 khi `page < 0`, `size < 1`, `size > 50` hoặc tràn số.
+  22. `testGetCinemaShowtimes_EmptyResults`: Trả về mảng rỗng `data: []` kèm `totalElements: 0` khi không có suất chiếu phù hợp.

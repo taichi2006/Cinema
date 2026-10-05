@@ -95,6 +95,31 @@ public class CinemaController extends HttpServlet {
     }
 
     private void handleGetCinemaShowtimes(HttpServletRequest request, HttpServletResponse response, String id) throws Exception {
-        throw ApiException.notFound("Endpoint /cinema/{id}/showtime chưa được kích hoạt.");
+        String date = request.getParameter("date");
+        String movieId = request.getParameter("movieId");
+        String pageStr = request.getParameter("page");
+        String sizeStr = request.getParameter("size");
+
+        int page = 0;
+        if (pageStr != null && !pageStr.trim().isEmpty()) {
+            try {
+                page = Integer.parseInt(pageStr.trim());
+            } catch (NumberFormatException exception) {
+                throw ApiException.badRequest("Tham số 'page' phải là một số nguyên hợp lệ.");
+            }
+        }
+
+        int size = 20;
+        if (sizeStr != null && !sizeStr.trim().isEmpty()) {
+            try {
+                size = Integer.parseInt(sizeStr.trim());
+            } catch (NumberFormatException exception) {
+                throw ApiException.badRequest("Tham số 'size' phải là một số nguyên hợp lệ.");
+            }
+        }
+
+        Map<String, Object> result = cinemaService.getCinemaShowtimes(id, date, movieId, page, size);
+        response.setStatus(HttpServletResponse.SC_OK);
+        objectMapper.writeValue(response.getWriter(), result);
     }
 }

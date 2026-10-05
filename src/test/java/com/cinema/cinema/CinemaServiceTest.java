@@ -2,6 +2,7 @@ package com.cinema.cinema;
 
 import com.cinema.cinema.DTO.Request.CinemaRequest;
 import com.cinema.cinema.DTO.Response.CinemaResponse;
+import com.cinema.cinema.DTO.Response.CinemaShowtimeResponse;
 import com.cinema.common.dto.CommonDTO.PageMeta;
 import com.cinema.common.exception.ApiException;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -10,6 +11,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -27,10 +29,17 @@ class CinemaServiceTest {
     private static class StubCinemaDAO extends CinemaDAO {
         private List<Cinema> stubCinemas = Collections.emptyList();
         private long stubCount = 0L;
+        private List<CinemaShowtimeResponse> stubShowtimes = Collections.emptyList();
+        private long stubShowtimeCount = 0L;
 
         public void setStubData(List<Cinema> cinemas, long count) {
             this.stubCinemas = cinemas;
             this.stubCount = count;
+        }
+
+        public void setStubShowtimeData(List<CinemaShowtimeResponse> showtimes, long count) {
+            this.stubShowtimes = showtimes;
+            this.stubShowtimeCount = count;
         }
 
         @Override
@@ -51,6 +60,16 @@ class CinemaServiceTest {
         @Override
         public long countCinemas(CinemaRequest filter) {
             return stubCount;
+        }
+
+        @Override
+        public List<CinemaShowtimeResponse> findShowtimes(Long cinemaId, LocalDate date, Long movieId, int page, int size) {
+            return stubShowtimes;
+        }
+
+        @Override
+        public long countShowtimes(Long cinemaId, LocalDate date, Long movieId) {
+            return stubShowtimeCount;
         }
     }
 
@@ -348,5 +367,287 @@ class CinemaServiceTest {
                 () -> cinemaService.getCinemaById("abc")
         );
         assertEquals(400, exStr.getStatus());
+    }
+
+    @Test
+    @DisplayName("Lấy lịch chiếu của rạp thành công: trả về đủ 14 trường và phân trang")
+    void testGetCinemaShowtimes_Success() throws Exception {
+        Cinema cinema = new Cinema(
+                1L,
+                "Galaxy Nguyễn Du",
+                "116 Nguyễn Du, Quận 1, TP.HCM",
+                "HCM",
+                "Hồ Chí Minh",
+                "028 3823 4567",
+                "https://example.com/c1.jpg",
+                10.7725,
+                106.698,
+                "ACTIVE"
+        );
+        stubDAO.setStubData(List.of(cinema), 1L);
+
+        CinemaShowtimeResponse showtime = new CinemaShowtimeResponse(
+                "101",
+                "10",
+                "Dune: Part Two",
+                "1",
+                "Galaxy Nguyễn Du",
+                "5",
+                "Cinema 1",
+                "2026-10-05T18:00:00+07:00",
+                "2026-10-05T20:30:00+07:00",
+                "2D",
+                "VietSub",
+                85000L,
+                "VND",
+                95
+        );
+        stubDAO.setStubShowtimeData(List.of(showtime), 1L);
+
+        Map<String, Object> result = cinemaService.getCinemaShowtimes("1", "2026-10-05", null, 0, 20);
+
+        assertNotNull(result);
+        assertEquals(true, result.get("success"));
+        assertNotNull(result.get("data"));
+        assertNotNull(result.get("meta"));
+
+        @SuppressWarnings("unchecked")
+        List<CinemaShowtimeResponse> data = (List<CinemaShowtimeResponse>) result.get("data");
+        assertEquals(1, data.size());
+
+        CinemaShowtimeResponse item = data.get(0);
+        assertEquals("101", item.getId());
+        assertEquals("10", item.getMovieId());
+        assertEquals("Dune: Part Two", item.getMovieTitle());
+        assertEquals("1", item.getCinemaId());
+        assertEquals("Galaxy Nguyễn Du", item.getCinemaName());
+        assertEquals("5", item.getRoomId());
+        assertEquals("Cinema 1", item.getRoomName());
+        assertEquals("2026-10-05T18:00:00+07:00", item.getStartsAt());
+        assertEquals("2026-10-05T20:30:00+07:00", item.getEndsAt());
+        assertEquals("2D", item.getFormat());
+        assertEquals("VietSub", item.getLanguage());
+        assertEquals(85000L, item.getMinTicketPrice());
+        assertEquals("VND", item.getCurrency());
+        assertEquals(95, item.getAvailableSeatCount());
+
+        PageMeta meta = (PageMeta) result.get("meta");
+        assertEquals(0, meta.getPage());
+        assertEquals(20, meta.getSize());
+        assertEquals(1L, meta.getTotalElements());
+        assertEquals(1, meta.getTotalPages());
+
+        // Kiểm tra serialization JSON
+        String json = objectMapper.writeValueAsString(result);
+        JsonNode root = objectMapper.readTree(json);
+        assertTrue(root.get("success").asBoolean());
+        JsonNode itemNode = root.get("data").get(0);
+        assertEquals("101", itemNode.get("id").asText());
+        assertEquals("10", itemNode.get("movieId").asText());
+        assertEquals("Dune: Part Two", itemNode.get("movieTitle").asText());
+        assertEquals("1", itemNode.get("cinemaId").asText());
+        assertEquals("Galaxy Nguyễn Du", itemNode.get("cinemaName").asText());
+        assertEquals("5", itemNode.get("roomId").asText());
+        assertEquals("Cinema 1", itemNode.get("roomName").asText());
+        assertEquals("2026-10-05T18:00:00+07:00", itemNode.get("startsAt").asText());
+        assertEquals("2026-10-05T20:30:00+07:00", itemNode.get("endsAt").asText());
+        assertEquals("2D", itemNode.get("format").asText());
+        assertEquals("VietSub", itemNode.get("language").asText());
+        assertEquals(85000L, itemNode.get("minTicketPrice").asLong());
+        assertEquals("VND", itemNode.get("currency").asText());
+        assertEquals(95, itemNode.get("availableSeatCount").asInt());
+    }
+
+    @Test
+    @DisplayName("Lọc suất chiếu rạp theo movieId thành công")
+    void testGetCinemaShowtimes_FilterByMovieId() {
+        Cinema cinema = new Cinema(
+                1L,
+                "Galaxy Nguyễn Du",
+                "116 Nguyễn Du, Quận 1, TP.HCM",
+                "HCM",
+                "Hồ Chí Minh",
+                null,
+                null,
+                null,
+                null,
+                "ACTIVE"
+        );
+        stubDAO.setStubData(List.of(cinema), 1L);
+
+        CinemaShowtimeResponse showtime = new CinemaShowtimeResponse(
+                "102", "10", "Dune: Part Two", "1", "Galaxy Nguyễn Du", "5", "Cinema 1",
+                "2026-10-05T21:00:00+07:00", "2026-10-05T23:30:00+07:00",
+                "IMAX", "VietSub", 120000L, "VND", 50
+        );
+        stubDAO.setStubShowtimeData(List.of(showtime), 1L);
+
+        Map<String, Object> result = cinemaService.getCinemaShowtimes("1", "2026-10-05", "10", 0, 10);
+        assertNotNull(result);
+        assertEquals(true, result.get("success"));
+
+        @SuppressWarnings("unchecked")
+        List<CinemaShowtimeResponse> data = (List<CinemaShowtimeResponse>) result.get("data");
+        assertEquals(1, data.size());
+        assertEquals("102", data.get(0).getId());
+        assertEquals("10", data.get(0).getMovieId());
+    }
+
+    @Test
+    @DisplayName("Lấy suất chiếu: Rạp không tồn tại -> ném 404")
+    void testGetCinemaShowtimes_CinemaNotFound() {
+        stubDAO.setStubData(Collections.emptyList(), 0L);
+
+        ApiException ex = assertThrows(
+                ApiException.class,
+                () -> cinemaService.getCinemaShowtimes("999", "2026-10-05", null, 0, 20)
+        );
+        assertEquals(404, ex.getStatus());
+        assertEquals("Không tìm thấy rạp", ex.getMessage());
+    }
+
+    @Test
+    @DisplayName("Lấy suất chiếu: Rạp INACTIVE -> ném 404")
+    void testGetCinemaShowtimes_InactiveCinema() {
+        Cinema inactiveCinema = new Cinema(
+                2L, "Galaxy Cũ", "Địa chỉ", "HCM", "Hồ Chí Minh",
+                null, null, null, null, "INACTIVE"
+        );
+        stubDAO.setStubData(List.of(inactiveCinema), 1L);
+
+        ApiException ex = assertThrows(
+                ApiException.class,
+                () -> cinemaService.getCinemaShowtimes("2", "2026-10-05", null, 0, 20)
+        );
+        assertEquals(404, ex.getStatus());
+        assertEquals("Không tìm thấy rạp", ex.getMessage());
+    }
+
+    @Test
+    @DisplayName("Lấy suất chiếu: Thiếu tham số bắt buộc date (null hoặc khoảng trắng) -> ném 400")
+    void testGetCinemaShowtimes_MissingDate() {
+        Cinema cinema = new Cinema(1L, "Galaxy Nguyễn Du", null, "HCM", "HCM", null, null, null, null, "ACTIVE");
+        stubDAO.setStubData(List.of(cinema), 1L);
+
+        ApiException exNull = assertThrows(
+                ApiException.class,
+                () -> cinemaService.getCinemaShowtimes("1", null, null, 0, 20)
+        );
+        assertEquals(400, exNull.getStatus());
+        assertTrue(exNull.getMessage().contains("bắt buộc"));
+
+        ApiException exBlank = assertThrows(
+                ApiException.class,
+                () -> cinemaService.getCinemaShowtimes("1", "   ", null, 0, 20)
+        );
+        assertEquals(400, exBlank.getStatus());
+    }
+
+    @Test
+    @DisplayName("Lấy suất chiếu: Sai định dạng date -> ném 400")
+    void testGetCinemaShowtimes_InvalidDateFormat() {
+        Cinema cinema = new Cinema(1L, "Galaxy Nguyễn Du", null, "HCM", "HCM", null, null, null, null, "ACTIVE");
+        stubDAO.setStubData(List.of(cinema), 1L);
+
+        ApiException ex1 = assertThrows(
+                ApiException.class,
+                () -> cinemaService.getCinemaShowtimes("1", "invalid-date", null, 0, 20)
+        );
+        assertEquals(400, ex1.getStatus());
+
+        ApiException ex2 = assertThrows(
+                ApiException.class,
+                () -> cinemaService.getCinemaShowtimes("1", "05-10-2026", null, 0, 20)
+        );
+        assertEquals(400, ex2.getStatus());
+
+        ApiException ex3 = assertThrows(
+                ApiException.class,
+                () -> cinemaService.getCinemaShowtimes("1", "2026/10/05", null, 0, 20)
+        );
+        assertEquals(400, ex3.getStatus());
+    }
+
+    @Test
+    @DisplayName("Lấy suất chiếu: movieId không hợp lệ (âm, 0, chữ) -> ném 400")
+    void testGetCinemaShowtimes_InvalidMovieId() {
+        Cinema cinema = new Cinema(1L, "Galaxy Nguyễn Du", null, "HCM", "HCM", null, null, null, null, "ACTIVE");
+        stubDAO.setStubData(List.of(cinema), 1L);
+
+        ApiException exAlpha = assertThrows(
+                ApiException.class,
+                () -> cinemaService.getCinemaShowtimes("1", "2026-10-05", "abc", 0, 20)
+        );
+        assertEquals(400, exAlpha.getStatus());
+
+        ApiException exNegative = assertThrows(
+                ApiException.class,
+                () -> cinemaService.getCinemaShowtimes("1", "2026-10-05", "-5", 0, 20)
+        );
+        assertEquals(400, exNegative.getStatus());
+
+        ApiException exZero = assertThrows(
+                ApiException.class,
+                () -> cinemaService.getCinemaShowtimes("1", "2026-10-05", "0", 0, 20)
+        );
+        assertEquals(400, exZero.getStatus());
+    }
+
+    @Test
+    @DisplayName("Lấy suất chiếu: Phân trang page hoặc size không hợp lệ -> ném 400")
+    void testGetCinemaShowtimes_InvalidPageAndSize() {
+        Cinema cinema = new Cinema(1L, "Galaxy Nguyễn Du", null, "HCM", "HCM", null, null, null, null, "ACTIVE");
+        stubDAO.setStubData(List.of(cinema), 1L);
+
+        // page < 0
+        ApiException exPage = assertThrows(
+                ApiException.class,
+                () -> cinemaService.getCinemaShowtimes("1", "2026-10-05", null, -1, 20)
+        );
+        assertEquals(400, exPage.getStatus());
+
+        // size < 1
+        ApiException exSizeZero = assertThrows(
+                ApiException.class,
+                () -> cinemaService.getCinemaShowtimes("1", "2026-10-05", null, 0, 0)
+        );
+        assertEquals(400, exSizeZero.getStatus());
+
+        // size > 50
+        ApiException exSizeOver = assertThrows(
+                ApiException.class,
+                () -> cinemaService.getCinemaShowtimes("1", "2026-10-05", null, 0, 51)
+        );
+        assertEquals(400, exSizeOver.getStatus());
+
+        // Tràn số phân trang
+        ApiException exOverflow = assertThrows(
+                ApiException.class,
+                () -> cinemaService.getCinemaShowtimes("1", "2026-10-05", null, Integer.MAX_VALUE, 10)
+        );
+        assertEquals(400, exOverflow.getStatus());
+    }
+
+    @Test
+    @DisplayName("Lấy suất chiếu: Danh sách rỗng khi không có suất chiếu thỏa mãn")
+    void testGetCinemaShowtimes_EmptyResults() {
+        Cinema cinema = new Cinema(1L, "Galaxy Nguyễn Du", null, "HCM", "HCM", null, null, null, null, "ACTIVE");
+        stubDAO.setStubData(List.of(cinema), 1L);
+        stubDAO.setStubShowtimeData(Collections.emptyList(), 0L);
+
+        Map<String, Object> result = cinemaService.getCinemaShowtimes("1", "2026-10-05", null, 0, 20);
+
+        assertNotNull(result);
+        assertEquals(true, result.get("success"));
+
+        @SuppressWarnings("unchecked")
+        List<CinemaShowtimeResponse> data = (List<CinemaShowtimeResponse>) result.get("data");
+        assertTrue(data.isEmpty());
+
+        PageMeta meta = (PageMeta) result.get("meta");
+        assertEquals(0, meta.getPage());
+        assertEquals(20, meta.getSize());
+        assertEquals(0L, meta.getTotalElements());
+        assertEquals(0, meta.getTotalPages());
     }
 }
