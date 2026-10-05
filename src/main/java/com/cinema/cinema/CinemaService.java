@@ -188,4 +188,8 @@ public class CinemaService {
             throw ApiException.badRequest("Vị trí phân trang vượt quá giới hạn cho phép.");
         }
     }
+
+    public List<CinemaDAO.CityItem> getCities() {
+        return cinemaDAO.findDistinctCities();
+    }
 }

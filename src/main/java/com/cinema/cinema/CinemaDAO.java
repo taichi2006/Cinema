@@ -223,4 +223,25 @@ public class CinemaDAO {
         }
         return obj.toString();
     }
+
+    public record CityItem(String cityCode, String cityName) {}
+
+    public List<CityItem> findDistinctCities() {
+        EntityManager entityManager = JPAUtil.getEntityManager();
+        try {
+            String sql = "SELECT DISTINCT c.city_code, c.city_name FROM cinema.cinemas c WHERE c.status = 'ACTIVE' ORDER BY c.city_name ASC";
+            var query = entityManager.createNativeQuery(sql);
+            List<?> results = query.getResultList();
+            List<CityItem> cities = new ArrayList<>();
+            for (Object rowObj : results) {
+                Object[] row = (Object[]) rowObj;
+                String code = row[0] != null ? row[0].toString() : null;
+                String name = row[1] != null ? row[1].toString() : null;
+                cities.add(new CityItem(code, name));
+            }
+            return cities;
+        } finally {
+            entityManager.close();
+        }
+    }
 }

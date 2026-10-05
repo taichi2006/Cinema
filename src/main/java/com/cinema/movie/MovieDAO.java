@@ -380,4 +380,14 @@ public class MovieDAO {
             default -> "ORDER BY m.releaseDate DESC, m.movieId DESC ";
         };
     }
+
+    public List<Genre> findAllGenres() {
+        EntityManager entityManager = JPAUtil.getEntityManager();
+        try {
+            return entityManager.createQuery("SELECT g FROM Genre g ORDER BY g.genreName ASC", Genre.class)
+                    .getResultList();
+        } finally {
+            entityManager.close();
+        }
+    }
 }
