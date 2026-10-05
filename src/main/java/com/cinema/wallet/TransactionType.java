@@ -1,13 +1,17 @@
 package com.cinema.wallet;
 
-/**
- * Loại giao dịch của ví:
- * - TOP_UP: Nạp tiền vào ví
- * - PAYMENT: Thanh toán (vé, bắp nước, ...)
- * - REFUND: Hoàn tiền vào ví
- */
 public enum TransactionType {
-    TOP_UP,
-    PAYMENT,
-    REFUND
+    TOP_UP("CREDIT"), // nạp tiền
+    PAYMENT("DEBIT"), // thanh toán
+    REFUND("CREDIT"); // hoàn tiền
+
+    private final String direction;
+
+    TransactionType(String direction) {
+        this.direction = direction;
+    }
+
+    public String getDirection() {
+        return direction;
+    }
 }

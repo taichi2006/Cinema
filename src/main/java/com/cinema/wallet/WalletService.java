@@ -4,7 +4,6 @@ import com.cinema.common.dto.CommonDTO.PageMeta;
 import com.cinema.common.exception.ApiException;
 import com.cinema.common.util.JPAUtil;
 import com.cinema.user.User;
-import com.cinema.wallet.dto.request.AdminConfirmRequest;
 import com.cinema.wallet.dto.request.TopUpRequest;
 import com.cinema.wallet.dto.response.*;
 import jakarta.persistence.EntityManager;
@@ -19,11 +18,10 @@ import java.util.List;
 
 /**
  * Service xử lý toàn bộ nghiệp vụ của module Wallet:
- * - Xem số dư ví (bảng cinema.wallets)
- * - Tạo yêu cầu nạp tiền PENDING (bảng cinema.wallet_topups)
- * - Theo dõi kết quả nạp tiền (bảng cinema.wallet_topups)
- * - Xem lịch sử bút toán ví đã hoàn tất (bảng cinema.wallet_transactions)
- * - Quản trị viên (ADMIN) xem danh sách chờ và duyệt nạp tiền
+ * - Xem số dư ví 
+ * - Nạp tiền vào ví tự động thành công 
+ * - Theo dõi kết quả nạp tiền 
+ * - Xem lịch sử bút toán ví đã hoàn tất 
  */
 public class WalletService {
 
@@ -78,7 +76,7 @@ public class WalletService {
     }
 
     /**
-     * 2. POST /wallet/top-up: Tạo yêu cầu nạp ví (lưu vào cinema.wallet_topups, chưa cộng tiền)
+     * 2. POST /wallet/top-up: Nạp tiền vào ví (tự động nạp thành công ngay lập tức và ghi nhận giao dịch)
      */
     public TopUpResponse topUp(long userId, TopUpRequest req, String idempotencyKey) {
         // Kiểm tra Idempotency-Key theo yêu cầu Swagger (16 - 128 ký tự)
@@ -94,43 +92,91 @@ public class WalletService {
             throw WalletException.invalidAmount("Số tiền nạp tối thiểu là 10,000 VND và tối đa là 50,000,000 VND");
         }
 
-        Wallet wallet = getOrCreateWallet(userId);
+        EntityManager em = JPAUtil.getEntityManager();
+        try {
+            em.getTransaction().begin();
 
-        // Chặn giao dịch nếu ví đang bị tạm khóa (SUSPENDED)
-        if (wallet.getStatus() == WalletStatus.SUSPENDED) {
-            throw WalletException.walletSuspended();
+            Wallet wallet = em.createQuery("SELECT w FROM Wallet w JOIN FETCH w.user WHERE w.user.id = :userId", Wallet.class)
+                    .setParameter("userId", userId)
+                    .getResultStream().findFirst().orElse(null);
+
+            if (wallet == null) {
+                User user = em.find(User.class, userId);
+                if (user == null) {
+                    throw WalletException.resourceNotFound("Không tìm thấy người dùng #" + userId);
+                }
+                wallet = new Wallet(user);
+                wallet.setBalance(0L);
+                wallet.setCurrency("VND");
+                wallet.setStatus(WalletStatus.ACTIVE);
+                em.persist(wallet);
+            }
+
+            // Chặn giao dịch nếu ví đang bị tạm khóa (SUSPENDED)
+            if (wallet.getStatus() == WalletStatus.SUSPENDED) {
+                throw WalletException.walletSuspended();
+            }
+
+            Instant now = Instant.now();
+            Instant expiresAt = now.plus(Duration.ofMinutes(15));
+
+            // 1. Lưu bản ghi nạp tiền vào cinema.wallet_topups ở trạng thái SUCCEEDED (theo check constraint DB)
+            WalletTopup topup = new WalletTopup();
+            topup.setWallet(wallet);
+            topup.setAmount(req.getAmount());
+            topup.setCurrency("VND");
+            topup.setStatus(WalletTopupStatus.SUCCEEDED);
+            topup.setCreatedAt(now);
+            topup.setExpiresAt(expiresAt);
+            topup.setCompletedAt(now);
+            em.persist(topup);
+
+            String checkoutUrl = "/wallet/top-up/" + topup.getId();
+            topup.setCheckoutUrl(checkoutUrl);
+
+            // 2. Tự động cộng tiền vào ví cinema.wallets
+            long newBalance = wallet.getBalance() + req.getAmount();
+            wallet.setBalance(newBalance);
+            wallet.setUpdatedAt(now);
+            em.merge(wallet);
+
+            // 3. Ghi bút toán vào sổ cái cinema.wallet_transactions theo đúng ràng buộc check DB:
+            // TOP_UP -> direction = CREDIT và topup_id IS NOT NULL
+            WalletTransaction tx = new WalletTransaction();
+            tx.setWallet(wallet);
+            tx.setTransactionType(TransactionType.TOP_UP.name());
+            tx.setDirection(TransactionType.TOP_UP.getDirection()); // CREDIT
+            tx.setAmount(req.getAmount());
+            tx.setBalanceAfter(newBalance);
+            tx.setCurrency("VND");
+            tx.setTopupId(topup.getId());
+            tx.setDescription("Nạp tiền vào ví thành công");
+            tx.setCreatedAt(now);
+            em.persist(tx);
+
+            em.getTransaction().commit();
+
+            return new TopUpResponse(
+                    String.valueOf(topup.getId()),
+                    topup.getAmount(),
+                    "VND",
+                    (req.getMethod() != null && !req.getMethod().isBlank()) ? req.getMethod().trim() : "BANK_TRANSFER",
+                    topup.getStatus() != null ? topup.getStatus().name() : "SUCCEEDED",
+                    checkoutUrl,
+                    expiresAt.toString(),
+                    now.toString(),
+                    now.toString(),
+                    null
+            );
+        } catch (Exception e) {
+            if (em.getTransaction().isActive()) {
+                em.getTransaction().rollback();
+            }
+            if (e instanceof ApiException) throw (ApiException) e;
+            throw ApiException.internal("Lỗi nạp tiền vào ví: " + e.getMessage());
+        } finally {
+            em.close();
         }
-
-        Instant now = Instant.now();
-        Instant expiresAt = now.plus(Duration.ofMinutes(15)); // Hết hạn sau 15 phút
-
-        // Lưu vào bảng cinema.wallet_topups ở trạng thái PENDING
-        WalletTopup topup = new WalletTopup();
-        topup.setWallet(wallet);
-        topup.setAmount(req.getAmount());
-        topup.setCurrency("VND");
-        topup.setStatus("PENDING");
-        topup.setCreatedAt(now);
-        topup.setExpiresAt(expiresAt);
-
-        topup = topupDAO.save(topup);
-
-        String checkoutUrl = "/wallet/top-up/" + topup.getId();
-        topup.setCheckoutUrl(checkoutUrl);
-        topupDAO.save(topup);
-
-        return new TopUpResponse(
-                String.valueOf(topup.getId()),
-                topup.getAmount(),
-                "VND",
-                (req.getMethod() != null && !req.getMethod().isBlank()) ? req.getMethod().trim() : "BANK_TRANSFER",
-                topup.getStatus(),
-                checkoutUrl,
-                expiresAt.toString(),
-                now.toString(),
-                null,
-                null
-        );
     }
 
     /**
@@ -154,8 +200,8 @@ public class WalletService {
                 topup.getAmount(),
                 topup.getCurrency() != null ? topup.getCurrency().trim() : "VND",
                 "GATEWAY",
-                topup.getStatus(),
-                "PENDING".equalsIgnoreCase(topup.getStatus()) ? "/wallet/top-up/" + topup.getId() : null,
+                topup.getStatus() != null ? topup.getStatus().name() : "SUCCEEDED",
+                topup.getStatus() == WalletTopupStatus.PENDING ? "/wallet/top-up/" + topup.getId() : null,
                 expiresAt.toString(),
                 created.toString(),
                 completedAt,
@@ -207,7 +253,7 @@ public class WalletService {
 
         List<TransactionItemResponse> items = new ArrayList<>();
         for (WalletTransaction t : list) {
-            String dir = t.getDirection() != null ? t.getDirection() : "IN";
+            String dir = t.getDirection() != null ? t.getDirection() : "CREDIT";
             Long balAfter = t.getBalanceAfter() != null ? t.getBalanceAfter() : 0L;
             String refType = t.getTransactionType();
             String refId = t.getTopupId() != null ? String.valueOf(t.getTopupId())
@@ -258,153 +304,6 @@ public class WalletService {
 
         public void setMeta(PageMeta meta) {
             this.meta = meta;
-        }
-    }
-
-    // ==================== ADMIN OPERATIONS ====================
-
-    /**
-     * 5. GET /wallet/top-up/pending (ADMIN): Xem danh sách yêu cầu nạp tiền PENDING từ bảng cinema.wallet_topups
-     */
-    public PendingTopUpsResult getPendingTopUps(int page, int size) {
-        int p = Math.max(page, 0);
-        int s = (size <= 0) ? 20 : Math.min(size, 100);
-
-        List<WalletTopup> list = topupDAO.findPendingTopUps(p, s);
-        long total = topupDAO.countPendingTopUps();
-        int totalPages = (int) Math.ceil((double) total / s);
-
-        List<AdminPendingItemResponse> items = new ArrayList<>();
-        for (WalletTopup t : list) {
-            Instant created = t.getCreatedAt() != null ? t.getCreatedAt() : Instant.now();
-            Instant expires = t.getExpiresAt() != null ? t.getExpiresAt() : created.plus(Duration.ofMinutes(15));
-            User u = t.getWallet().getUser();
-
-            items.add(new AdminPendingItemResponse(
-                    String.valueOf(t.getId()),
-                    t.getWallet().getId(),
-                    u.getId(),
-                    u.getEmail(),
-                    t.getAmount(),
-                    t.getCurrency() != null ? t.getCurrency().trim() : "VND",
-                    "GATEWAY",
-                    t.getStatus(),
-                    "Yêu cầu nạp tiền vào ví",
-                    created.toString(),
-                    expires.toString()
-            ));
-        }
-
-        PageMeta meta = new PageMeta(p, s, total, totalPages);
-        return new PendingTopUpsResult(items, meta);
-    }
-
-    public static class PendingTopUpsResult {
-        private List<AdminPendingItemResponse> items;
-        private PageMeta meta;
-
-        public PendingTopUpsResult() {}
-
-        public PendingTopUpsResult(List<AdminPendingItemResponse> items, PageMeta meta) {
-            this.items = items;
-            this.meta = meta;
-        }
-
-        public List<AdminPendingItemResponse> getItems() {
-            return items;
-        }
-
-        public void setItems(List<AdminPendingItemResponse> items) {
-            this.items = items;
-        }
-
-        public PageMeta getMeta() {
-            return meta;
-        }
-
-        public void setMeta(PageMeta meta) {
-            this.meta = meta;
-        }
-    }
-
-    /**
-     * 6. POST /wallet/top-up/{id}/confirm (ADMIN): Duyệt hoặc từ chối nạp tiền
-     * - Cập nhật cinema.wallet_topups (SUCCESSFUL / FAILED)
-     * - Nếu duyệt: Cộng balance vào cinema.wallets và ghi 1 bút toán vào cinema.wallet_transactions
-     */
-    public AdminConfirmResponse confirmTopUp(long topupId, AdminConfirmRequest req) {
-        EntityManager em = JPAUtil.getEntityManager();
-        try {
-            em.getTransaction().begin();
-
-            WalletTopup topup = em.find(WalletTopup.class, topupId);
-            if (topup == null) {
-                throw WalletException.resourceNotFound("Không tìm thấy giao dịch nạp tiền #" + topupId);
-            }
-
-            if (!"PENDING".equalsIgnoreCase(topup.getStatus())) {
-                throw ApiException.badRequest("Giao dịch #" + topupId + " không ở trạng thái PENDING (hiện tại: " + topup.getStatus() + ")");
-            }
-
-            boolean approve = req != null && Boolean.TRUE.equals(req.getApprove());
-            Wallet wallet = topup.getWallet();
-            Instant now = Instant.now();
-
-            if (approve) {
-                // 1. Cập nhật trạng thái topup
-                topup.setStatus("SUCCESSFUL");
-                topup.setCompletedAt(now);
-                em.merge(topup);
-
-                // 2. Cộng tiền vào ví
-                Long newBalance = wallet.getBalance() + topup.getAmount();
-                wallet.setBalance(newBalance);
-                wallet.setUpdatedAt(now);
-                em.merge(wallet);
-
-                // 3. Ghi bút toán vào sổ cái cinema.wallet_transactions
-                WalletTransaction tx = new WalletTransaction();
-                tx.setWallet(wallet);
-                tx.setTransactionType("TOP_UP");
-                tx.setDirection("IN");
-                tx.setAmount(topup.getAmount());
-                tx.setBalanceAfter(newBalance);
-                tx.setCurrency(topup.getCurrency() != null ? topup.getCurrency().trim() : "VND");
-                tx.setTopupId(topup.getId());
-                tx.setDescription(req != null && req.getNote() != null && !req.getNote().isBlank()
-                        ? "Nạp tiền ví | Admin: " + req.getNote().trim()
-                        : "Nạp tiền vào ví thành công");
-                tx.setCreatedAt(now);
-                em.persist(tx);
-
-            } else {
-                // Từ chối nạp tiền
-                topup.setStatus("FAILED");
-                topup.setFailureCode("REJECTED_BY_ADMIN");
-                topup.setCompletedAt(now);
-                em.merge(topup);
-            }
-
-            em.getTransaction().commit();
-
-            return new AdminConfirmResponse(
-                    String.valueOf(topup.getId()),
-                    wallet.getId(),
-                    topup.getAmount(),
-                    topup.getCurrency() != null ? topup.getCurrency().trim() : "VND",
-                    topup.getStatus(),
-                    wallet.getBalance(),
-                    now.toString()
-            );
-
-        } catch (Exception e) {
-            if (em.getTransaction().isActive()) {
-                em.getTransaction().rollback();
-            }
-            if (e instanceof ApiException) throw (ApiException) e;
-            throw ApiException.internal("Lỗi xử lý duyệt nạp tiền: " + e.getMessage());
-        } finally {
-            em.close();
         }
     }
 }

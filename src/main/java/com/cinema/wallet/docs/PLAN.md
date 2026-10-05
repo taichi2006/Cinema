@@ -1,16 +1,14 @@
 # 📋 Kế hoạch triển khai Module `wallet`
 
-> **Trạng thái**: Tinh gọn theo cấu trúc dự án & Đồng bộ 100% với JSON Response chuẩn của Nhóm — Sẵn sàng triển khai  
-> **Tham chiếu**: `UMLClassDiagram.drawio.png` · Team API Specifications · Module `auth`, `user`, `movie` hiện có
+> 
 
----
 
 ## 1. Vị trí trong dự án
 
 Tổ chức thư mục `dto/` được phân tách khoa học thành 3 phần rõ ràng:
 1. `envelope/`: Các lớp Envelope chuẩn Swagger (`SuccessEnvelope`, `ErrorEnvelope`, `PageMeta`, `FieldError`)
-2. `request/`: Các lớp DTO đầu vào (`TopUpRequest`, `AdminConfirmRequest`)
-3. `response/`: Các lớp DTO đầu ra (`WalletResponse`, `TopUpResponse`, `TransactionItemResponse`, `AdminPendingItemResponse`, `AdminConfirmResponse`)
+2. `request/`: Các lớp DTO đầu vào (`TopUpRequest`)
+3. `response/`: Các lớp DTO đầu ra (`WalletResponse`, `TopUpResponse`, `TransactionItemResponse`)
 
 ```
 src/main/java/com/cinema/
@@ -19,20 +17,17 @@ src/main/java/com/cinema/
     │   └── PLAN.md                ← file kế hoạch này
     ├── dto/
     │   ├── request/               ← 1. Request DTOs
-    │   │   ├── TopUpRequest.java
-    │   │   └── AdminConfirmRequest.java
+    │   │   └── TopUpRequest.java
     │   └── response/              ← 2. Response DTOs
     │       ├── WalletResponse.java
     │       ├── TopUpResponse.java
-    │       ├── TransactionItemResponse.java
-    │       ├── AdminPendingItemResponse.java
-    │       └── AdminConfirmResponse.java
+    │       └── TransactionItemResponse.java
     │   (Tái sử dụng CommonDTO.ApiResponse & CommonDTO.PageMeta từ module common)
     ├── Wallet.java                ← JPA Entity (bảng cinema.wallets)
     ├── WalletTopup.java           ← JPA Entity (bảng cinema.wallet_topups)
     ├── WalletTransaction.java     ← JPA Entity (bảng cinema.wallet_transactions)
     ├── TransactionType.java       ← Enum: TOP_UP | PAYMENT | REFUND
-    ├── TransactionStatus.java     ← Enum: PENDING | SUCCEEDED | FAILED | ...
+    ├── WalletTopupStatus.java     ← Enum: PENDING | SUCCEEDED | FAILED | EXPIRED | REVERSAL_PENDING | REVERSED
     ├── WalletStatus.java          ← Enum: ACTIVE | SUSPENDED
     ├── WalletException.java       ← Exception nghiệp vụ ví kế thừa ApiException
     ├── WalletDAO.java             ← Truy vấn CSDL cho Wallet
@@ -111,7 +106,7 @@ wallet_topups (1) ─ (0..1) wallet_transactions (qua topup_id)
 ### 3.1 Các Enum
 * **`WalletStatus`**: `ACTIVE`, `SUSPENDED`
 * **`TransactionType`**: `TOP_UP`, `PAYMENT`, `REFUND`
-* **`TransactionStatus`**: `PENDING`, `SUCCESSFUL`, `FAILED`
+* **`WalletTopupStatus`**: `PENDING`, `SUCCEEDED`, `FAILED`, `EXPIRED`, `REVERSAL_PENDING`, `REVERSED`
 
 ---
 
@@ -171,12 +166,17 @@ public class WalletTransaction {
     @Column(name = "transaction_type", nullable = false, length = 20)
     private TransactionType transactionType;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    private TransactionStatus status = TransactionStatus.PENDING;
+    @Column(nullable = false, length = 6)
+    private String direction; // "CREDIT" hoặc "DEBIT"
 
-    @Column(name = "reference_id", length = 100)
-    private String referenceId;
+    @Column(name = "topup_id")
+    private Long topupId;
+
+    @Column(name = "payment_id")
+    private Long paymentId;
+
+    @Column(name = "refund_id")
+    private Long refundId;
 
     @Column(columnDefinition = "TEXT")
     private String description;
@@ -277,10 +277,8 @@ public class WalletDTO {
 **`WalletTransactionDAO`**:
 - `save(WalletTransaction tx)`: Lưu bản ghi giao dịch.
 - `findById(long id)`: Tìm giao dịch theo `transactionId`.
-- `findHistory(long walletId, TransactionType type, Instant from, Instant to, int page, int size)`: Lấy lịch sử giao dịch đã thành công (`SUCCESSFUL`), hỗ trợ lọc theo loại và khoảng thời gian.
-- `countHistory(long walletId, TransactionType type, Instant from, Instant to)`: Đếm tổng số giao dịch thỏa điều kiện.
-- `findAllPending(int page, int size)`: Lấy danh sách giao dịch `PENDING` cho Admin.
-- `countAllPending()`: Đếm tổng số giao dịch `PENDING`.
+- `findHistory(long walletId, String type, Instant from, Instant to, int page, int size)`: Lấy lịch sử giao dịch, hỗ trợ lọc theo loại và khoảng thời gian.
+- `countHistory(long walletId, String type, Instant from, Instant to)`: Đếm tổng số giao dịch thỏa điều kiện.
 
 ---
 
@@ -288,13 +286,11 @@ public class WalletDTO {
 
 | Phương thức | Nghiệp vụ chi tiết |
 |---|---|
-| `createWalletForUser(User user, EntityManager em)` | Khởi tạo ví mới với `balance = 0.00`, `status = ACTIVE` khi đăng ký tài khoản. |
+| `createWalletForUser(User user, EntityManager em)` | Khởi tạo ví mới với `balance = 0`, `status = ACTIVE` khi đăng ký tài khoản. |
 | `getMyWallet(long userId)` | Lấy thông tin ví của user. Nếu user cũ chưa có ví trong DB, hệ thống sẽ tự động khởi tạo ví (auto-provision) cho user đó. |
-| `topUp(long userId, TopUpRequest req, String idempotencyKey)` | 1. Kiểm tra trạng thái ví: Nếu `SUSPENDED` → ném lỗi `WALLET_SUSPENDED` (HTTP 403).<br>2. Validate `amount > 0`: Nếu sai ném `TOP_UP_AMOUNT_INVALID` (HTTP 422).<br>3. Tạo `WalletTransaction` với `transactionType = TOP_UP`, `status = PENDING`.<br>4. Trả về `TopUpResponse` (chưa cộng tiền). |
-| `getTopUpStatus(long userId, long txId)` | Lấy chi tiết trạng thái nạp tiền. Đảm bảo giao dịch thuộc đúng ví của `userId` hiện tại. |
-| `getTransactionHistory(long userId, String typeStr, String fromDate, String toDate, int page, int size)` | Lấy danh sách bút toán `SUCCESSFUL` của ví, hỗ trợ lọc theo `type`, khoảng ngày, kèm metadata phân trang. |
-| `getPendingTopUps(int page, int size)` | *(Role ADMIN)* Lấy danh sách các yêu cầu nạp tiền `PENDING`. |
-| `confirmTopUp(long txId, boolean approve, String adminNote)` | *(Role ADMIN)*<br>1. Kiểm tra transaction có tồn tại và đang ở trạng thái `PENDING` không.<br>2. Nếu **approve = true**: Chuyển `status = SUCCESSFUL`, tính `balanceAfter = currentBalance + amount`, cập nhật `balance` của ví.<br>3. Nếu **approve = false**: Chuyển `status = FAILED`. |
+| `topUp(long userId, TopUpRequest req, String idempotencyKey)` | 1. Kiểm tra trạng thái ví: Nếu `SUSPENDED` → ném lỗi `WALLET_SUSPENDED` (HTTP 403).<br>2. Validate `10,000 <= amount <= 50,000,000 VND`.<br>3. Trong 1 transaction duy nhất: Lưu bản ghi `wallet_topups` ở trạng thái `SUCCEEDED`, tự động cộng tiền vào ví `wallets` và ghi nhận bút toán `TOP_UP` (direction = `CREDIT`) vào sổ cái `wallet_transactions`.<br>4. Trả về `TopUpResponse` (nạp thành công ngay lập tức). |
+| `getTopUpStatus(long userId, long topupId)` | Lấy chi tiết trạng thái nạp tiền từ bảng `wallet_topups`. Đảm bảo giao dịch thuộc đúng ví của `userId` hiện tại. |
+| `getTransactionHistory(long userId, String typeStr, String fromDate, String toDate, int page, int size)` | Lấy danh sách bút toán của ví từ `wallet_transactions`, hỗ trợ lọc theo `type`, khoảng ngày, kèm metadata phân trang. |
 
 ---
 
@@ -305,15 +301,13 @@ public class WalletDTO {
 | HTTP Method | Path Pattern | Quyền | Phương thức xử lý | Mô tả |
 |:---|:---|:---:|:---|:---|
 | `GET` | `/wallet` | USER / ADMIN | `getMyWallet()` | Xem thông tin và số dư ví của tài khoản đang đăng nhập |
-| `POST` | `/wallet/top-up` | USER / ADMIN | `topUp()` | Tạo yêu cầu nạp tiền (`PENDING`) |
+| `POST` | `/wallet/top-up` | USER / ADMIN | `topUp()` | Nạp tiền vào ví (tự động nạp thành công ngay lập tức) |
 | `GET` | `/wallet/top-up/{id}` | USER / ADMIN | `getTopUpStatus()` | Theo dõi kết quả nạp tiền của giao dịch `{id}` |
-| `GET` | `/wallet/transaction` | USER / ADMIN | `getTransactionHistory()` | Xem lịch sử biến động số dư đã hoàn tất (`SUCCESSFUL`) |
-| `GET` | `/wallet/top-up/pending` | **ADMIN** | `getPendingTopUps()` | Admin xem danh sách các yêu cầu nạp tiền chờ duyệt |
-| `POST` | `/wallet/top-up/{id}/confirm` | **ADMIN** | `confirmTopUp()` | Admin duyệt/từ chối yêu cầu nạp tiền và cộng tiền vào ví |
+| `GET` | `/wallet/transaction` | USER / ADMIN | `getTransactionHistory()` | Xem lịch sử biến động số dư đã hoàn tất |
 
 ---
 
-## 4. Chi tiết Request / Response API (Chuẩn Nhóm)
+## 4. Chi tiết Request / Response API 
 
 ### 4.1 `GET /wallet`
 * **Quyền**: Mọi user đã đăng nhập.
@@ -584,64 +578,6 @@ public class WalletDTO {
 
 ---
 
-### (Thêm) 4.5 `GET /wallet/top-up/pending` *(Role ADMIN)*
-* **Quyền**: Chỉ `ADMIN` (User thường trả về `403 Forbidden`).
-* **Query Params**: `page` (mặc định 0), `size` (mặc định 20).
-* **Response 200 OK**:
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": "101",
-      "walletId": 1,
-      "userId": 5,
-      "userEmail": "user@example.com",
-      "amount": 100000.00,
-      "currency": "VND",
-      "status": "PENDING",
-      "description": "Nạp tiền xem phim cuối tuần",
-      "createdAt": "2026-10-04T08:15:00Z"
-    }
-  ],
-  "meta": {
-    "page": 0,
-    "size": 20,
-    "totalElements": 1,
-    "totalPages": 1
-  },
-  "traceId": "string"
-}
-```
-
----
-
-### (Thêm) 4.6 `POST /wallet/top-up/{id}/confirm` *(Role ADMIN)*
-* **Quyền**: Chỉ `ADMIN`.
-* **Request Body**:
-```json
-{
-  "approve": true,
-  "note": "Đã nhận chuyển khoản ngân hàng thành công"
-}
-```
-* **Response 200 OK**:
-```json
-{
-  "success": true,
-  "data": {
-    "id": "101",
-    "walletId": 1,
-    "amount": 100000.00,
-    "currency": "VND",
-    "status": "SUCCESSFUL",
-    "newBalance": 250000.00
-  },
-  "meta": {},
-  "traceId": "string"
-}
-```
-
 ---
 
 ## 5. Danh sách thay đổi ở các file hiện có
@@ -653,13 +589,3 @@ public class WalletDTO {
 | 3 | `AuthService.java` | Tại hàm `register(...)`, sau khi `em.persist(u)` tiến hành tạo sẵn ví rỗng cho user mới |
 
 ---
-
-## 6. Tổng hợp các quyết định đã chốt (Q1 → Q5)
-
-| Câu hỏi | Quyết định thống nhất |
-|:---|:---|
-| **Q1. Tự động tạo ví** | **CÓ**: Tự động tạo ví rỗng (`balance = 0.00`, `status = ACTIVE`) khi đăng ký tài khoản. Trong `WalletService.getMyWallet()` có cơ chế dự phòng tự tạo ví nếu user cũ chưa có. |
-| **Q2. Luồng nạp tiền** | **HƯỚNG B**: User tạo yêu cầu `PENDING`. Admin kiểm tra đối soát và duyệt qua API `/confirm` để cộng tiền vào ví. |
-| **Q3. Endpoint cho Admin** | **CÓ**: Bổ sung `GET /wallet/top-up/pending` và `POST /wallet/top-up/{id}/confirm` được bảo vệ bởi role `ADMIN`. |
-| **Q4. Kiểu dữ liệu tiền tệ** | Sử dụng **`NUMERIC(15,2)`** trong PostgreSQL và **`BigDecimal`** trong Java Entity/Service để đảm bảo độ chính xác tuyệt đối. |
-| **Q5. Xử lý ví `SUSPENDED`** | **Chặn các API giao dịch của ví**: Nếu ví đang bị tạm khóa (`SUSPENDED`), chặn nạp tiền (`POST /wallet/top-up`) và thanh toán vé (trả về lỗi `403 Forbidden` với mã `WALLET_SUSPENDED`). Cho phép xem thông tin ví (`GET /wallet`). |

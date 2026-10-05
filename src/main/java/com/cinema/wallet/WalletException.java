@@ -3,7 +3,7 @@ package com.cinema.wallet;
 import com.cinema.common.exception.ApiException;
 
 /**
- * Exception nghiệp vụ dành riêng cho Module Wallet, kế thừa ApiException dùng chung.
+ * Exception nghiệp vụ
  */
 public class WalletException extends ApiException {
 

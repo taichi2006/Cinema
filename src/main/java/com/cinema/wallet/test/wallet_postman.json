@@ -58,7 +58,7 @@
             }
         },
         {
-            "name": "3. Create Top-Up Request",
+            "name": "3. Top-Up Wallet (Auto-Success)",
             "request": {
                 "method": "POST",
                 "header": [
@@ -100,55 +100,7 @@
             }
         },
         {
-            "name": "5. (Admin) Get Pending Top-Ups",
-            "request": {
-                "method": "GET",
-                "header": [
-                    {
-                        "key": "Authorization",
-                        "value": "Bearer <YOUR_ADMIN_TOKEN_HERE>"
-                    }
-                ],
-                "url": {
-                    "raw": "http://localhost:8080/api/wallet/top-up/pending?page=0&size=10",
-                    "query": [
-                        {
-                            "key": "page",
-                            "value": "0"
-                        },
-                        {
-                            "key": "size",
-                            "value": "10"
-                        }
-                    ]
-                }
-            }
-        },
-        {
-            "name": "6. (Admin) Confirm Top-Up",
-            "request": {
-                "method": "POST",
-                "header": [
-                    {
-                        "key": "Authorization",
-                        "value": "Bearer <YOUR_ADMIN_TOKEN_HERE>"
-                    },
-                    {
-                        "key": "Content-Type",
-                        "value": "application/json"
-                    }
-                ],
-                "body": {
-                    "mode": "raw",
-                    "raw": "{\n  \"approve\": true,\n  \"note\": \"Xác nhận chuyển khoản thành công\"\n}"
-                },
-                "url": {
-                    "raw": "http://localhost:8080/api/wallet/top-up/1/confirm"
-                }
-            }
-        },
-        {
-            "name": "7. Get Transactions History",
+            "name": "5. Get Transactions History",
             "request": {
                 "method": "GET",
                 "header": [
