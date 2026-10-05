@@ -23,7 +23,11 @@ public class AuthFilter implements Filter {
         HttpServletResponse resp = (HttpServletResponse) response;
 
         try {
-            String token = JwtUtil.readCookie(req, JwtUtil.COOKIE_ACCESS);
+            String authHeader = req.getHeader("Authorization");
+            String token = null;
+            if (authHeader != null && authHeader.startsWith("Bearer ")) {
+                token = authHeader.substring(7);
+            }
             if (token == null)
                 throw AuthException.unauthorized();
 

@@ -52,6 +52,28 @@ public class JwtUtil {
                 .parseSignedClaims(token).getPayload();
     }
 
+    // ── Refresh Token ─────────────────────────────────────────────────────────
+
+    public static String generateRefreshToken(long userId) {
+        Date now = new Date();
+        return Jwts.builder()
+                .subject(String.valueOf(userId))
+                .claim("type", "refresh")
+                .issuedAt(now)
+                .expiration(new Date(now.getTime() + REFRESH_TTL_MS))
+                .signWith(KEY)
+                .compact();
+    }
+
+    public static Claims parseRefreshToken(String token) {
+        Claims claims = Jwts.parser().verifyWith(KEY).build()
+                .parseSignedClaims(token).getPayload();
+        if (!"refresh".equals(claims.get("type", String.class))) {
+            throw new JwtException("Invalid token type");
+        }
+        return claims;
+    }
+
 
     // ── Cookie helpers (dùng chung) ───────────────────────────────────────────
 

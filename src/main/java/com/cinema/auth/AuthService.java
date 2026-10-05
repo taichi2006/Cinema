@@ -8,12 +8,14 @@ import com.cinema.user.User;
 import jakarta.persistence.EntityManager;
 import org.mindrot.jbcrypt.BCrypt;
 
-public class AuthService {
+import com.cinema.auth.dto.request.LoginRequest;
+import com.cinema.auth.dto.request.RegisterRequest;
+import com.cinema.auth.dto.request.RefreshRequest;
+import com.cinema.auth.dto.response.AuthUserResponse;
+import com.cinema.auth.dto.response.LoginResponse;
+import io.jsonwebtoken.Claims;
 
-    public record RegisterRequest(String email, String password, String fullName) {}
-    public record LoginRequest(String email, String password) {}
-    public record AuthUserResponse(long userId, String email, String fullName, String role) {}
-    public record LoginData(AuthUserResponse user, String accessToken) {}
+public class AuthService {
 
     public AuthUserResponse register(RegisterRequest req) {
         if (req.email() == null || req.password() == null)
@@ -54,7 +56,7 @@ public class AuthService {
         }
     }
 
-    public LoginData login(LoginRequest req) {
+    public LoginResponse login(LoginRequest req) {
         if (req.email() == null || req.password() == null)
             throw ApiException.badRequest("Thiếu email hoặc mật khẩu");
 
@@ -75,13 +77,46 @@ public class AuthService {
 
             String roleName = user.getRole().getName();
             String access = JwtUtil.generateAccessToken(user.getId(), roleName);
+            String refresh = JwtUtil.generateRefreshToken(user.getId());
 
-            return new LoginData(
+            return new LoginResponse(
                 new AuthUserResponse(user.getId(), user.getEmail(), user.getFullName(), roleName),
-                access
+                access,
+                refresh
             );
         } finally {
             em.close();
+        }
+    }
+
+
+    public LoginResponse refresh(RefreshRequest req) {
+        if (req.refreshToken() == null)
+            throw ApiException.badRequest("Thiếu refresh token");
+        try {
+            Claims claims = JwtUtil.parseRefreshToken(req.refreshToken());
+            long userId = Long.parseLong(claims.getSubject());
+
+            EntityManager em = JPAUtil.getEntityManager();
+            try {
+                User user = em.find(User.class, userId);
+                if (user == null || "DISABLED".equals(user.getStatus())) {
+                    throw AuthException.unauthorized();
+                }
+                String roleName = user.getRole().getName();
+                String newAccess = JwtUtil.generateAccessToken(user.getId(), roleName);
+                String newRefresh = JwtUtil.generateRefreshToken(user.getId());
+
+                return new LoginResponse(
+                    new AuthUserResponse(user.getId(), user.getEmail(), user.getFullName(), roleName),
+                    newAccess,
+                    newRefresh
+                );
+            } finally {
+                em.close();
+            }
+        } catch (Exception e) {
+            throw AuthException.invalidToken();
         }
     }
 }

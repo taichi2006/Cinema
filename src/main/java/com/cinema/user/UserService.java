@@ -4,7 +4,6 @@ import com.cinema.common.exception.ApiException;
 import com.cinema.common.util.JPAUtil;
 import jakarta.persistence.EntityManager;
 import org.mindrot.jbcrypt.BCrypt;
-
 public class UserService {
 
     // ── Request / Response ────────────────────────────────────────────────────
@@ -50,6 +49,7 @@ public class UserService {
             em.close();
         }
     }
+
 
     // ── changePassword ────────────────────────────────────────────────────────
 
