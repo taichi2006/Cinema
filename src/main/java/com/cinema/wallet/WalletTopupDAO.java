@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Data Access Object cho thực thể WalletTopup (bảng cinema.wallet_topups).
+ * Data Access Object cho thực thể WalletTopup.
  */
 public class WalletTopupDAO {
 

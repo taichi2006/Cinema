@@ -41,11 +41,11 @@ public class WalletModuleTest {
         topup.setWallet(wallet);
         topup.setAmount(100000L);
         topup.setCurrency("VND");
-        topup.setStatus("PENDING");
+        topup.setStatus(WalletTopupStatus.PENDING);
 
         assertEquals(100000L, topup.getAmount());
         assertEquals("VND", topup.getCurrency());
-        assertEquals("PENDING", topup.getStatus());
+        assertEquals(WalletTopupStatus.PENDING, topup.getStatus());
         assertEquals(wallet, topup.getWallet());
     }
 
@@ -56,8 +56,8 @@ public class WalletModuleTest {
 
         WalletTransaction tx = new WalletTransaction();
         tx.setWallet(wallet);
-        tx.setTransactionType("TOP_UP");
-        tx.setDirection("IN");
+        tx.setTransactionType(TransactionType.TOP_UP.name());
+        tx.setDirection(TransactionType.TOP_UP.getDirection());
         tx.setAmount(50000L);
         tx.setBalanceAfter(50000L);
         tx.setCurrency("VND");
@@ -65,7 +65,7 @@ public class WalletModuleTest {
         tx.setDescription("Nạp tiền ví");
 
         assertEquals("TOP_UP", tx.getTransactionType());
-        assertEquals("IN", tx.getDirection());
+        assertEquals("CREDIT", tx.getDirection());
         assertEquals(50000L, tx.getAmount());
         assertEquals(50000L, tx.getBalanceAfter());
         assertEquals(10L, tx.getTopupId());

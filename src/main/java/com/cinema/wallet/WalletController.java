@@ -3,7 +3,6 @@ package com.cinema.wallet;
 import com.cinema.common.dto.CommonDTO.ApiResponse;
 import com.cinema.common.exception.ApiException;
 import com.cinema.common.exception.ErrorHandler;
-import com.cinema.wallet.dto.request.AdminConfirmRequest;
 import com.cinema.wallet.dto.request.TopUpRequest;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.annotation.WebServlet;
@@ -16,13 +15,10 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Controller xử lý tất cả các HTTP Request đến module Wallet:
- * - GET  /wallet                     : Xem thông tin và số dư ví
- * - POST /wallet/top-up              : Tạo yêu cầu nạp tiền (PENDING)
- * - GET  /wallet/top-up/{id}         : Theo dõi kết quả nạp tiền
- * - GET  /wallet/transaction         : Lịch sử bút toán ví đã hoàn tất (kèm PageMeta)
- * - GET  /wallet/top-up/pending      : (ADMIN) Danh sách yêu cầu chờ duyệt (kèm PageMeta)
- * - POST /wallet/top-up/{id}/confirm : (ADMIN) Duyệt nạp tiền
+ * - GET  /wallet             : Xem thông tin và số dư ví
+ * - POST /wallet/top-up      : Nạp tiền vào ví 
+ * - GET  /wallet/top-up/{id} : Theo dõi kết quả nạp tiền
+ * - GET  /wallet/transaction : Lịch sử bút toán ví đã hoàn tất
  */
 @WebServlet(urlPatterns = {"/wallet", "/wallet/*"})
 public class WalletController extends HttpServlet {
@@ -34,7 +30,6 @@ public class WalletController extends HttpServlet {
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         try {
             long userId = getUserId(req);
-            String role = getRole(req);
             String action = pathInfo(req);
 
             // 1. GET /wallet
@@ -62,23 +57,7 @@ public class WalletController extends HttpServlet {
                 return;
             }
 
-            // 3. GET /wallet/top-up/pending (Role ADMIN - Phân trang yêu cầu nạp chờ duyệt)
-            if ("/top-up/pending".equals(action)) {
-                requireAdmin(role);
-                int page = parseQueryInt(req.getParameter("page"), 0);
-                int size = parseQueryInt(req.getParameter("size"), 20);
-
-                var pending = service.getPendingTopUps(page, size);
-                Map<String, Object> result = new LinkedHashMap<>();
-                result.put("success", true);
-                result.put("data", pending.getItems());
-                result.put("meta", pending.getMeta());
-
-                writeJson(resp, HttpServletResponse.SC_OK, result);
-                return;
-            }
-
-            // 4. GET /wallet/top-up/{id}
+            // 3. GET /wallet/top-up/{id}
             if (action.startsWith("/top-up/")) {
                 String idStr = action.substring("/top-up/".length());
                 long txId = parseLongId(idStr);
@@ -98,10 +77,9 @@ public class WalletController extends HttpServlet {
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         try {
             long userId = getUserId(req);
-            String role = getRole(req);
             String action = pathInfo(req);
 
-            // 1. POST /wallet/top-up: Tạo yêu cầu nạp tiền
+            // 1. POST /wallet/top-up: Nạp tiền vào ví
             if ("/top-up".equals(action)) {
                 String idempotencyKey = req.getHeader("Idempotency-Key");
                 if (idempotencyKey == null || idempotencyKey.isBlank()) {
@@ -112,19 +90,6 @@ public class WalletController extends HttpServlet {
                 var data = service.topUp(userId, body, idempotencyKey);
 
                 writeJson(resp, HttpServletResponse.SC_CREATED, ApiResponse.ok(data));
-                return;
-            }
-
-            // 2. POST /wallet/top-up/{id}/confirm: ADMIN duyệt nạp tiền
-            if (action.startsWith("/top-up/") && action.endsWith("/confirm")) {
-                requireAdmin(role);
-                String idStr = action.substring("/top-up/".length(), action.length() - "/confirm".length());
-                long txId = parseLongId(idStr);
-
-                AdminConfirmRequest body = json.readValue(req.getInputStream(), AdminConfirmRequest.class);
-                var data = service.confirmTopUp(txId, body);
-
-                writeJson(resp, HttpServletResponse.SC_OK, ApiResponse.ok(data));
                 return;
             }
 
@@ -151,17 +116,6 @@ public class WalletController extends HttpServlet {
         if (uid instanceof Long l) return l;
         if (uid instanceof Integer i) return i.longValue();
         throw ApiException.unauthorized("Chưa đăng nhập hoặc thiếu token xác thực");
-    }
-
-    private String getRole(HttpServletRequest req) {
-        Object role = req.getAttribute("role");
-        return role != null ? role.toString() : "USER";
-    }
-
-    private void requireAdmin(String role) {
-        if (!"ADMIN".equalsIgnoreCase(role)) {
-            throw ApiException.forbidden("Chỉ quản trị viên (ADMIN) mới có quyền thực hiện hành động này");
-        }
     }
 
     private long parseLongId(String idStr) {

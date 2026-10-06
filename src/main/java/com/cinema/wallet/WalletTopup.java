@@ -4,8 +4,8 @@ import jakarta.persistence.*;
 import java.time.Instant;
 
 /**
- * Thực thể Yêu cầu nạp tiền (Mapping bảng cinema.wallet_topups trong PostgreSQL).
- * Quản lý vòng đời của yêu cầu nạp tiền: PENDING, SUCCESSFUL, FAILED, EXPIRED.
+ * Thực thể Yêu cầu nạp tiền.
+ * Quản lý vòng đời của yêu cầu nạp tiền.
  */
 @Entity
 @Table(name = "wallet_topups", schema = "cinema")
@@ -26,8 +26,9 @@ public class WalletTopup {
     @Column(length = 3, nullable = false)
     private String currency = "VND";
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 25)
-    private String status = "PENDING";
+    private WalletTopupStatus status = WalletTopupStatus.SUCCEEDED;
 
     @Column(name = "checkout_url", columnDefinition = "text")
     private String checkoutUrl;
@@ -38,7 +39,7 @@ public class WalletTopup {
     @Column(name = "created_at")
     private Instant createdAt = Instant.now();
 
-    @Column(name = "expires_at")
+    @Column(name = "expires_at", nullable = false)
     private Instant expiresAt;
 
     @Column(name = "completed_at")
@@ -78,11 +79,11 @@ public class WalletTopup {
         this.currency = currency;
     }
 
-    public String getStatus() {
+    public WalletTopupStatus getStatus() {
         return status;
     }
 
-    public void setStatus(String status) {
+    public void setStatus(WalletTopupStatus status) {
         this.status = status;
     }
 

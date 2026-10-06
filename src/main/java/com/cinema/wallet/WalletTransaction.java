@@ -4,8 +4,8 @@ import jakarta.persistence.*;
 import java.time.Instant;
 
 /**
- * Thực thể Bút toán giao dịch ví (Mapping bảng cinema.wallet_transactions).
- * Sổ cái biến động số dư: Nạp tiền (TOP_UP), Thanh toán vé (PAYMENT), Hoàn tiền (REFUND).
+ * Thực thể Bút toán giao dịch ví
+ * Sổ cái biến động số dư
  */
 @Entity
 @Table(name = "wallet_transactions", schema = "cinema")
@@ -24,7 +24,7 @@ public class WalletTransaction {
     private String transactionType;
 
     @Column(nullable = false, length = 6)
-    private String direction; // "IN" hoặc "OUT"
+    private String direction; // "CREDIT" hoặc "DEBIT"
 
     @Column(nullable = false)
     private Long amount;

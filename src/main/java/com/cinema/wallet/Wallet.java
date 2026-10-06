@@ -6,8 +6,8 @@ import jakarta.persistence.*;
 import java.time.Instant;
 
 /**
- * Thực thể Ví người dùng (Mapping bảng cinema.wallets).
- * Quản lý số dư (Long - VND) và trạng thái ví của từng tài khoản người dùng.
+ * Thực thể Ví người dùng
+ * Quản lý số dư và trạng thái ví của từng tài khoản người dùng.
  */
 @Entity
 @Table(name = "wallets", schema = "cinema")
