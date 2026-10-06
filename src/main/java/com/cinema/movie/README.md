@@ -8,19 +8,23 @@ Tài liệu kỹ thuật mô tả kiến trúc, endpoint API, cấu trúc dữ l
 
 ```text
 com.cinema.movie/
-├── MovieController.java        # Servlet tiếp nhận HTTP GET /movie
-├── MovieService.java           # Xử lý validation, phân trang và mapping DTO
-├── MovieDAO.java               # Truy vấn CSDL JPA/Hibernate & Native SQL
-├── Movie.java                  # Entity ánh xạ bảng cinema.movies
-├── Genre.java                  # Entity ánh xạ bảng cinema.genres (Many-to-Many)
-├── DTO/
-│   ├── Request/
+├── controller/
+│   └── MovieController.java        # Servlet tiếp nhận HTTP GET /movie
+├── dao/
+│   └── MovieDAO.java               # Truy vấn CSDL JPA/Hibernate & Native SQL
+├── dto/
+│   ├── request/
 │   │   └── MovieRequest.java       # DTO đóng gói tham số query & pagination
-│   └── Response/
+│   └── response/
 │       ├── MovieResponse.java      # DTO dữ liệu phim trả về client
 │       ├── ShowtimeResponse.java   # DTO dữ liệu suất chiếu trả về client
 │       └── ReviewResponse.java     # DTO dữ liệu đánh giá phim trả về client
-└── README.md                   # Tài liệu kỹ thuật module
+├── entity/
+│   ├── Movie.java                  # Entity ánh xạ bảng cinema.movies
+│   └── Genre.java                  # Entity ánh xạ bảng cinema.genres (Many-to-Many)
+├── service/
+│   └── MovieService.java           # Xử lý validation, phân trang và mapping DTO
+└── README.md                       # Tài liệu kỹ thuật module
 ```
 
 ---

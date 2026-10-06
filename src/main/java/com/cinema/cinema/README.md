@@ -8,16 +8,20 @@ Tài liệu kỹ thuật mô tả kiến trúc, endpoint API, cấu trúc dữ l
 
 ```text
 com.cinema.cinema/
-├── CinemaController.java                 # Servlet tiếp nhận HTTP GET /cinema, điều phối URL Dispatcher
-├── CinemaService.java                    # Xử lý validation, phân trang và mapping DTO
-├── CinemaDAO.java                        # Tầng truy vấn CSDL JPA/Hibernate (JPQL & Native SQL)
-├── Cinema.java                           # Entity ánh xạ bảng cinema.cinemas
-├── DTO/
-│   ├── Request/
+├── controller/
+│   └── CinemaController.java             # Servlet tiếp nhận HTTP GET /cinema, điều phối URL Dispatcher
+├── dao/
+│   └── CinemaDAO.java                    # Tầng truy vấn CSDL JPA/Hibernate (JPQL & Native SQL)
+├── dto/
+│   ├── request/
 │   │   └── CinemaRequest.java            # DTO đóng gói tham số query & pagination
-│   └── Response/
+│   └── response/
 │       ├── CinemaResponse.java           # DTO dữ liệu rạp trả về client
 │       └── CinemaShowtimeResponse.java   # DTO dữ liệu lịch chiếu rạp (14 trường)
+├── entity/
+│   └── Cinema.java                       # Entity ánh xạ bảng cinema.cinemas
+├── service/
+│   └── CinemaService.java                # Xử lý validation, phân trang và mapping DTO
 └── README.md                             # Tài liệu kỹ thuật module
 ```
 

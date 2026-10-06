@@ -1,6 +1,7 @@
-package com.cinema.cinema;
+package com.cinema.cinema.controller;
 
-import com.cinema.cinema.DTO.Request.CinemaRequest;
+import com.cinema.cinema.dto.request.CinemaRequest;
+import com.cinema.cinema.service.CinemaService;
 import com.cinema.common.exception.ApiException;
 import com.cinema.common.exception.ErrorHandler;
 import com.fasterxml.jackson.databind.ObjectMapper;

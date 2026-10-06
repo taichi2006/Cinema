@@ -1,9 +1,11 @@
-package com.cinema.movie;
+package com.cinema.movie.dao;
 
 import com.cinema.common.util.JPAUtil;
-import com.cinema.movie.DTO.Request.MovieRequest;
-import com.cinema.movie.DTO.Response.ReviewResponse;
-import com.cinema.movie.DTO.Response.ShowtimeResponse;
+import com.cinema.movie.dto.request.MovieRequest;
+import com.cinema.movie.dto.response.ReviewResponse;
+import com.cinema.movie.dto.response.ShowtimeResponse;
+import com.cinema.movie.entity.Genre;
+import com.cinema.movie.entity.Movie;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.TypedQuery;

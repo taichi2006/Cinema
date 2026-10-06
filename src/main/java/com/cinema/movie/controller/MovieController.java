@@ -1,10 +1,11 @@
-package com.cinema.movie;
+package com.cinema.movie.controller;
 
 import com.cinema.common.dto.CommonDTO.ApiResponse;
 import com.cinema.common.exception.ApiException;
 import com.cinema.common.exception.ErrorHandler;
-import com.cinema.movie.DTO.Request.MovieRequest;
-import com.cinema.movie.DTO.Response.MovieResponse;
+import com.cinema.movie.dto.request.MovieRequest;
+import com.cinema.movie.dto.response.MovieResponse;
+import com.cinema.movie.service.MovieService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;

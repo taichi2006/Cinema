@@ -1,4 +1,4 @@
-package com.cinema.movie.DTO.Response;
+package com.cinema.movie.dto.response;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;

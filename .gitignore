@@ -46,4 +46,69 @@ swagger_cinema.yaml
 src/main/java/com/cinema/wallet/docs/POSTMAN_GUIDE.md
 .smarttomcat
 
+src/main/java/com/cinema/wallet/test/wallet_postman.jsontarget/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+.kotlin
+
+### IntelliJ IDEA ###
+.idea/modules.xml
+.idea/jarRepositories.xml
+.idea/compiler.xml
+.idea/libraries/
+*.iws
+*.iml
+*.ipr
+
+### Eclipse ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### VS Code ###
+.vscode/
+
+### Mac OS ###
+.DS_Store
+
+.env
+
+UMLClassDiagram.drawio.png
+PROJECT_STRUCTURE.md
+swagger_cinema.yaml
+src/main/java/com/cinema/wallet/docs/POSTMAN_GUIDE.md
+.smarttomcat
+
 src/main/java/com/cinema/wallet/test/wallet_postman.json
+
+# Markdown, giữ README
+*.[mM][dD]
+![rR][eE][aA][dD][mM][eE].[mM][dD]
+
+# Postman
+.postman/
+[Pp]ostman/
+*.postman_collection.json
+*.postman_environment.json
+*.postman_globals.json
+
+#SQL
+*.[sS][qQ][lL]
+
+#test
+src/test/

@@ -1,11 +1,11 @@
 package com.cinema.home;
 
-import com.cinema.cinema.CinemaDAO.CityItem;
-import com.cinema.cinema.CinemaService;
-import com.cinema.cinema.DTO.Request.CinemaRequest;
-import com.cinema.movie.DTO.Request.MovieRequest;
-import com.cinema.movie.Genre;
-import com.cinema.movie.MovieService;
+import com.cinema.cinema.dao.CinemaDAO.CityItem;
+import com.cinema.cinema.dto.request.CinemaRequest;
+import com.cinema.cinema.service.CinemaService;
+import com.cinema.movie.dto.request.MovieRequest;
+import com.cinema.movie.entity.Genre;
+import com.cinema.movie.service.MovieService;
 
 import java.util.ArrayList;
 import java.util.Collections;

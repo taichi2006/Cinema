@@ -1,7 +1,8 @@
-package com.cinema.cinema;
+package com.cinema.cinema.dao;
 
-import com.cinema.cinema.DTO.Request.CinemaRequest;
-import com.cinema.cinema.DTO.Response.CinemaShowtimeResponse;
+import com.cinema.cinema.dto.request.CinemaRequest;
+import com.cinema.cinema.dto.response.CinemaShowtimeResponse;
+import com.cinema.cinema.entity.Cinema;
 import com.cinema.common.util.JPAUtil;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.TypedQuery;

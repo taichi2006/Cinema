@@ -1,8 +1,11 @@
-package com.cinema.cinema;
+package com.cinema.cinema.service;
 
-import com.cinema.cinema.DTO.Request.CinemaRequest;
-import com.cinema.cinema.DTO.Response.CinemaResponse;
-import com.cinema.cinema.DTO.Response.CinemaShowtimeResponse;
+import com.cinema.cinema.dao.CinemaDAO;
+import com.cinema.cinema.dao.CinemaDAO.CityItem;
+import com.cinema.cinema.dto.request.CinemaRequest;
+import com.cinema.cinema.dto.response.CinemaResponse;
+import com.cinema.cinema.dto.response.CinemaShowtimeResponse;
+import com.cinema.cinema.entity.Cinema;
 import com.cinema.common.dto.CommonDTO.PageMeta;
 import com.cinema.common.exception.ApiException;
 

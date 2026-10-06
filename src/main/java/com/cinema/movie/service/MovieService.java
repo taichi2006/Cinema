@@ -1,12 +1,15 @@
-package com.cinema.movie;
+package com.cinema.movie.service;
 
 import com.cinema.common.dto.CommonDTO.ApiResponse;
 import com.cinema.common.dto.CommonDTO.PageMeta;
 import com.cinema.common.exception.ApiException;
-import com.cinema.movie.DTO.Request.MovieRequest;
-import com.cinema.movie.DTO.Response.MovieResponse;
-import com.cinema.movie.DTO.Response.ReviewResponse;
-import com.cinema.movie.DTO.Response.ShowtimeResponse;
+import com.cinema.movie.dao.MovieDAO;
+import com.cinema.movie.dto.request.MovieRequest;
+import com.cinema.movie.dto.response.MovieResponse;
+import com.cinema.movie.dto.response.ReviewResponse;
+import com.cinema.movie.dto.response.ShowtimeResponse;
+import com.cinema.movie.entity.Genre;
+import com.cinema.movie.entity.Movie;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;

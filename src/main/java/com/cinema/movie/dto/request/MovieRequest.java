@@ -1,4 +1,4 @@
-package com.cinema.movie.DTO.Request;
+package com.cinema.movie.dto.request;
 
 public class MovieRequest {
 
