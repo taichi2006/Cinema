@@ -19,28 +19,22 @@ Hệ thống sử dụng mô hình MVC với **Thin Controller** và **Thick Ser
 
 - **`User.java`**: Map với bảng `cinema.users`. Chỉ chứa các trường: `id`, `role`, `email`, `passwordHash`, `fullName`, `status`. Tuyệt đối không nhồi nhét các logic thừa thãi.
 - **`Role.java`**: Map với bảng `cinema.roles` (quan hệ N-1 với User).
-- **`UserService.java`**: Xử lý các nghiệp vụ của User hiện tại (Lấy thông tin cá nhân `getMe`, Đổi tên `updateProfile`). Sử dụng toàn bộ lệnh JPA thuần túy (`em.find()`, `user.set...`).
+- **`UserService.java`**: Xử lý các nghiệp vụ của User hiện tại (Lấy thông tin cá nhân `getMe`, Đổi tên `updateProfile`, Đổi mật khẩu `changePassword`). Sử dụng toàn bộ lệnh JPA thuần túy (`em.find()`, `user.set...`).
 
 ---
 
-## 3. Module `auth` (Hệ thống đăng nhập bằng Token)
+## 3. Module `auth` (Hệ thống đăng nhập siêu tinh gọn)
 
-Chúng ta sử dụng cơ chế **JWT Bearer Authorization** với Access Token (ngắn hạn) và Refresh Token (dài hạn).
+Chúng ta sử dụng cơ chế **JWT Cookie-based** với duy nhất **1 Access Token dài hạn (7 ngày)**, không cần Refresh Token hay bảng phụ trợ.
 
 ### 3.1. Các Endpoint cung cấp
 1. **`POST /api/auth/register`**: Tạo tài khoản với mật khẩu được mã hóa tự động bằng `BCrypt`.
-2. **`POST /api/auth/login`**: Kiểm tra Email/Password và `status` (bị khóa hay không). Nếu thành công, Server trả về thông tin User kèm `accessToken` và `refreshToken`.
-3. **`POST /api/auth/refresh`**: Cấp lại Access Token và Refresh Token mới dựa vào Refresh Token cũ.
-4. **`POST /api/auth/logout`**: Đăng xuất thành công. Client tự xóa token.
+2. **`POST /api/auth/login`**: Kiểm tra Email/Password và `status` (bị khóa hay không). Nếu thành công, Server tự tạo 1 Cookie chứa chuỗi JWT ném về cho trình duyệt.
+3. **`POST /api/auth/logout`**: Chỉ đơn giản là yêu cầu trình duyệt "xóa Cookie JWT đi". Không cần kết nối Database.
 
 ### 3.2. Tiện ích `JwtUtil.java`
-- Chỉ đảm nhận 2 việc: Ký tạo (Generate) token và Đọc (Parse) token.
+- Chỉ đảm nhận 2 việc: Ký tạo (Generate) token và Đọc (Parse) token. 
 - Token chứa 2 thông tin cơ bản: `userId` và `role`.
-
-### 3.3. Tổ chức DTO (Data Transfer Object)
-- Tất cả các Object gửi lên Server và trả về đều được chuẩn hóa nằm trong:
-  - `com.cinema.auth.dto.request`: `LoginRequest`, `RegisterRequest`, `RefreshRequest`.
-  - `com.cinema.auth.dto.response`: `LoginResponse`, `AuthUserResponse`.
 
 ---
 
@@ -48,8 +42,8 @@ Chúng ta sử dụng cơ chế **JWT Bearer Authorization** với Access Token 
 
 Thay vì mỗi API phải tự kiểm tra xem User đã đăng nhập chưa, chúng ta sử dụng **Filter**.
 
-- `AuthFilter` được đăng ký để tự động chặn tất cả các Request đi vào `/user/*`, `/booking/*`, `/admin/*`.
-- Khi có Request đi qua, nó sẽ tự động đọc header `Authorization` (định dạng `Bearer <token>`), giải mã token.
+- `AuthFilter` được đăng ký để tự động "trấn lột" tất cả các Request đi vào `/user/*`, `/booking/*`, `/admin/*`.
+- Khi có Request đi qua, nó sẽ tự động chui vào Cookie, lấy JWT ra giải mã.
 - **Nếu Token hợp lệ**: Nó nhét `userId` và `role` vào `request.setAttribute` rồi mở cửa cho đi tiếp vào Controller.
 - **Nếu Token sai / hết hạn / không có**: Nó ném lỗi `401 Unauthorized` và đuổi về ngay lập tức. Cửa đóng.
 
@@ -94,7 +88,5 @@ Các hàm đã được định nghĩa sẵn bao gồm:
 ---
 
 ## Lời khuyên cho Frontend Team
-- **Lưu Access Token**: Sau khi có được `accessToken` từ API Login, Frontend nên lưu token này (vd: `localStorage` hoặc `sessionStorage`).
-- **Gửi Token lên Server**: Trong tất cả các API cần xác thực quyền, bắt buộc phải đính kèm header:
-  `Authorization: Bearer <accessToken>`
-- Khi gọi Logout, Frontend chỉ cần tự xóa Token dưới client mà không cần bắt buộc phụ thuộc hoàn toàn vào Response.
+- **Tuyệt đối không lưu Token vào `localStorage`**.
+- Hãy bật cấu hình `credentials: 'include'` (với Fetch) hoặc `withCredentials: true` (với Axios). Khi đó trình duyệt sẽ tự động gửi Cookie lên Server một cách an toàn và vô hình!
