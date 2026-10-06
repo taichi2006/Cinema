@@ -47,5 +47,4 @@ src/main/java/com/cinema/wallet/docs/POSTMAN_GUIDE.md
 .smarttomcat
 
 src/main/java/com/cinema/wallet/test/
-src/main/java/com/cinema/wallet/test/wallet_postman.json
 /test/
