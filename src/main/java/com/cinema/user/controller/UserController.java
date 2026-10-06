@@ -8,7 +8,7 @@ import com.cinema.user.service.UserService;
 import com.cinema.user.service.UserVoucherService;
 
 import com.cinema.auth.AuthService;
-import com.cinema.auth.ChangePasswordRequest;
+import com.cinema.auth.dto.request.ChangePasswordRequest;
 import com.cinema.auth.AuthException;
 import com.cinema.common.dto.CommonDTO.ApiResponse;
 import com.cinema.common.exception.ApiException;

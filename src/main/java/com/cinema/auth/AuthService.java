@@ -2,13 +2,14 @@ package com.cinema.auth;
 
 import com.cinema.common.exception.ApiException;
 import com.cinema.common.util.JPAUtil;
-import com.cinema.user.Role;
-import com.cinema.user.User;
+import com.cinema.user.entity.Role;
+import com.cinema.user.entity.User;
 import com.cinema.wallet.Wallet; 
 
 import jakarta.persistence.EntityManager;
 import org.mindrot.jbcrypt.BCrypt;
 
+import com.cinema.auth.dto.request.ChangePasswordRequest;
 import com.cinema.auth.dto.request.LoginRequest;
 import com.cinema.auth.dto.request.RegisterRequest;
 import com.cinema.auth.dto.request.RefreshRequest;
@@ -123,6 +124,39 @@ public class AuthService {
             }
         } catch (Exception e) {
             throw AuthException.invalidToken();
+        }
+    }
+
+    public void changePassword(long userId, ChangePasswordRequest req) {
+        if (req == null || req.oldPassword() == null || req.newPassword() == null)
+            throw ApiException.badRequest("Thiếu oldPassword hoặc newPassword");
+        if (req.newPassword().length() < 8)
+            throw ApiException.badRequest("Mật khẩu mới phải có ít nhất 8 ký tự");
+
+        EntityManager em = JPAUtil.getEntityManager();
+        try {
+            em.getTransaction().begin();
+            User user = em.find(User.class, userId);
+            if (user == null)
+                throw ApiException.notFound("Người dùng không tồn tại");
+
+            if ("DISABLED".equals(user.getStatus()))
+                throw AuthException.accountLocked();
+
+            if (!BCrypt.checkpw(req.oldPassword(), user.getPasswordHash()))
+                throw ApiException.badRequest("Mật khẩu cũ không đúng");
+
+            user.setPasswordHash(BCrypt.hashpw(req.newPassword(), BCrypt.gensalt(12)));
+            int currentAuthVersion = user.getAuthVersion() == null ? 0 : user.getAuthVersion();
+            user.setAuthVersion(currentAuthVersion + 1);
+
+            em.getTransaction().commit();
+        } catch (Exception e) {
+            if (em.getTransaction().isActive()) em.getTransaction().rollback();
+            if (e instanceof ApiException) throw e;
+            throw ApiException.internal("Lỗi hệ thống: " + e.getMessage());
+        } finally {
+            em.close();
         }
     }
 }

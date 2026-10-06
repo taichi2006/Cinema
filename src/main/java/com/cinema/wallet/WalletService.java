@@ -3,7 +3,7 @@ package com.cinema.wallet;
 import com.cinema.common.dto.CommonDTO.PageMeta;
 import com.cinema.common.exception.ApiException;
 import com.cinema.common.util.JPAUtil;
-import com.cinema.user.User;
+import com.cinema.user.entity.User;
 import com.cinema.wallet.dto.request.TopUpRequest;
 import com.cinema.wallet.dto.response.*;
 import jakarta.persistence.EntityManager;

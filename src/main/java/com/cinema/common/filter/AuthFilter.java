@@ -28,6 +28,9 @@ public class AuthFilter implements Filter {
             if (authHeader != null && authHeader.startsWith("Bearer ")) {
                 token = authHeader.substring(7);
             }
+            if (token == null) {
+                token = JwtUtil.readCookie(req, JwtUtil.COOKIE_ACCESS);
+            }
             if (token == null)
                 throw AuthException.unauthorized();
 

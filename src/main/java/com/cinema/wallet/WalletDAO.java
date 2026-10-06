@@ -1,7 +1,7 @@
 package com.cinema.wallet;
 
 import com.cinema.common.util.JPAUtil;
-import com.cinema.user.User;
+import com.cinema.user.entity.User;
 import jakarta.persistence.EntityManager;
 
 import java.util.List;
