@@ -13,7 +13,8 @@ import jakarta.servlet.http.HttpServletResponse;
 
 import java.io.IOException;
 
-@WebFilter(urlPatterns = {"/user/*", "/booking/*", "/admin/*", "/showtime/*"}, dispatcherTypes = {DispatcherType.REQUEST, DispatcherType.FORWARD})
+@WebFilter(urlPatterns = { "/user/*", "/booking/*", "/admin/*", "/wallet/*" }, dispatcherTypes = {
+        DispatcherType.REQUEST, DispatcherType.FORWARD })
 public class AuthFilter implements Filter {
 
     @Override
@@ -27,6 +28,9 @@ public class AuthFilter implements Filter {
             String token = null;
             if (authHeader != null && authHeader.startsWith("Bearer ")) {
                 token = authHeader.substring(7);
+            }
+            if (token == null) {
+                token = JwtUtil.readCookie(req, JwtUtil.COOKIE_ACCESS);
             }
             if (token == null)
                 throw AuthException.unauthorized();

@@ -1,0 +1,132 @@
+{
+    "info": {
+        "name": "Cinema - Wallet Module (Direct Localhost)",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "0. Register User",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"email\": \"customer@gmail.com\",\n  \"password\": \"Password123@\",\n  \"fullName\": \"Nguyen Van A\"\n}"
+                },
+                "url": {
+                    "raw": "http://localhost:8080/api/auth/register"
+                }
+            }
+        },
+        {
+            "name": "1. Login User",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"email\": \"customer@gmail.com\",\n  \"password\": \"Password123@\"\n}"
+                },
+                "url": {
+                    "raw": "http://localhost:8080/api/auth/login"
+                }
+            }
+        },
+        {
+            "name": "2. Get My Wallet",
+            "request": {
+                "method": "GET",
+                "header": [
+                    {
+                        "key": "Authorization",
+                        "value": "Bearer <YOUR_TOKEN_HERE>"
+                    }
+                ],
+                "url": {
+                    "raw": "http://localhost:8080/api/wallet"
+                }
+            }
+        },
+        {
+            "name": "3. Top-Up Wallet (Auto-Success)",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Authorization",
+                        "value": "Bearer <YOUR_TOKEN_HERE>"
+                    },
+                    {
+                        "key": "Idempotency-Key",
+                        "value": "topup-unique-key-12345678"
+                    },
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"amount\": 200000,\n  \"method\": \"BANK_TRANSFER\"\n}"
+                },
+                "url": {
+                    "raw": "http://localhost:8080/api/wallet/top-up"
+                }
+            }
+        },
+        {
+            "name": "4. Get Top-Up Detail",
+            "request": {
+                "method": "GET",
+                "header": [
+                    {
+                        "key": "Authorization",
+                        "value": "Bearer <YOUR_TOKEN_HERE>"
+                    }
+                ],
+                "url": {
+                    "raw": "http://localhost:8080/api/wallet/top-up/1"
+                }
+            }
+        },
+        {
+            "name": "5. Get Transactions History",
+            "request": {
+                "method": "GET",
+                "header": [
+                    {
+                        "key": "Authorization",
+                        "value": "Bearer <YOUR_TOKEN_HERE>"
+                    }
+                ],
+                "url": {
+                    "raw": "http://localhost:8080/api/wallet/transaction?page=0&size=10&type=TOP_UP",
+                    "query": [
+                        {
+                            "key": "page",
+                            "value": "0"
+                        },
+                        {
+                            "key": "size",
+                            "value": "10"
+                        },
+                        {
+                            "key": "type",
+                            "value": "TOP_UP"
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+}

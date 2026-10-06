@@ -25,7 +25,7 @@ src/main/java/com/cinema/
 ## 🔌 API Endpoints
 Toàn bộ API được tự động cấu hình tiền tố `/api/` qua Filter.
 Ví dụ:
-- `GET /api/movie` - Lấy danh sách phim
+- `GET /api/movies` - Lấy danh sách phim
 
 *(Để thêm API mới, chỉ cần khai báo `@WebServlet("/endpoint")` trong Controller, hệ thống tự động nhận diện thành `/api/endpoint`)*
 

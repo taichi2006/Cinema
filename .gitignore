@@ -40,16 +40,10 @@ build/
 
 .env
 
-# Markdown, giữ README
-*.[mM][dD]
-![rR][eE][aA][dD][mM][eE].[mM][dD]
+UMLClassDiagram.drawio.png
+PROJECT_STRUCTURE.md
+swagger_cinema.yaml
+src/main/java/com/cinema/wallet/docs/POSTMAN_GUIDE.md
+.smarttomcat
 
-# Postman
-.postman/
-[Pp]ostman/
-*.postman_collection.json
-*.postman_environment.json
-*.postman_globals.json
-
-#SQL
-*.[sS][qQ][lL]
+src/main/java/com/cinema/wallet/test/wallet_postman.json
