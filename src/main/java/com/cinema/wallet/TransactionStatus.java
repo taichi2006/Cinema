@@ -22,6 +22,6 @@ public enum TransactionStatus {
      * Kiểm tra trạng thái giao dịch có phải là thành công hay không.
      */
     public boolean isSuccessful() {
-        return this == SUCCEEDED || this == SUCCESSFUL;
+        return this == SUCCEEDED || this == SUCCESSFUL || this == PENDING;
     }
 }
