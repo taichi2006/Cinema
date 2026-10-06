@@ -17,6 +17,10 @@
         <class>com.cinema.movie.Movie</class>
         <class>com.cinema.user.Role</class>
         <class>com.cinema.user.User</class>
+        <!-- Module Wallet: Ví người dùng, nạp tiền và lịch sử bút toán giao dịch -->
+        <class>com.cinema.wallet.Wallet</class>
+        <class>com.cinema.wallet.WalletTopup</class>
+        <class>com.cinema.wallet.WalletTransaction</class>
 
         <properties>
 
