@@ -1,4 +1,4 @@
-package com.cinema.wallet;
+package com.cinema.wallet.entity;
 
 import jakarta.persistence.*;
 import java.time.Instant;

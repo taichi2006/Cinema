@@ -4,7 +4,7 @@ import com.cinema.common.exception.ApiException;
 import com.cinema.common.util.JPAUtil;
 import com.cinema.user.Role;
 import com.cinema.user.User;
-import com.cinema.wallet.Wallet; 
+import com.cinema.wallet.entity.Wallet; 
 
 import jakarta.persistence.EntityManager;
 import org.mindrot.jbcrypt.BCrypt;

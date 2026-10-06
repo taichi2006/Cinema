@@ -1,6 +1,8 @@
-package com.cinema.wallet;
+package com.cinema.wallet.dao;
 
 import com.cinema.common.util.JPAUtil;
+import com.cinema.wallet.entity.WalletTopup;
+import com.cinema.wallet.enums.WalletTopupStatus;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityTransaction;
 
@@ -51,9 +53,10 @@ public class WalletTopupDAO {
         EntityManager em = JPAUtil.getEntityManager();
         try {
             return em.createQuery(
-                    "SELECT t FROM WalletTopup t JOIN FETCH t.wallet w JOIN FETCH w.user WHERE t.status = 'PENDING' ORDER BY t.createdAt DESC",
+                    "SELECT t FROM WalletTopup t JOIN FETCH t.wallet w JOIN FETCH w.user WHERE t.status = :status ORDER BY t.createdAt DESC",
                     WalletTopup.class
             )
+            .setParameter("status", WalletTopupStatus.PENDING)
             .setFirstResult(page * size)
             .setMaxResults(size)
             .getResultList();
@@ -66,9 +69,11 @@ public class WalletTopupDAO {
         EntityManager em = JPAUtil.getEntityManager();
         try {
             return em.createQuery(
-                    "SELECT COUNT(t) FROM WalletTopup t WHERE t.status = 'PENDING'",
+                    "SELECT COUNT(t) FROM WalletTopup t WHERE t.status = :status",
                     Long.class
-            ).getSingleResult();
+            )
+            .setParameter("status", WalletTopupStatus.PENDING)
+            .getSingleResult();
         } finally {
             em.close();
         }

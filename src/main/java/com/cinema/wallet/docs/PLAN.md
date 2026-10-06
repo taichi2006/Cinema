@@ -13,28 +13,36 @@ Tổ chức thư mục `dto/` được phân tách khoa học thành 3 phần r�
 ```
 src/main/java/com/cinema/
 └── wallet/
-    ├── docs/
-    │   └── PLAN.md                ← file kế hoạch này
+    ├── controller/
+    │   └── WalletController.java      ← Servlet @WebServlet(urlPatterns = {"/wallet", "/wallet/*"})
+    ├── service/
+    │   └── WalletService.java         ← Logic nghiệp vụ & Data Mapping
+    ├── dao/
+    │   ├── WalletDAO.java             ← Truy vấn CSDL cho Wallet
+    │   ├── WalletTopupDAO.java        ← Truy vấn CSDL cho WalletTopup
+    │   └── WalletTransactionDAO.java  ← Truy vấn CSDL cho WalletTransaction
+    ├── entity/
+    │   ├── Wallet.java                ← JPA Entity (bảng cinema.wallets)
+    │   ├── WalletTopup.java           ← JPA Entity (bảng cinema.wallet_topups)
+    │   └── WalletTransaction.java     ← JPA Entity (bảng cinema.wallet_transactions)
+    ├── enums/
+    │   ├── WalletStatus.java          ← Enum: ACTIVE | SUSPENDED
+    │   ├── WalletTopupStatus.java     ← Enum: PENDING | SUCCEEDED | FAILED | EXPIRED | REVERSAL_PENDING | REVERSED
+    │   └── TransactionType.java       ← Enum: TOP_UP | PAYMENT | REFUND
+    ├── exception/
+    │   └── WalletException.java       ← Exception nghiệp vụ ví kế thừa ApiException
     ├── dto/
-    │   ├── request/               ← 1. Request DTOs
+    │   ├── request/
     │   │   └── TopUpRequest.java
-    │   └── response/              ← 2. Response DTOs
+    │   └── response/
     │       ├── WalletResponse.java
     │       ├── TopUpResponse.java
     │       └── TransactionItemResponse.java
-    │   (Tái sử dụng CommonDTO.ApiResponse & CommonDTO.PageMeta từ module common)
-    ├── Wallet.java                ← JPA Entity (bảng cinema.wallets)
-    ├── WalletTopup.java           ← JPA Entity (bảng cinema.wallet_topups)
-    ├── WalletTransaction.java     ← JPA Entity (bảng cinema.wallet_transactions)
-    ├── TransactionType.java       ← Enum: TOP_UP | PAYMENT | REFUND
-    ├── WalletTopupStatus.java     ← Enum: PENDING | SUCCEEDED | FAILED | EXPIRED | REVERSAL_PENDING | REVERSED
-    ├── WalletStatus.java          ← Enum: ACTIVE | SUSPENDED
-    ├── WalletException.java       ← Exception nghiệp vụ ví kế thừa ApiException
-    ├── WalletDAO.java             ← Truy vấn CSDL cho Wallet
-    ├── WalletTopupDAO.java        ← Truy vấn CSDL cho WalletTopup
-    ├── WalletTransactionDAO.java  ← Truy vấn CSDL cho WalletTransaction
-    ├── WalletService.java         ← Logic nghiệp vụ & Data Mapping
-    └── WalletController.java      ← Servlet @WebServlet(urlPatterns = {"/wallet", "/wallet/*"})
+    ├── docs/
+    │   ├── PLAN.md                    ← File kế hoạch này
+    │   └── POSTMAN_GUIDE.md           ← Hướng dẫn test API chi tiết
+    └── test/
+        └── wallet_postman.json        ← Postman Collection
 ```
 
 ---

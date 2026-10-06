@@ -1,4 +1,4 @@
-package com.cinema.wallet;
+package com.cinema.wallet.exception;
 
 import com.cinema.common.exception.ApiException;
 

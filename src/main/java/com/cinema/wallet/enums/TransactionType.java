@@ -1,4 +1,4 @@
-package com.cinema.wallet;
+package com.cinema.wallet.enums;
 
 public enum TransactionType {
     TOP_UP("CREDIT"), // nạp tiền

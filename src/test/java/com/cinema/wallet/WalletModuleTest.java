@@ -5,6 +5,13 @@ import com.cinema.common.dto.CommonDTO.ErrorResponse;
 import com.cinema.common.dto.CommonDTO.PageMeta;
 import com.cinema.user.User;
 import com.cinema.wallet.dto.response.WalletResponse;
+import com.cinema.wallet.entity.Wallet;
+import com.cinema.wallet.entity.WalletTopup;
+import com.cinema.wallet.entity.WalletTransaction;
+import com.cinema.wallet.enums.TransactionType;
+import com.cinema.wallet.enums.WalletStatus;
+import com.cinema.wallet.enums.WalletTopupStatus;
+import com.cinema.wallet.exception.WalletException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 

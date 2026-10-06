@@ -1,9 +1,10 @@
-package com.cinema.wallet;
+package com.cinema.wallet.controller;
 
 import com.cinema.common.dto.CommonDTO.ApiResponse;
 import com.cinema.common.exception.ApiException;
 import com.cinema.common.exception.ErrorHandler;
 import com.cinema.wallet.dto.request.TopUpRequest;
+import com.cinema.wallet.service.WalletService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;

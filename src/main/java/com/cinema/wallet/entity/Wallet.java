@@ -1,6 +1,7 @@
-package com.cinema.wallet;
+package com.cinema.wallet.entity;
 
 import com.cinema.user.User;
+import com.cinema.wallet.enums.WalletStatus;
 import jakarta.persistence.*;
 
 import java.time.Instant;

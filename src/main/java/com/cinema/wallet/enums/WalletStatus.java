@@ -1,4 +1,4 @@
-package com.cinema.wallet;
+package com.cinema.wallet.enums;
 
 /**
  * Trạng thái hoạt động của ví:

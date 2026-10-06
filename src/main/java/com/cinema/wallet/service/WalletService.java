@@ -1,11 +1,21 @@
-package com.cinema.wallet;
+package com.cinema.wallet.service;
 
 import com.cinema.common.dto.CommonDTO.PageMeta;
 import com.cinema.common.exception.ApiException;
 import com.cinema.common.util.JPAUtil;
 import com.cinema.user.User;
+import com.cinema.wallet.dao.WalletDAO;
+import com.cinema.wallet.dao.WalletTopupDAO;
+import com.cinema.wallet.dao.WalletTransactionDAO;
 import com.cinema.wallet.dto.request.TopUpRequest;
 import com.cinema.wallet.dto.response.*;
+import com.cinema.wallet.entity.Wallet;
+import com.cinema.wallet.entity.WalletTopup;
+import com.cinema.wallet.entity.WalletTransaction;
+import com.cinema.wallet.enums.TransactionType;
+import com.cinema.wallet.enums.WalletStatus;
+import com.cinema.wallet.enums.WalletTopupStatus;
+import com.cinema.wallet.exception.WalletException;
 import jakarta.persistence.EntityManager;
 
 import java.time.Duration;
