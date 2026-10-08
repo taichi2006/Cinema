@@ -1,39 +1,65 @@
 package com.cinema.common.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+
 public class CommonDTO {
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public static class ApiResponse<T> {
         private final boolean success;
+        private final int statusCode;
         private final String message;
         private final T data;
 
-        public ApiResponse(boolean success, String message, T data) {
+        public ApiResponse(boolean success, int statusCode, String message, T data) {
             this.success = success;
+            this.statusCode = statusCode;
             this.message = message;
             this.data = data;
         }
 
-        public static <T> ApiResponse<T> ok(T data) { return new ApiResponse<>(true, null, data); }
-        public static <T> ApiResponse<T> ok(T data, String message) { return new ApiResponse<>(true, message, data); }
-        public static ApiResponse<Void> success(String message) { return new ApiResponse<>(true, message, null); }
+        public ApiResponse(boolean success, String message, T data) {
+            this(success, success ? 200 : 400, message, data);
+        }
+
+        public static <T> ApiResponse<T> ok(T data) {
+            return new ApiResponse<>(true, 200, null, data);
+        }
+
+        public static <T> ApiResponse<T> created(T data) {
+            return new ApiResponse<>(true, 201, null, data);
+        }
+
+        public static <T> ApiResponse<T> ok(T data, String message) {
+            return new ApiResponse<>(true, 200, message, data);
+        }
+
+        public static ApiResponse<Void> success(String message) {
+            return new ApiResponse<>(true, 200, message, null);
+        }
 
         public boolean isSuccess() { return success; }
+        public int getStatusCode() { return statusCode; }
+        public int getStatus() { return statusCode; }
         public String getMessage() { return message; }
         public T getData() { return data; }
     }
 
     public static class ErrorResponse {
         private final boolean success = false;
-        private final int status;
-        private final String error;
+        private final int statusCode;
+        private final String message;
 
-        public ErrorResponse(int status, String error) {
-            this.status = status;
-            this.error = error;
+        public ErrorResponse(int statusCode, String message) {
+            this.statusCode = statusCode;
+            this.message = message;
         }
 
         public boolean isSuccess() { return success; }
-        public int getStatus() { return status; }
-        public String getError() { return error; }
+        public int getStatusCode() { return statusCode; }
+        public int getStatus() { return statusCode; }
+        public String getMessage() { return message; }
+        public String getError() { return message; }
     }
 
     public static class PageMeta {

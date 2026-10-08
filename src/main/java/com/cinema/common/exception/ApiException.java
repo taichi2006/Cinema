@@ -17,5 +17,7 @@ public class ApiException extends RuntimeException {
     public static ApiException forbidden(String message) { return new ApiException(403, message); }
     public static ApiException notFound(String message) { return new ApiException(404, message); }
     public static ApiException conflict(String message) { return new ApiException(409, message); }
+    public static ApiException gone(String message) { return new ApiException(410, message); }
+    public static ApiException unprocessable(String message) { return new ApiException(422, message); }
     public static ApiException internal(String message) { return new ApiException(500, message); }
 }

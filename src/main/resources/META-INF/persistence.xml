@@ -17,6 +17,14 @@
         <class>com.cinema.movie.Movie</class>
         <class>com.cinema.user.Role</class>
         <class>com.cinema.user.User</class>
+        <class>com.cinema.showtime.Showtime</class>
+        <class>com.cinema.showtime.Seat</class>
+        <class>com.cinema.showtime.ShowtimeSeat</class>
+        <class>com.cinema.product.Product</class>
+        <class>com.cinema.voucher.Voucher</class>
+        <class>com.cinema.booking.entity.Booking</class>
+        <class>com.cinema.booking.entity.BookingItem</class>
+        <class>com.cinema.booking.entity.Refund</class>
 
         <properties>
 
