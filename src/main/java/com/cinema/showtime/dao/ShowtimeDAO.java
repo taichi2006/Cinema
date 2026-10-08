@@ -1,12 +1,14 @@
-package com.cinema.showtime;
+package com.cinema.showtime.dao;
 
 import com.cinema.common.util.JPAUtil;
-import com.cinema.showtime.DTO.Response.SeatResponse;
+import com.cinema.showtime.dto.response.SeatResponse;
+import com.cinema.showtime.dto.response.ShowtimeResponse;
 import jakarta.persistence.EntityManager;
 
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -29,14 +31,13 @@ public class ShowtimeDAO {
             String status,
             Long minTicketPrice,
             String currency,
-            Integer availableSeatCount
-    ) {}
+            Integer availableSeatCount) {
+    }
 
     public Optional<ShowtimeInfo> findShowtimeInfo(Long showtimeId) {
         EntityManager entityManager = JPAUtil.getEntityManager();
         try {
-            String sql =
-                    "SELECT " +
+            String sql = "SELECT " +
                     "    s.showtime_id, " +
                     "    s.movie_id, " +
                     "    m.title AS movie_title, " +
@@ -50,13 +51,17 @@ public class ShowtimeDAO {
                     "    s.format, " +
                     "    s.language, " +
                     "    s.status, " +
-                    "    COALESCE((SELECT MIN(ss.price) FROM cinema.showtime_seats ss WHERE ss.showtime_id = s.showtime_id AND ss.is_blocked = false), s.base_price) AS min_ticket_price, " +
+                    "    COALESCE((SELECT MIN(ss.price) FROM cinema.showtime_seats ss WHERE ss.showtime_id = s.showtime_id AND ss.is_blocked = false), s.base_price) AS min_ticket_price, "
+                    +
                     "    'VND' AS currency, " +
                     "    CASE " +
-                    "        WHEN (SELECT COUNT(*) FROM cinema.showtime_seats ss WHERE ss.showtime_id = s.showtime_id) > 0 THEN " +
-                    "            (SELECT COUNT(ss.seat_id) FROM cinema.showtime_seats ss WHERE ss.showtime_id = s.showtime_id AND ss.is_blocked = false AND NOT EXISTS (SELECT 1 FROM cinema.booking_seats bs WHERE bs.showtime_id = s.showtime_id AND bs.seat_id = ss.seat_id AND bs.status IN ('HELD', 'BOOKED'))) " +
+                    "        WHEN (SELECT COUNT(*) FROM cinema.showtime_seats ss WHERE ss.showtime_id = s.showtime_id) > 0 THEN "
+                    +
+                    "            (SELECT COUNT(ss.seat_id) FROM cinema.showtime_seats ss WHERE ss.showtime_id = s.showtime_id AND ss.is_blocked = false AND NOT EXISTS (SELECT 1 FROM cinema.booking_seats bs WHERE bs.showtime_id = s.showtime_id AND bs.seat_id = ss.seat_id AND bs.status IN ('HELD', 'BOOKED'))) "
+                    +
                     "        ELSE " +
-                    "            GREATEST(0, r.capacity - COALESCE((SELECT COUNT(bs.seat_id) FROM cinema.booking_seats bs WHERE bs.showtime_id = s.showtime_id AND bs.status IN ('HELD', 'BOOKED')), 0)) " +
+                    "            GREATEST(0, r.capacity - COALESCE((SELECT COUNT(bs.seat_id) FROM cinema.booking_seats bs WHERE bs.showtime_id = s.showtime_id AND bs.status IN ('HELD', 'BOOKED')), 0)) "
+                    +
                     "    END AS available_seat_count " +
                     "FROM cinema.showtimes s " +
                     "JOIN cinema.rooms r ON s.room_id = r.room_id " +
@@ -108,85 +113,7 @@ public class ShowtimeDAO {
                     status,
                     minTicketPrice,
                     currency,
-                    availableSeatCount
-            ));
-        } finally {
-            entityManager.close();
-        }
-    }
-
-    public List<SeatResponse> findSeatsForShowtime(Long showtimeId, Long roomId, Long currentUserId) {
-        EntityManager entityManager = JPAUtil.getEntityManager();
-        try {
-            String sql =
-                    "SELECT " +
-                    "    se.seat_id, " +
-                    "    se.seat_row, " +
-                    "    se.seat_number, " +
-                    "    se.x, " +
-                    "    se.y, " +
-                    "    st.type_name, " +
-                    "    COALESCE(ss.price, s.base_price + st.extra_price) AS price, " +
-                    "    CASE " +
-                    "        WHEN se.status = 'BLOCKED' OR COALESCE(ss.is_blocked, false) = true THEN 'BLOCKED' " +
-                    "        WHEN bs.status = 'BOOKED' OR b.status = 'PAID' THEN 'BOOKED' " +
-                    "        WHEN bs.status = 'HELD' AND b.status = 'PENDING_PAYMENT' AND b.expires_at > CURRENT_TIMESTAMP THEN 'HELD' " +
-                    "        ELSE 'AVAILABLE' " +
-                    "    END AS seat_status, " +
-                    "    CASE " +
-                    "        WHEN bs.status = 'HELD' AND b.status = 'PENDING_PAYMENT' AND b.expires_at > CURRENT_TIMESTAMP AND b.user_id = :currentUserId THEN true " +
-                    "        ELSE false " +
-                    "    END AS held_by_current_user, " +
-                    "    CASE " +
-                    "        WHEN bs.status = 'HELD' AND b.status = 'PENDING_PAYMENT' AND b.expires_at > CURRENT_TIMESTAMP THEN b.expires_at " +
-                    "        ELSE NULL " +
-                    "    END AS hold_expires_at " +
-                    "FROM cinema.seats se " +
-                    "JOIN cinema.rooms r ON se.room_id = r.room_id " +
-                    "JOIN cinema.seat_types st ON se.seat_type_id = st.seat_type_id " +
-                    "JOIN cinema.showtimes s ON s.showtime_id = :showtimeId AND s.room_id = r.room_id " +
-                    "LEFT JOIN cinema.showtime_seats ss ON ss.showtime_id = s.showtime_id AND ss.seat_id = se.seat_id " +
-                    "LEFT JOIN cinema.booking_seats bs ON bs.showtime_id = s.showtime_id AND bs.seat_id = se.seat_id AND bs.status IN ('HELD', 'BOOKED') " +
-                    "LEFT JOIN cinema.bookings b ON bs.booking_id = b.booking_id AND b.status IN ('PENDING_PAYMENT', 'PAID') " +
-                    "WHERE se.room_id = :roomId " +
-                    "ORDER BY se.y ASC, se.x ASC, se.seat_id ASC";
-
-            var query = entityManager.createNativeQuery(sql);
-            query.setParameter("showtimeId", showtimeId);
-            query.setParameter("roomId", roomId);
-            query.setParameter("currentUserId", currentUserId != null ? currentUserId : -1L);
-
-            List<?> results = query.getResultList();
-            List<SeatResponse> seats = new ArrayList<>();
-
-            for (Object rowObj : results) {
-                Object[] row = (Object[]) rowObj;
-                String seatId = row[0] != null ? row[0].toString() : null;
-                String rowName = row[1] != null ? row[1].toString() : null;
-                Integer number = row[2] != null ? ((Number) row[2]).intValue() : null;
-                Integer x = row[3] != null ? ((Number) row[3]).intValue() : null;
-                Integer y = row[4] != null ? ((Number) row[4]).intValue() : null;
-                String type = row[5] != null ? row[5].toString() : null;
-                Long price = row[6] != null ? ((Number) row[6]).longValue() : 0L;
-                String status = row[7] != null ? row[7].toString() : "AVAILABLE";
-                Boolean heldByCurrentUser = row[8] != null ? Boolean.parseBoolean(row[8].toString()) : false;
-                String holdExpiresAt = formatTimestamp(row[9]);
-
-                seats.add(new SeatResponse(
-                        seatId,
-                        rowName,
-                        number,
-                        x,
-                        y,
-                        type,
-                        price,
-                        status,
-                        heldByCurrentUser,
-                        holdExpiresAt
-                ));
-            }
-
-            return seats;
+                    availableSeatCount));
         } finally {
             entityManager.close();
         }
@@ -231,6 +158,143 @@ public class ShowtimeDAO {
             return Instant.parse(obj.toString());
         } catch (Exception e) {
             return null;
+        }
+    }
+
+    public Optional<ShowtimeResponse> findShowtimeById(Long showTimeId) {
+        if (showTimeId == null) {
+            return Optional.empty();
+        }
+        EntityManager entityManager = JPAUtil.getEntityManager();
+        try {
+            List<?> results;
+            try {
+                String sql = "SELECT s.show_time_id, s.movie_id, s.room_id, " +
+                        "CAST(s.show_date AS TEXT), CAST(s.start_time AS TEXT), CAST(s.end_time AS TEXT), " +
+                        "s.base_price, s.status " +
+                        "FROM cinema.show_times s WHERE s.show_time_id = :showTimeId";
+                var query = entityManager.createNativeQuery(sql);
+                query.setParameter("showTimeId", showTimeId);
+                results = query.getResultList();
+            } catch (Exception e) {
+                String fallbackSql = "SELECT s.showtime_id, s.movie_id, s.room_id, " +
+                        "CAST(s.starts_at AS DATE), CAST(s.starts_at AS TIME), CAST(s.ends_at AS TIME), " +
+                        "s.base_price, s.status " +
+                        "FROM cinema.showtimes s WHERE s.showtime_id = :showTimeId";
+                var fallbackQuery = entityManager.createNativeQuery(fallbackSql);
+                fallbackQuery.setParameter("showTimeId", showTimeId);
+                results = fallbackQuery.getResultList();
+            }
+
+            if (results.isEmpty()) {
+                return Optional.empty();
+            }
+
+            Object[] row = (Object[]) results.get(0);
+            Long id = row[0] != null ? ((Number) row[0]).longValue() : null;
+            Long movieId = row[1] != null ? ((Number) row[1]).longValue() : null;
+            Long roomId = row[2] != null ? ((Number) row[2]).longValue() : null;
+            String showDate = row[3] != null ? row[3].toString() : null;
+            String startTime = row[4] != null ? row[4].toString() : null;
+            String endTime = row[5] != null ? row[5].toString() : null;
+            Double basePrice = row[6] != null ? ((Number) row[6]).doubleValue() : null;
+            String status = row[7] != null ? row[7].toString() : null;
+
+            return Optional.of(new ShowtimeResponse(
+                    id,
+                    movieId,
+                    roomId,
+                    showDate,
+                    startTime,
+                    endTime,
+                    basePrice,
+                    status));
+        } finally {
+            entityManager.close();
+        }
+    }
+
+    public List<SeatResponse> findSeatsByShowtimeId(Long showTimeId) {
+        if (showTimeId == null) {
+            return Collections.emptyList();
+        }
+        EntityManager entityManager = JPAUtil.getEntityManager();
+        try {
+            List<?> results = Collections.emptyList();
+            try {
+                String sql = "SELECT " +
+                        "    sts.id, " +
+                        "    sts.seat_id, " +
+                        "    s.seat_row, " +
+                        "    s.seat_col, " +
+                        "    s.seat_label, " +
+                        "    sts.price, " +
+                        "    CASE " +
+                        "        WHEN sts.status = 'SELECTED' AND sts.hold_expiration_at IS NOT NULL AND sts.hold_expiration_at < CURRENT_TIMESTAMP THEN 'AVAILABLE' "
+                        +
+                        "        ELSE sts.status " +
+                        "    END AS actual_status, " +
+                        "    CASE " +
+                        "        WHEN sts.status = 'SELECTED' AND sts.hold_expiration_at IS NOT NULL AND sts.hold_expiration_at < CURRENT_TIMESTAMP THEN NULL "
+                        +
+                        "        ELSE CAST(sts.hold_expiration_at AS TEXT) " +
+                        "    END AS actual_hold_expiration_at " +
+                        "FROM cinema.show_time_seats sts " +
+                        "JOIN cinema.seats s ON sts.seat_id = s.seat_id " +
+                        "WHERE sts.show_time_id = :showTimeId " +
+                        "ORDER BY s.seat_row ASC, s.seat_col ASC";
+                var query = entityManager.createNativeQuery(sql);
+                query.setParameter("showTimeId", showTimeId);
+                results = query.getResultList();
+            } catch (Exception e) {
+                try {
+                    String fallbackSql = "SELECT " +
+                            "    sts.id, " +
+                            "    sts.seat_id, " +
+                            "    s.seat_row, " +
+                            "    s.seat_number, " +
+                            "    CONCAT(s.seat_row, s.seat_number), " +
+                            "    sts.price, " +
+                            "    'AVAILABLE', " +
+                            "    NULL " +
+                            "FROM cinema.showtime_seats sts " +
+                            "JOIN cinema.seats s ON sts.seat_id = s.seat_id " +
+                            "WHERE sts.showtime_id = :showTimeId " +
+                            "ORDER BY s.seat_row ASC, s.seat_number ASC";
+                    var fallbackQuery = entityManager.createNativeQuery(fallbackSql);
+                    fallbackQuery.setParameter("showTimeId", showTimeId);
+                    results = fallbackQuery.getResultList();
+                } catch (Exception ex) {
+                    results = Collections.emptyList();
+                }
+            }
+
+            List<SeatResponse> seats = new ArrayList<>();
+            for (Object rowObj : results) {
+                Object[] row = (Object[]) rowObj;
+                Long id = row[0] != null ? ((Number) row[0]).longValue() : null;
+                Long seatId = row[1] != null ? ((Number) row[1]).longValue() : null;
+                String seatRow = row[2] != null ? row[2].toString() : null;
+                Integer seatCol = row[3] != null ? ((Number) row[3]).intValue() : null;
+                String seatLabel = row[4] != null ? row[4].toString()
+                        : (seatRow != null && seatCol != null ? seatRow + seatCol : null);
+                Double price = row[5] != null ? ((Number) row[5]).doubleValue() : null;
+                String status = row[6] != null ? row[6].toString() : "AVAILABLE";
+                String holdExpirationAt = row[7] != null ? formatTimestamp(row[7]) : null;
+
+                seats.add(new SeatResponse(
+                        id,
+                        seatId,
+                        seatRow,
+                        seatCol,
+                        seatLabel,
+                        price,
+                        status,
+                        holdExpirationAt));
+            }
+            return seats;
+        } finally {
+            entityManager.close();
         }
     }
 }

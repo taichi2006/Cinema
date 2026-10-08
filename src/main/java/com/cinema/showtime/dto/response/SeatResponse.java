@@ -1,114 +1,98 @@
-package com.cinema.showtime.DTO.Response;
+package com.cinema.showtime.dto.response;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 
 @JsonPropertyOrder({
         "id",
-        "row",
-        "number",
-        "x",
-        "y",
-        "type",
+        "seatId",
+        "seatRow",
+        "seatCol",
+        "seatLabel",
         "price",
         "status",
-        "heldByCurrentUser",
-        "holdExpiresAt"
+        "holdExpirationAt"
 })
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class SeatResponse {
 
-    private String id;
-    private String row;
-    private Integer number;
-    private Integer x;
-    private Integer y;
-    private String type;
-    private Long price;
+    private Long id;
+    private Long seatId;
+    private String seatRow;
+    private Integer seatCol;
+    private String seatLabel;
+    private Double price;
     private String status;
-    private Boolean heldByCurrentUser;
-    private String holdExpiresAt;
+    private String holdExpirationAt;
 
     public SeatResponse() {
     }
 
     public SeatResponse(
-            String id,
-            String row,
-            Integer number,
-            Integer x,
-            Integer y,
-            String type,
-            Long price,
+            Long id,
+            Long seatId,
+            String seatRow,
+            Integer seatCol,
+            String seatLabel,
+            Double price,
             String status,
-            Boolean heldByCurrentUser,
-            String holdExpiresAt
+            String holdExpirationAt
     ) {
         this.id = id;
-        this.row = row;
-        this.number = number;
-        this.x = x;
-        this.y = y;
-        this.type = type;
+        this.seatId = seatId;
+        this.seatRow = seatRow;
+        this.seatCol = seatCol;
+        this.seatLabel = seatLabel;
         this.price = price;
         this.status = status;
-        this.heldByCurrentUser = heldByCurrentUser;
-        this.holdExpiresAt = holdExpiresAt;
+        this.holdExpirationAt = holdExpirationAt;
     }
 
-    public String getId() {
+    public Long getId() {
         return id;
     }
 
-    public void setId(String id) {
+    public void setId(Long id) {
         this.id = id;
     }
 
-    public String getRow() {
-        return row;
+    public Long getSeatId() {
+        return seatId;
     }
 
-    public void setRow(String row) {
-        this.row = row;
+    public void setSeatId(Long seatId) {
+        this.seatId = seatId;
     }
 
-    public Integer getNumber() {
-        return number;
+    public String getSeatRow() {
+        return seatRow;
     }
 
-    public void setNumber(Integer number) {
-        this.number = number;
+    public void setSeatRow(String seatRow) {
+        this.seatRow = seatRow;
     }
 
-    public Integer getX() {
-        return x;
+    public Integer getSeatCol() {
+        return seatCol;
     }
 
-    public void setX(Integer x) {
-        this.x = x;
+    public void setSeatCol(Integer seatCol) {
+        this.seatCol = seatCol;
     }
 
-    public Integer getY() {
-        return y;
+    public String getSeatLabel() {
+        return seatLabel;
     }
 
-    public void setY(Integer y) {
-        this.y = y;
+    public void setSeatLabel(String seatLabel) {
+        this.seatLabel = seatLabel;
     }
 
-    public String getType() {
-        return type;
-    }
-
-    public void setType(String type) {
-        this.type = type;
-    }
-
-    public Long getPrice() {
+    public Double getPrice() {
         return price;
     }
 
-    public void setPrice(Long price) {
+    public void setPrice(Double price) {
         this.price = price;
     }
 
@@ -120,19 +104,11 @@ public class SeatResponse {
         this.status = status;
     }
 
-    public Boolean getHeldByCurrentUser() {
-        return heldByCurrentUser;
+    public String getHoldExpirationAt() {
+        return holdExpirationAt;
     }
 
-    public void setHeldByCurrentUser(Boolean heldByCurrentUser) {
-        this.heldByCurrentUser = heldByCurrentUser;
-    }
-
-    public String getHoldExpiresAt() {
-        return holdExpiresAt;
-    }
-
-    public void setHoldExpiresAt(String holdExpiresAt) {
-        this.holdExpiresAt = holdExpiresAt;
+    public void setHoldExpirationAt(String holdExpirationAt) {
+        this.holdExpirationAt = holdExpirationAt;
     }
 }

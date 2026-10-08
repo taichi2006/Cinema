@@ -1,9 +1,10 @@
-package com.cinema.showtime;
+package com.cinema.showtime.controller;
 
 import com.cinema.auth.AuthException;
 import com.cinema.auth.JwtUtil;
 import com.cinema.common.exception.ApiException;
 import com.cinema.common.exception.ErrorHandler;
+import com.cinema.showtime.service.ShowtimeService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
@@ -16,7 +17,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Map;
 
-@WebServlet(urlPatterns = {"/showtime", "/showtime/*"})
+@WebServlet(urlPatterns = {"/showtimes", "/showtimes/*"})
 public class ShowtimeController extends HttpServlet {
 
     private final ShowtimeService showtimeService = new ShowtimeService();
@@ -36,7 +37,9 @@ public class ShowtimeController extends HttpServlet {
                     .filter(s -> !s.isBlank())
                     .toArray(String[]::new);
 
-            if (segments.length == 2) {
+            if (segments.length == 1) {
+                handleGetShowtimeDetail(request, response, segments[0]);
+            } else if (segments.length == 2) {
                 String id = segments[0];
                 String subResource = segments[1].toLowerCase();
                 switch (subResource) {
@@ -50,6 +53,13 @@ public class ShowtimeController extends HttpServlet {
         } catch (Exception ex) {
             ErrorHandler.handle(response, ex);
         }
+    }
+
+    private void handleGetShowtimeDetail(HttpServletRequest request, HttpServletResponse response, String id) throws Exception {
+        Map<String, Object> result = showtimeService.getShowtimeDetail(id);
+
+        response.setStatus(HttpServletResponse.SC_OK);
+        objectMapper.writeValue(response.getWriter(), result);
     }
 
     private void handleGetSeatMap(HttpServletRequest request, HttpServletResponse response, String id) throws Exception {
@@ -73,10 +83,10 @@ public class ShowtimeController extends HttpServlet {
                 Claims claims = JwtUtil.parseAccessToken(token);
                 return Long.parseLong(claims.getSubject());
             } catch (JwtException | IllegalArgumentException e) {
-                throw AuthException.invalidToken();
+                throw new ApiException(401, "Chua dang nhap");
             }
         }
 
-        throw AuthException.unauthorized();
+        throw new ApiException(401, "Chua dang nhap");
     }
 }

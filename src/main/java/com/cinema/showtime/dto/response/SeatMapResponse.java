@@ -1,4 +1,4 @@
-package com.cinema.showtime.DTO.Response;
+package com.cinema.showtime.dto.response;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
@@ -6,56 +6,29 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import java.util.List;
 
 @JsonPropertyOrder({
-        "showtime",
-        "serverTime",
-        "screenPosition",
+        "showTimeId",
         "seats"
 })
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class SeatMapResponse {
 
-    private ShowtimeDetailResponse showtime;
-    private String serverTime;
-    private String screenPosition;
+    private Long showTimeId;
     private List<SeatResponse> seats;
 
     public SeatMapResponse() {
     }
 
-    public SeatMapResponse(
-            ShowtimeDetailResponse showtime,
-            String serverTime,
-            String screenPosition,
-            List<SeatResponse> seats
-    ) {
-        this.showtime = showtime;
-        this.serverTime = serverTime;
-        this.screenPosition = screenPosition;
+    public SeatMapResponse(Long showTimeId, List<SeatResponse> seats) {
+        this.showTimeId = showTimeId;
         this.seats = seats;
     }
 
-    public ShowtimeDetailResponse getShowtime() {
-        return showtime;
+    public Long getShowTimeId() {
+        return showTimeId;
     }
 
-    public void setShowtime(ShowtimeDetailResponse showtime) {
-        this.showtime = showtime;
-    }
-
-    public String getServerTime() {
-        return serverTime;
-    }
-
-    public void setServerTime(String serverTime) {
-        this.serverTime = serverTime;
-    }
-
-    public String getScreenPosition() {
-        return screenPosition;
-    }
-
-    public void setScreenPosition(String screenPosition) {
-        this.screenPosition = screenPosition;
+    public void setShowTimeId(Long showTimeId) {
+        this.showTimeId = showTimeId;
     }
 
     public List<SeatResponse> getSeats() {

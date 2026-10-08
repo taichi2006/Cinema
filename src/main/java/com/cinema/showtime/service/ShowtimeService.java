@@ -1,12 +1,11 @@
-package com.cinema.showtime;
+package com.cinema.showtime.service;
 
 import com.cinema.common.exception.ApiException;
-import com.cinema.showtime.DTO.Response.SeatMapResponse;
-import com.cinema.showtime.DTO.Response.SeatResponse;
-import com.cinema.showtime.DTO.Response.ShowtimeDetailResponse;
+import com.cinema.showtime.dao.ShowtimeDAO;
+import com.cinema.showtime.dto.response.SeatMapResponse;
+import com.cinema.showtime.dto.response.SeatResponse;
+import com.cinema.showtime.dto.response.ShowtimeResponse;
 
-import java.time.Instant;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,57 +22,32 @@ public class ShowtimeService {
         this.showtimeDAO = showtimeDAO;
     }
 
+    public Map<String, Object> getShowtimeDetail(String idStr) {
+        Long showtimeId = parseAndValidateShowtimeId(idStr);
+
+        ShowtimeResponse showtime = showtimeDAO.findShowtimeById(showtimeId)
+                .orElseThrow(() -> ApiException.notFound("Khong tim thay suat chieu"));
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("success", true);
+        result.put("data", showtime);
+        return result;
+    }
+
     public Map<String, Object> getSeatMap(String idStr, Long currentUserId) {
         Long showtimeId = parseAndValidateShowtimeId(idStr);
 
-        ShowtimeDAO.ShowtimeInfo showtimeInfo = showtimeDAO.findShowtimeInfo(showtimeId)
-                .orElseThrow(() -> ApiException.notFound("Không tìm thấy suất chiếu"));
-
-        if (!"OPEN".equalsIgnoreCase(showtimeInfo.status())) {
-            throw new ApiException(422, "Suất chiếu đã bắt đầu hoặc đã đóng bán");
+        if (showtimeDAO.findShowtimeById(showtimeId).isEmpty() && showtimeDAO.findShowtimeInfo(showtimeId).isEmpty()) {
+            throw ApiException.notFound("Khong tim thay suat chieu");
         }
 
-        if (showtimeInfo.startsAtInstant() != null && showtimeInfo.startsAtInstant().isBefore(Instant.now())) {
-            throw new ApiException(422, "Suất chiếu đã bắt đầu hoặc đã đóng bán");
-        }
+        List<SeatResponse> seats = showtimeDAO.findSeatsByShowtimeId(showtimeId);
 
-        List<SeatResponse> seats = showtimeDAO.findSeatsForShowtime(
-                showtimeId,
-                showtimeInfo.roomId(),
-                currentUserId
-        );
-
-        ShowtimeDetailResponse showtimeDetail = new ShowtimeDetailResponse(
-                String.valueOf(showtimeInfo.showtimeId()),
-                showtimeInfo.movieId() != null ? String.valueOf(showtimeInfo.movieId()) : null,
-                showtimeInfo.movieTitle(),
-                showtimeInfo.cinemaId() != null ? String.valueOf(showtimeInfo.cinemaId()) : null,
-                showtimeInfo.cinemaName(),
-                showtimeInfo.roomId() != null ? String.valueOf(showtimeInfo.roomId()) : null,
-                showtimeInfo.roomName(),
-                showtimeInfo.startsAt(),
-                showtimeInfo.endsAt(),
-                showtimeInfo.format(),
-                showtimeInfo.language(),
-                showtimeInfo.minTicketPrice(),
-                showtimeInfo.currency(),
-                showtimeInfo.availableSeatCount()
-        );
-
-        String serverTime = Instant.now().toString();
-        String screenPosition = showtimeInfo.screenPosition() != null ? showtimeInfo.screenPosition() : "TOP";
-
-        SeatMapResponse seatMap = new SeatMapResponse(
-                showtimeDetail,
-                serverTime,
-                screenPosition,
-                seats
-        );
+        SeatMapResponse seatMap = new SeatMapResponse(showtimeId, seats);
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("success", true);
         result.put("data", seatMap);
-        result.put("meta", Collections.emptyMap());
         return result;
     }
 
