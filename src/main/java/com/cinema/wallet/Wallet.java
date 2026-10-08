@@ -25,25 +25,16 @@ public class Wallet {
     @Column(nullable = false)
     private Long balance = 0L;
 
-    @Column(length = 3, nullable = false)
-    private String currency = "VND";
-
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private WalletStatus status = WalletStatus.ACTIVE;
 
-    @Column(name = "created_at", insertable = false, updatable = false)
-    private Instant createdAt;
-
-    @Column(name = "updated_at", insertable = false, updatable = false)
-    private Instant updatedAt;
 
     public Wallet() {}
 
     public Wallet(User user) {
         this.user = user;
         this.balance = 0L;
-        this.currency = "VND";
         this.status = WalletStatus.ACTIVE;
     }
 
@@ -71,14 +62,6 @@ public class Wallet {
         this.balance = balance;
     }
 
-    public String getCurrency() {
-        return currency;
-    }
-
-    public void setCurrency(String currency) {
-        this.currency = currency;
-    }
-
     public WalletStatus getStatus() {
         return status;
     }
@@ -87,20 +70,5 @@ public class Wallet {
         this.status = status;
     }
 
-    public Instant getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(Instant createdAt) {
-        this.createdAt = createdAt;
-    }
-
-    public Instant getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(Instant updatedAt) {
-        this.updatedAt = updatedAt;
-    }
 }
 

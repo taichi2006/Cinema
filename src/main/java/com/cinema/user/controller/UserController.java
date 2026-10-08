@@ -8,6 +8,7 @@ import com.cinema.user.service.UserService;
 import com.cinema.user.service.UserVoucherService;
 
 import com.cinema.auth.AuthService;
+import com.cinema.auth.JwtUtil;
 import com.cinema.auth.dto.request.ChangePasswordRequest;
 import com.cinema.auth.AuthException;
 import com.cinema.common.dto.CommonDTO.ApiResponse;
@@ -18,13 +19,14 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import io.jsonwebtoken.Claims;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.*;
 
 import java.io.IOException;
 
-@WebServlet("/user/*")
+@WebServlet(urlPatterns = {"/user", "/user/*"})
 public class UserController extends HttpServlet {
 
     private final UserService service = new UserService();
@@ -33,7 +35,7 @@ public class UserController extends HttpServlet {
     private final AuthService authService = new AuthService();
     private final ObjectMapper json = new ObjectMapper()
             .registerModule(new JavaTimeModule())
-            .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
             .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
     @Override
@@ -46,7 +48,7 @@ public class UserController extends HttpServlet {
         super.service(req, resp);
     }
 
-    // GET /api/user
+    // GET /user, /user/bookings, /user/vouchers
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
@@ -54,8 +56,8 @@ public class UserController extends HttpServlet {
             long userId = authenticatedUserId(req);
             String action = pathInfo(req);
             switch (action) {
-                case "/" -> write(resp, ApiResponse.ok(service.getProfile(userId)));
-                case "/booking" -> write(resp, ApiResponse.ok(
+                case "", "/" -> write(resp, ApiResponse.ok(service.getProfile(userId)));
+                case "/bookings", "/booking" -> write(resp, ApiResponse.ok(
                         bookingService.getBookingHistory(
                                 userId,
                                 new UserBookingRequest(
@@ -68,7 +70,7 @@ public class UserController extends HttpServlet {
                                 )
                         )
                 ));
-                case "/voucher" -> write(resp, ApiResponse.ok(
+                case "/vouchers", "/voucher" -> write(resp, ApiResponse.ok(
                         voucherService.getUserVouchers(
                                 userId,
                                 new UserVoucherRequest(
@@ -78,14 +80,14 @@ public class UserController extends HttpServlet {
                                 )
                         )
                 ));
-                default    -> throw ApiException.notFound("Endpoint không tồn tại");
+                default -> throw ApiException.notFound("Endpoint không tồn tại");
             }
         } catch (Exception ex) {
             ErrorHandler.handle(resp, ex);
         }
     }
 
-    // PATCH /api/user
+    // PATCH /user
 
     @Override
     protected void doPatch(HttpServletRequest req, HttpServletResponse resp) throws IOException {
@@ -93,12 +95,9 @@ public class UserController extends HttpServlet {
             long userId = authenticatedUserId(req);
             String action = pathInfo(req);
             switch (action) {
-                case "/" -> {
+                case "", "/" -> {
                     var body = readJson(req, UpdateUserRequest.class);
-                    write(resp, ApiResponse.ok(
-                            service.updateProfile(userId, body),
-                            "Cập nhật thông tin thành công"
-                    ));
+                    write(resp, ApiResponse.ok(service.updateProfile(userId, body)));
                 }
                 default -> throw ApiException.notFound("Endpoint không tồn tại");
             }
@@ -107,7 +106,7 @@ public class UserController extends HttpServlet {
         }
     }
 
-    // POST /api/user/change-password
+    // POST /user/change-password
 
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
@@ -120,7 +119,7 @@ public class UserController extends HttpServlet {
 
             var body = readJson(req, ChangePasswordRequest.class);
             authService.changePassword(userId, body);
-            resp.setStatus(HttpServletResponse.SC_NO_CONTENT);
+            write(resp, ApiResponse.ok(null));
         } catch (Exception exception) {
             ErrorHandler.handle(resp, exception);
         }
@@ -130,7 +129,9 @@ public class UserController extends HttpServlet {
 
     private String pathInfo(HttpServletRequest req) {
         String p = req.getPathInfo();
-        if (p == null) return "/";
+        if (p == null || p.isBlank()) {
+            return "/";
+        }
         if (p.endsWith("/") && p.length() > 1) {
             return p.substring(0, p.length() - 1);
         }
@@ -141,6 +142,21 @@ public class UserController extends HttpServlet {
         Object attribute = request.getAttribute("userId");
         if (attribute instanceof Number userId) {
             return userId.longValue();
+        }
+
+        String token = null;
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            token = authHeader.substring(7);
+        }
+        if (token == null || token.isBlank()) {
+            token = JwtUtil.readCookie(request, JwtUtil.COOKIE_ACCESS);
+        }
+        if (token != null && !token.isBlank()) {
+            try {
+                Claims claims = JwtUtil.parseAccessToken(token);
+                return Long.parseLong(claims.getSubject());
+            } catch (Exception ignored) {}
         }
         throw AuthException.unauthorized();
     }

@@ -8,8 +8,12 @@ public class AuthException extends ApiException {
         super(401, message);
     }
 
+    public AuthException(int status, String message) {
+        super(status, message);
+    }
+
     public static AuthException unauthorized() {
-        return new AuthException("Chưa đăng nhập hoặc phiên làm việc đã hết hạn");
+        return new AuthException("Chưa đăng nhập");
     }
 
     public static AuthException invalidCredentials() {
@@ -17,10 +21,14 @@ public class AuthException extends ApiException {
     }
 
     public static AuthException accountLocked() {
-        return new AuthException("Tài khoản đã bị khóa");
+        return new AuthException(403, "Tài khoản đã bị khóa");
+    }
+
+    public static AuthException refreshTokenExpired() {
+        return new AuthException("Refresh token đã hết hạn");
     }
 
     public static AuthException invalidToken() {
-        return new AuthException("Token không hợp lệ hoặc đã hết hạn");
+        return new AuthException("Refresh token đã hết hạn");
     }
 }

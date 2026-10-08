@@ -18,9 +18,7 @@ public class WalletException extends ApiException {
         return code;
     }
 
-    public static WalletException idempotencyKeyRequired() {
-        return new WalletException(400, "IDEMPOTENCY_KEY_REQUIRED", "Thiếu header Idempotency-Key (bắt buộc 16-128 ký tự)");
-    }
+
 
     public static WalletException walletSuspended() {
         return new WalletException(403, "WALLET_SUSPENDED", "Ví của bạn đang bị tạm khóa (SUSPENDED), không thể thực hiện giao dịch");

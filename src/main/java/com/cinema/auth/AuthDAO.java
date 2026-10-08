@@ -1,12 +1,14 @@
 package com.cinema.auth;
 
 import com.cinema.common.util.JPAUtil;
-import com.cinema.user.entity.Role;
 import com.cinema.user.entity.User;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityTransaction;
 import jakarta.persistence.LockModeType;
 
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -27,26 +29,16 @@ public class AuthDAO {
         }
     }
 
-    public Optional<Long> findRoleIdByName(String roleName) {
-        EntityManager entityManager = JPAUtil.getEntityManager();
-        try {
-            return entityManager.createQuery(
-                            "SELECT role.id FROM Role role WHERE role.name = :roleName",
-                            Long.class
-                    )
-                    .setParameter("roleName", roleName)
-                    .getResultStream()
-                    .findFirst();
-        } finally {
-            entityManager.close();
-        }
+    public User createUser(String email, String passwordHash, String fullName) {
+        return createUser(email, passwordHash, fullName, null, null);
     }
 
     public User createUser(
             String email,
             String passwordHash,
             String fullName,
-            long roleId
+            String phone,
+            LocalDate dob
     ) {
         EntityManager entityManager = JPAUtil.getEntityManager();
         EntityTransaction transaction = entityManager.getTransaction();
@@ -57,8 +49,20 @@ public class AuthDAO {
             user.setEmail(email);
             user.setPasswordHash(passwordHash);
             user.setFullName(fullName);
-            user.setRole(entityManager.getReference(Role.class, roleId));
+            user.setPhone(phone);
+            user.setDob(dob);
+            user.setStatus("ACTIVE");
             entityManager.persist(user);
+
+            // Khởi tạo ví rỗng cho user trong bảng cinema.wallets
+            entityManager.createNativeQuery(
+                            """
+                            INSERT INTO cinema.wallets (user_id, balance, status)
+                            VALUES (:userId, 0.00, 'ACTIVE')
+                            """
+                    )
+                    .setParameter("userId", user.getId())
+                    .executeUpdate();
 
             transaction.commit();
             return user;
@@ -70,14 +74,13 @@ public class AuthDAO {
         }
     }
 
-    public Optional<User> findUserWithRoleByEmail(String email) {
+    public Optional<User> findUserByEmail(String email) {
         EntityManager entityManager = JPAUtil.getEntityManager();
         try {
             return entityManager.createQuery(
                             """
                             SELECT user
                             FROM User user
-                            JOIN FETCH user.role
                             WHERE user.email = :email
                             """,
                             User.class
@@ -90,14 +93,13 @@ public class AuthDAO {
         }
     }
 
-    public Optional<User> findUserWithRoleById(long userId) {
+    public Optional<User> findUserById(long userId) {
         EntityManager entityManager = JPAUtil.getEntityManager();
         try {
             return entityManager.createQuery(
                             """
                             SELECT user
                             FROM User user
-                            JOIN FETCH user.role
                             WHERE user.id = :userId
                             """,
                             User.class
@@ -105,6 +107,107 @@ public class AuthDAO {
                     .setParameter("userId", userId)
                     .getResultStream()
                     .findFirst();
+        } finally {
+            entityManager.close();
+        }
+    }
+
+    public void saveRefreshToken(
+            long userId,
+            String tokenHash,
+            Instant expiresAt,
+            String userAgent,
+            String ipAddress
+    ) {
+        EntityManager entityManager = JPAUtil.getEntityManager();
+        EntityTransaction transaction = entityManager.getTransaction();
+        try {
+            transaction.begin();
+            entityManager.createNativeQuery(
+                            """
+                            INSERT INTO cinema.refresh_tokens (user_id, token_hash, expires_at, user_agent, ip_address, revoked)
+                            VALUES (:userId, :tokenHash, :expiresAt, :userAgent, :ipAddress, false)
+                            """
+                    )
+                    .setParameter("userId", userId)
+                    .setParameter("tokenHash", tokenHash)
+                    .setParameter("expiresAt", Timestamp.from(expiresAt))
+                    .setParameter("userAgent", userAgent)
+                    .setParameter("ipAddress", ipAddress)
+                    .executeUpdate();
+            transaction.commit();
+        } catch (RuntimeException exception) {
+            rollback(transaction);
+            throw exception;
+        } finally {
+            entityManager.close();
+        }
+    }
+
+    public boolean isRefreshTokenValid(String tokenHash, long userId) {
+        EntityManager entityManager = JPAUtil.getEntityManager();
+        try {
+            Number count = (Number) entityManager.createNativeQuery(
+                            """
+                            SELECT count(*)
+                            FROM cinema.refresh_tokens
+                            WHERE token_hash = :tokenHash
+                              AND user_id = :userId
+                              AND revoked = false
+                              AND expires_at > CURRENT_TIMESTAMP
+                            """
+                    )
+                    .setParameter("tokenHash", tokenHash)
+                    .setParameter("userId", userId)
+                    .getSingleResult();
+            return count != null && count.longValue() > 0;
+        } finally {
+            entityManager.close();
+        }
+    }
+
+    public boolean revokeRefreshToken(String tokenHash) {
+        EntityManager entityManager = JPAUtil.getEntityManager();
+        EntityTransaction transaction = entityManager.getTransaction();
+        try {
+            transaction.begin();
+            int updated = entityManager.createNativeQuery(
+                            """
+                            UPDATE cinema.refresh_tokens
+                            SET revoked = true, revoked_at = CURRENT_TIMESTAMP
+                            WHERE token_hash = :tokenHash AND revoked = false
+                            """
+                    )
+                    .setParameter("tokenHash", tokenHash)
+                    .executeUpdate();
+            transaction.commit();
+            return updated > 0;
+        } catch (RuntimeException exception) {
+            rollback(transaction);
+            throw exception;
+        } finally {
+            entityManager.close();
+        }
+    }
+
+    public void revokeAllUserTokens(long userId) {
+        EntityManager entityManager = JPAUtil.getEntityManager();
+        EntityTransaction transaction = entityManager.getTransaction();
+        try {
+            transaction.begin();
+            entityManager.createNativeQuery(
+                            """
+                            UPDATE cinema.refresh_tokens
+                            SET revoked = true, revoked_at = CURRENT_TIMESTAMP
+                            WHERE user_id = :userId AND revoked = false
+                            """
+                    )
+                    .setParameter("userId", userId)
+                    .executeUpdate();
+            transaction.commit();
+        } catch (RuntimeException exception) {
+            rollback(transaction);
+            throw exception;
         } finally {
             entityManager.close();
         }
@@ -126,13 +229,11 @@ public class AuthDAO {
             }
 
             user.setPasswordHash(newPasswordHash);
-            int currentAuthVersion = user.getAuthVersion() == null ? 0 : user.getAuthVersion();
-            user.setAuthVersion(currentAuthVersion + 1);
 
             entityManager.createNativeQuery(
                             """
                             UPDATE cinema.refresh_tokens
-                            SET revoked = true
+                            SET revoked = true, revoked_at = CURRENT_TIMESTAMP
                             WHERE user_id = :userId AND revoked = false
                             """
                     )

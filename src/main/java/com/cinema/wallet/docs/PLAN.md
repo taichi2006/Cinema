@@ -48,27 +48,7 @@ src/main/java/com/cinema/
 | `wallet_id` | `int8` | PK, Identity | Khóa chính |
 | `user_id` | `int8` | FK → `users.user_id`, UNIQUE, NOT NULL | Mỗi user có đúng 1 ví |
 | `balance` | `int8` | NOT NULL, DEFAULT 0 | Số dư nguyên VND (Long) |
-| `currency` | `bpchar(3)` | NOT NULL, DEFAULT `'VND'` | Đơn vị tiền tệ |
 | `status` | `varchar(20)` | NOT NULL, DEFAULT `'ACTIVE'` | `ACTIVE` \| `SUSPENDED` |
-| `created_at` | `timestamptz` | NOT NULL, DEFAULT `now()` | |
-| `updated_at` | `timestamptz` | NOT NULL, DEFAULT `now()` | |
-
----
-
-### Bảng `cinema.wallet_topups`
-
-| Cột | Kiểu | Ràng buộc | Ghi chú |
-|-----|------|-----------|---------|
-| `topup_id` | `int8` | PK, Identity | Khóa chính |
-| `wallet_id` | `int8` | FK → `wallets.wallet_id`, NOT NULL | Ví liên quan |
-| `amount` | `int8` | NOT NULL, CHECK > 0 | Số tiền nạp VND |
-| `currency` | `bpchar(3)` | NOT NULL, DEFAULT `'VND'` | |
-| `status` | `varchar(25)` | NOT NULL, DEFAULT `'PENDING'` | `PENDING`, `SUCCESSFUL`, `FAILED`, `EXPIRED` |
-| `checkout_url` | `text` | NULLABLE | URL thanh toán |
-| `failure_code` | `varchar(80)` | NULLABLE | Mã lỗi nếu thất bại |
-| `created_at` | `timestamptz` | NOT NULL, DEFAULT `now()` | |
-| `expires_at` | `timestamptz` | NULLABLE | Thời điểm hết hạn (sau 15 phút) |
-| `completed_at` | `timestamptz` | NULLABLE | Thời điểm hoàn tất/duyệt |
 
 ---
 
@@ -76,16 +56,11 @@ src/main/java/com/cinema/
 
 | Cột | Kiểu | Ràng buộc | Ghi chú |
 |-----|------|-----------|---------|
-| `wallet_transaction_id` | `int8` | PK, Identity | Khóa chính |
+| `transaction_id` | `int8` | PK, Identity | Khóa chính |
 | `wallet_id` | `int8` | FK → `wallets.wallet_id`, NOT NULL | Ví liên quan |
-| `transaction_type` | `varchar(10)` | NOT NULL | `TOP_UP`, `PAYMENT`, `REFUND` |
-| `direction` | `varchar(6)` | NOT NULL | `IN` (cộng tiền) \| `OUT` (trừ tiền) |
 | `amount` | `int8` | NOT NULL, CHECK > 0 | Số tiền biến động VND |
-| `balance_after` | `int8` | NOT NULL | Số dư ví ngay sau giao dịch |
-| `currency` | `bpchar(3)` | NOT NULL, DEFAULT `'VND'` | |
-| `topup_id` | `int8` | NULLABLE | Khóa liên kết bảng `wallet_topups` |
-| `payment_id` | `int8` | NULLABLE | Khóa liên kết bảng `payments` |
-| `refund_id` | `int8` | NULLABLE | Khóa liên kết bảng `refunds` |
+| `transaction_type` | `varchar(20)` | NOT NULL | `ADD_MONEY`, `PAYMENT`, `REFUND` |
+| `status` | `varchar(20)` | NOT NULL, DEFAULT `'PENDING'` | `PENDING`, `SUCCESSFUL`, `FAILED` |
 | `description` | `text` | NULLABLE | Ghi chú biến động số dư |
 | `created_at` | `timestamptz` | NOT NULL, DEFAULT `now()` | |
 
@@ -94,9 +69,7 @@ src/main/java/com/cinema/
 ### Quan hệ thực thể
 ```
 users (1) ──────── (1) wallets
-wallets (1) ─────── (0..*) wallet_topups
 wallets (1) ─────── (0..*) wallet_transactions
-wallet_topups (1) ─ (0..1) wallet_transactions (qua topup_id)
 ```
 
 ---
@@ -105,8 +78,7 @@ wallet_topups (1) ─ (0..1) wallet_transactions (qua topup_id)
 
 ### 3.1 Các Enum
 * **`WalletStatus`**: `ACTIVE`, `SUSPENDED`
-* **`TransactionType`**: `TOP_UP`, `PAYMENT`, `REFUND`
-* **`WalletTopupStatus`**: `PENDING`, `SUCCEEDED`, `FAILED`, `EXPIRED`, `REVERSAL_PENDING`, `REVERSED`
+* **`TransactionType`**: `ADD_MONEY`, `PAYMENT`, `REFUND`
 
 ---
 
@@ -130,12 +102,6 @@ public class Wallet {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private WalletStatus status = WalletStatus.ACTIVE;
-
-    @Column(name = "created_at", insertable = false, updatable = false)
-    private Instant createdAt;
-
-    @Column(name = "updated_at", insertable = false, updatable = false)
-    private Instant updatedAt;
     // Getters, Setters, Constructors
 }
 ```
@@ -159,26 +125,14 @@ public class WalletTransaction {
     @Column(nullable = false, precision = 15, scale = 2)
     private BigDecimal amount;
 
-    @Column(name = "balance_after", precision = 15, scale = 2)
-    private BigDecimal balanceAfter;
-
     @Enumerated(EnumType.STRING)
     @Column(name = "transaction_type", nullable = false, length = 20)
-    private TransactionType transactionType;
+    private TransactionType type;
 
-    @Column(nullable = false, length = 6)
-    private String direction; // "CREDIT" hoặc "DEBIT"
+    @Column(name = "status", nullable = false, length = 20)
+    private String status = "PENDING";
 
-    @Column(name = "topup_id")
-    private Long topupId;
-
-    @Column(name = "payment_id")
-    private Long paymentId;
-
-    @Column(name = "refund_id")
-    private Long refundId;
-
-    @Column(columnDefinition = "TEXT")
+    @Column(name = "description", columnDefinition = "text")
     private String description;
 
     @Column(name = "created_at", insertable = false, updatable = false)
@@ -194,9 +148,9 @@ public class WalletTransaction {
 Sử dụng Java `record` tinh gọn để map giữa Entity và JSON response chuẩn của nhóm:
 
 ```java
-public class WalletDTO {
+    public class WalletDTO {
     // Response cho GET /wallet
-    public record WalletResponse(String id, BigDecimal balance, String currency, Instant updatedAt) {}
+    public record WalletResponse(String id, BigDecimal balance) {}
 
     // Request cho POST /wallet/top-up
     public record TopUpRequest(BigDecimal amount, String method) {}
@@ -205,7 +159,6 @@ public class WalletDTO {
     public record TopUpResponse(
         String id,
         BigDecimal amount,
-        String currency,
         String method,
         String status,
         String checkoutUrl,
@@ -219,48 +172,16 @@ public class WalletDTO {
     public record TransactionItemResponse(
         String id,
         String type,
-        String direction,       // Suy diễn: TOP_UP / REFUND -> "CREDIT", PAYMENT -> "DEBIT"
+        String status,
         BigDecimal amount,
-        BigDecimal balanceAfter,
-        String currency,        // Mặc định: "VND"
-        String referenceType,   // Suy diễn từ transaction_type
-        String referenceId,
         String description,
         Instant createdAt
-    ) {}
-
-    // Request cho POST /wallet/top-up/{id}/confirm (Admin)
-    public record AdminConfirmRequest(boolean approve, String note) {}
-
-    // Response cho GET /wallet/top-up/pending (Admin)
-    public record AdminPendingItemResponse(
-        String id,
-        Long walletId,
-        Long userId,
-        String userEmail,
-        BigDecimal amount,
-        String currency,
-        String status,
-        String description,
-        Instant createdAt
-    ) {}
-
-    // Response cho POST /wallet/top-up/{id}/confirm (Admin)
-    public record AdminConfirmResponse(
-        String id,
-        Long walletId,
-        BigDecimal amount,
-        String currency,
-        String status,
-        BigDecimal newBalance
     ) {}
 }
 ```
 
 **Nguyên tắc chuyển đổi (Mapping Rules)**:
 * `id`: Chuyển từ `Long` sang chuỗi `String.valueOf(id)`.
-* `currency`: Mặc định luôn là `"VND"`.
-* `direction`: Nếu `transactionType` là `TOP_UP` hoặc `REFUND` → `"CREDIT"`; nếu là `PAYMENT` → `"DEBIT"`.
 * `checkoutUrl`: Sinh chuỗi `"/wallet/top-up/" + id`.
 * `expiresAt`: Tính bằng `createdAt + 15 phút`.
 
@@ -288,8 +209,8 @@ public class WalletDTO {
 |---|---|
 | `createWalletForUser(User user, EntityManager em)` | Khởi tạo ví mới với `balance = 0`, `status = ACTIVE` khi đăng ký tài khoản. |
 | `getMyWallet(long userId)` | Lấy thông tin ví của user. Nếu user cũ chưa có ví trong DB, hệ thống sẽ tự động khởi tạo ví (auto-provision) cho user đó. |
-| `topUp(long userId, TopUpRequest req, String idempotencyKey)` | 1. Kiểm tra trạng thái ví: Nếu `SUSPENDED` → ném lỗi `WALLET_SUSPENDED` (HTTP 403).<br>2. Validate `10,000 <= amount <= 50,000,000 VND`.<br>3. Trong 1 transaction duy nhất: Lưu bản ghi `wallet_topups` ở trạng thái `SUCCEEDED`, tự động cộng tiền vào ví `wallets` và ghi nhận bút toán `TOP_UP` (direction = `CREDIT`) vào sổ cái `wallet_transactions`.<br>4. Trả về `TopUpResponse` (nạp thành công ngay lập tức). |
-| `getTopUpStatus(long userId, long topupId)` | Lấy chi tiết trạng thái nạp tiền từ bảng `wallet_topups`. Đảm bảo giao dịch thuộc đúng ví của `userId` hiện tại. |
+| `topUp(long userId, TopUpRequest req)` | 1. Kiểm tra trạng thái ví: Nếu `SUSPENDED` → ném lỗi `WALLET_SUSPENDED` (HTTP 403).<br>2. Validate `10,000 <= amount <= 50,000,000 VND`.<br>3. Tạo `WalletTransaction` với `type = ADD_MONEY` và `status = SUCCESSFUL`, tự động cộng tiền vào ví `wallets`.<br>4. Trả về `TopUpResponse`. |
+| `getTopUpStatus(long userId, long topupId)` | Lấy chi tiết trạng thái nạp tiền trực tiếp từ `WalletTransaction`. |
 | `getTransactionHistory(long userId, String typeStr, String fromDate, String toDate, int page, int size)` | Lấy danh sách bút toán của ví từ `wallet_transactions`, hỗ trợ lọc theo `type`, khoảng ngày, kèm metadata phân trang. |
 
 ---
@@ -317,9 +238,7 @@ public class WalletDTO {
   "success": true,
   "data": {
     "id": "1",
-    "balance": 150000.00,
-    "currency": "VND",
-    "updatedAt": "2026-10-04T09:08:42.095Z"
+    "balance": 150000.00
   },
   "meta": {},
   "traceId": "string"
@@ -342,9 +261,6 @@ public class WalletDTO {
 
 ### 4.2 `POST /wallet/top-up`
 * **Quyền**: User sở hữu ví (Ví không bị `SUSPENDED`).
-* **Parameters**:
-  - `idempotencyKey` (header): `string` (Key ngẫu nhiên 16-128 ký tự để ngăn chặn tạo trùng giao dịch)
-
 * **Request Body**:
 ```json
 {
@@ -360,9 +276,8 @@ public class WalletDTO {
   "data": {
     "id": "101",
     "amount": 100000.00,
-    "currency": "VND",
     "method": "GATEWAY",
-    "status": "PENDING",
+    "status": "SUCCESSFUL",
     "checkoutUrl": "/wallet/top-up/101",
     "expiresAt": "2026-10-04T09:23:42.102Z",
     "createdAt": "2026-10-04T09:08:42.102Z",
@@ -370,25 +285,6 @@ public class WalletDTO {
     "failureCode": null
   },
   "meta": {},
-  "traceId": "string"
-}
-```
-
-* **Lỗi 400 `IDEMPOTENCY_KEY_REQUIRED`**:
-```json
-{
-  "success": false,
-  "error": {
-    "code": "IDEMPOTENCY_KEY_REQUIRED",
-    "message": "Thiếu header Idempotency-Key",
-    "fieldErrors": [
-      {
-        "field": "idempotencyKey",
-        "message": "Header idempotencyKey là bắt buộc (16-128 ký tự)"
-      }
-    ],
-    "details": {}
-  },
   "traceId": "string"
 }
 ```
@@ -466,9 +362,8 @@ public class WalletDTO {
   "data": {
     "id": "101",
     "amount": 100000.00,
-    "currency": "VND",
     "method": "GATEWAY",
-    "status": "PENDING",
+    "status": "SUCCESSFUL",
     "checkoutUrl": "/wallet/top-up/101",
     "expiresAt": "2026-10-04T09:23:42.102Z",
     "createdAt": "2026-10-04T09:08:42.102Z",
@@ -524,13 +419,9 @@ public class WalletDTO {
   "data": [
     {
       "id": "98",
-      "type": "TOP_UP",
-      "direction": "CREDIT",
+      "type": "ADD_MONEY",
+      "status": "SUCCESSFUL",
       "amount": 100000.00,
-      "balanceAfter": 150000.00,
-      "currency": "VND",
-      "referenceType": "TOP_UP",
-      "referenceId": "101",
       "description": "Nạp tiền ví qua chuyển khoản",
       "createdAt": "2026-10-04T09:17:32.374Z"
     }

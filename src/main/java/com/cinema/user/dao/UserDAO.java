@@ -44,8 +44,8 @@ public class UserDAO {
             if (command.phoneProvided()) {
                 user.setPhone(command.phone());
             }
-            if (command.dateOfBirthProvided()) {
-                user.setDateOfBirth(command.dateOfBirth());
+            if (command.dobProvided()) {
+                user.setDob(command.dob());
             }
 
             transaction.commit();
@@ -65,7 +65,6 @@ public class UserDAO {
                         """
                         SELECT user
                         FROM User user
-                        JOIN FETCH user.role
                         WHERE user.id = :userId
                         """,
                         User.class
@@ -80,8 +79,8 @@ public class UserDAO {
             String fullName,
             boolean phoneProvided,
             String phone,
-            boolean dateOfBirthProvided,
-            LocalDate dateOfBirth
+            boolean dobProvided,
+            LocalDate dob
     ) {
     }
 }

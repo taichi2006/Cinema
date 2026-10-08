@@ -41,31 +41,32 @@ public class MovieDAO {
         try {
             StringBuilder sql = new StringBuilder(
                     "SELECT " +
-                    "s.showtime_id, " +
+                    "s.show_time_id, " +
                     "s.movie_id, " +
                     "c.cinema_id, " +
                     "c.cinema_name, " +
                     "r.room_id, " +
                     "r.room_name, " +
-                    "s.starts_at, " +
-                    "s.ends_at, " +
-                    "s.format, " +
-                    "s.language, " +
+                    "(s.show_date + s.start_time) AS starts_at, " +
+                    "(s.show_date + s.end_time) AS ends_at, " +
+                    "m.format, " +
+                    "m.language, " +
                     "s.base_price, " +
                     "s.status " +
-                    "FROM cinema.showtimes s " +
+                    "FROM cinema.show_times s " +
                     "JOIN cinema.rooms r ON s.room_id = r.room_id " +
                     "JOIN cinema.cinemas c ON r.cinema_id = c.cinema_id " +
+                    "JOIN cinema.movies m ON s.movie_id = m.movie_id " +
                     "WHERE s.movie_id = :movieId " +
-                    "AND s.status = 'OPEN' " +
-                    "AND CAST(s.starts_at AS date) = CAST(:showDate AS date) "
+                    "AND s.status = 'SCHEDULED' " +
+                    "AND s.show_date = CAST(:showDate AS date) "
             );
 
             if (cinemaId != null) {
                 sql.append("AND c.cinema_id = :cinemaId ");
             }
 
-            sql.append("ORDER BY s.starts_at ASC");
+            sql.append("ORDER BY s.show_date ASC, s.start_time ASC");
 
             var query = entityManager.createNativeQuery(sql.toString());
             query.setParameter("movieId", movieId);
@@ -110,12 +111,12 @@ public class MovieDAO {
         try {
             StringBuilder sql = new StringBuilder(
                     "SELECT COUNT(*) " +
-                    "FROM cinema.showtimes s " +
+                    "FROM cinema.show_times s " +
                     "JOIN cinema.rooms r ON s.room_id = r.room_id " +
                     "JOIN cinema.cinemas c ON r.cinema_id = c.cinema_id " +
                     "WHERE s.movie_id = :movieId " +
-                    "AND s.status = 'OPEN' " +
-                    "AND CAST(s.starts_at AS date) = CAST(:showDate AS date) "
+                    "AND s.status = 'SCHEDULED' " +
+                    "AND s.show_date = CAST(:showDate AS date) "
             );
 
             if (cinemaId != null) {
@@ -142,18 +143,14 @@ public class MovieDAO {
             StringBuilder sql = new StringBuilder(
                     "SELECT " +
                     "ur.review_id, " +
-                    "s.movie_id, " +
+                    "ur.movie_id, " +
                     "u.full_name, " +
                     "ur.rating, " +
                     "ur.comment, " +
-                    "ur.version, " +
-                    "ur.created_at, " +
-                    "ur.updated_at " +
-                    "FROM cinema.user_reviews ur " +
-                    "JOIN cinema.bookings b ON ur.booking_id = b.booking_id " +
-                    "JOIN cinema.showtimes s ON b.showtime_id = s.showtime_id " +
-                    "JOIN cinema.users u ON b.user_id = u.user_id " +
-                    "WHERE s.movie_id = :movieId "
+                    "ur.created_at " +
+                    "FROM cinema.reviews ur " +
+                    "JOIN cinema.users u ON ur.user_id = u.user_id " +
+                    "WHERE ur.movie_id = :movieId "
             );
 
             if ("createdAt,asc".equals(sort)) {
@@ -182,12 +179,10 @@ public class MovieDAO {
                 String authorName = row[2] != null ? row[2].toString() : null;
                 Integer rating = row[3] != null ? ((Number) row[3]).intValue() : null;
                 String comment = row[4] != null ? row[4].toString() : null;
-                Integer version = row[5] != null ? ((Number) row[5]).intValue() : null;
-                String createdAt = formatTimestamp(row[6]);
-                String updatedAt = formatTimestamp(row[7]);
+                String createdAt = formatTimestamp(row[5]);
 
                 responses.add(new ReviewResponse(
-                        reviewId, mId, authorName, rating, comment, version, createdAt, updatedAt
+                        reviewId, mId, authorName, rating, comment, createdAt
                 ));
             }
             return responses;
@@ -200,10 +195,8 @@ public class MovieDAO {
         EntityManager entityManager = JPAUtil.getEntityManager();
         try {
             String sql = "SELECT COUNT(*) " +
-                    "FROM cinema.user_reviews ur " +
-                    "JOIN cinema.bookings b ON ur.booking_id = b.booking_id " +
-                    "JOIN cinema.showtimes s ON b.showtime_id = s.showtime_id " +
-                    "WHERE s.movie_id = :movieId";
+                    "FROM cinema.reviews ur " +
+                    "WHERE ur.movie_id = :movieId";
 
             var query = entityManager.createNativeQuery(sql);
             query.setParameter("movieId", movieId);
@@ -264,7 +257,7 @@ public class MovieDAO {
             }
 
             if (hasGenre) {
-                jpql.append("AND (LOWER(g.genreCode) = :genre OR LOWER(g.genreName) = :genre) ");
+                jpql.append("AND LOWER(g.genreName) = :genre ");
             }
 
             boolean hasStatus = filter.getStatus() != null && !filter.getStatus().trim().isEmpty();
@@ -341,7 +334,7 @@ public class MovieDAO {
             }
 
             if (hasGenre) {
-                jpql.append("AND (LOWER(g.genreCode) = :genre OR LOWER(g.genreName) = :genre) ");
+                jpql.append("AND LOWER(g.genreName) = :genre ");
             }
 
             boolean hasStatus = filter.getStatus() != null && !filter.getStatus().trim().isEmpty();

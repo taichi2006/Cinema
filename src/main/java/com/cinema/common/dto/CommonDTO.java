@@ -1,9 +1,15 @@
 package com.cinema.common.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+
 public class CommonDTO {
     public static class ApiResponse<T> {
         private final boolean success;
+
+        @JsonInclude(JsonInclude.Include.NON_NULL)
         private final String message;
+
+        @JsonInclude(JsonInclude.Include.ALWAYS)
         private final T data;
 
         public ApiResponse(boolean success, String message, T data) {
@@ -36,11 +42,19 @@ public class CommonDTO {
         public String getError() { return error; }
     }
 
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public static class PageMeta {
-        private final int page;
-        private final int size;
-        private final long totalElements;
-        private final int totalPages;
+        private final Integer page;
+        private final Integer size;
+        private final Long totalElements;
+        private final Integer totalPages;
+
+        public PageMeta(int page, int size, long totalElements) {
+            this.page = page;
+            this.size = size;
+            this.totalElements = totalElements;
+            this.totalPages = null;
+        }
 
         public PageMeta(int page, int size, long totalElements, int totalPages) {
             this.page = page;
@@ -49,9 +63,9 @@ public class CommonDTO {
             this.totalPages = totalPages;
         }
 
-        public int getPage() { return page; }
-        public int getSize() { return size; }
-        public long getTotalElements() { return totalElements; }
-        public int getTotalPages() { return totalPages; }
+        public int getPage() { return page != null ? page : 0; }
+        public int getSize() { return size != null ? size : 0; }
+        public long getTotalElements() { return totalElements != null ? totalElements : 0L; }
+        public Integer getTotalPages() { return totalPages; }
     }
 }

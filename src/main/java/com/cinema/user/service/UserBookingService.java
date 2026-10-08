@@ -23,8 +23,7 @@ public class UserBookingService {
     private static final int DEFAULT_SIZE = 20;
     private static final ZoneId APPLICATION_ZONE = ZoneId.of("Asia/Bangkok");
     private static final Set<String> STATUSES = Set.of(
-            "PENDING_PAYMENT", "PAID", "CANCELLED", "EXPIRED",
-            "REFUND_PENDING", "REFUNDED"
+            "PENDING", "CONFIRMED", "CANCELLED", "EXPIRED"
     );
 
     private final UserBookingDAO bookingDAO;
@@ -46,22 +45,15 @@ public class UserBookingService {
             long total = bookingDAO.count(userId, query);
             var items = bookingDAO.findPage(userId, query).stream()
                     .map(row -> new UserBookingResponse(
-                            String.valueOf(row.id()),
+                            row.bookingId(),
                             row.status(),
-                            row.movieTitle(),
-                            row.cinemaName(),
-                            row.roomName(),
-                            row.startsAt(),
-                            row.seatLabels(),
-                            row.totalAmount(),
-                            row.currency(),
-                            row.createdAt()
+                            row.totalAmount()
                     ))
                     .toList();
 
             return new UserPageResponse<>(
                     items,
-                    new CommonDTO.PageMeta(query.page(), query.size(), total, totalPages(total, query.size()))
+                    new CommonDTO.PageMeta(query.page(), query.size(), total)
             );
         } catch (ApiException exception) {
             throw exception;
@@ -77,8 +69,11 @@ public class UserBookingService {
         }
 
         String status = optionalValue(request.status(), "status");
-        if (status != null && !STATUSES.contains(status)) {
-            throw ApiException.badRequest("Trạng thái booking không hợp lệ");
+        if (status != null) {
+            status = status.toUpperCase();
+            if (!STATUSES.contains(status)) {
+                throw ApiException.badRequest("Trạng thái booking không hợp lệ");
+            }
         }
 
         LocalDate from = parseDate(request.from(), "from");
@@ -97,10 +92,10 @@ public class UserBookingService {
         }
 
         String sort = request.sort() == null ? "createdAt,desc" : request.sort();
-        UserBookingCriteria.SortDirection direction = switch (sort) {
-            case "createdAt,asc" -> UserBookingCriteria.SortDirection.ASC;
-            case "createdAt,desc" -> UserBookingCriteria.SortDirection.DESC;
-            default -> throw ApiException.badRequest("sort chỉ nhận createdAt,asc hoặc createdAt,desc");
+        UserBookingCriteria.SortDirection direction = switch (sort.toLowerCase()) {
+            case "createdat,asc", "asc" -> UserBookingCriteria.SortDirection.ASC;
+            case "createdat,desc", "desc" -> UserBookingCriteria.SortDirection.DESC;
+            default -> UserBookingCriteria.SortDirection.DESC;
         };
 
         return new UserBookingCriteria(
@@ -118,7 +113,7 @@ public class UserBookingService {
         if (value.isBlank()) {
             throw ApiException.badRequest(name + " không được để trống");
         }
-        return value;
+        return value.trim();
     }
 
     private LocalDate parseDate(String value, String name) {
@@ -135,15 +130,9 @@ public class UserBookingService {
         if (value == null) return defaultValue;
         if (value.isBlank()) throw ApiException.badRequest(name + " không được để trống");
         try {
-            return Integer.parseInt(value);
+            return Integer.parseInt(value.trim());
         } catch (NumberFormatException exception) {
             throw ApiException.badRequest(name + " phải là số nguyên");
         }
-    }
-
-    static int totalPages(long totalElements, int size) {
-        if (totalElements == 0) return 0;
-        long pages = ((totalElements - 1) / size) + 1;
-        return (int) Math.min(pages, Integer.MAX_VALUE);
     }
 }

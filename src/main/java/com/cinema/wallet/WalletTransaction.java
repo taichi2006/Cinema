@@ -13,42 +13,28 @@ public class WalletTransaction {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "wallet_transaction_id")
+    @Column(name = "transaction_id")
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "wallet_id", nullable = false)
     private Wallet wallet;
 
-    @Column(name = "transaction_type", nullable = false, length = 10)
-    private String transactionType;
-
-    @Column(nullable = false, length = 6)
-    private String direction; // "CREDIT" hoặc "DEBIT"
-
     @Column(nullable = false)
     private Long amount;
 
-    @Column(name = "balance_after", nullable = false)
-    private Long balanceAfter;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "transaction_type", nullable = false, length = 20)
+    private TransactionType type;
 
-    @Column(length = 3, nullable = false)
-    private String currency = "VND";
-
-    @Column(name = "topup_id")
-    private Long topupId;
-
-    @Column(name = "payment_id")
-    private Long paymentId;
-
-    @Column(name = "refund_id")
-    private Long refundId;
+    @Column(name = "status", nullable = false, length = 20)
+    private String status = "PENDING";
 
     @Column(name = "description", columnDefinition = "text")
     private String description;
 
-    @Column(name = "created_at")
-    private Instant createdAt = Instant.now();
+    @Column(name = "created_at", insertable = false, updatable = false)
+    private Instant createdAt;
 
     public WalletTransaction() {}
 
@@ -68,20 +54,12 @@ public class WalletTransaction {
         this.wallet = wallet;
     }
 
-    public String getTransactionType() {
-        return transactionType;
+    public TransactionType getType() {
+        return type;
     }
 
-    public void setTransactionType(String transactionType) {
-        this.transactionType = transactionType;
-    }
-
-    public String getDirection() {
-        return direction;
-    }
-
-    public void setDirection(String direction) {
-        this.direction = direction;
+    public void setType(TransactionType type) {
+        this.type = type;
     }
 
     public Long getAmount() {
@@ -92,44 +70,12 @@ public class WalletTransaction {
         this.amount = amount;
     }
 
-    public Long getBalanceAfter() {
-        return balanceAfter;
+    public String getStatus() {
+        return status;
     }
 
-    public void setBalanceAfter(Long balanceAfter) {
-        this.balanceAfter = balanceAfter;
-    }
-
-    public String getCurrency() {
-        return currency;
-    }
-
-    public void setCurrency(String currency) {
-        this.currency = currency;
-    }
-
-    public Long getTopupId() {
-        return topupId;
-    }
-
-    public void setTopupId(Long topupId) {
-        this.topupId = topupId;
-    }
-
-    public Long getPaymentId() {
-        return paymentId;
-    }
-
-    public void setPaymentId(Long paymentId) {
-        this.paymentId = paymentId;
-    }
-
-    public Long getRefundId() {
-        return refundId;
-    }
-
-    public void setRefundId(Long refundId) {
-        this.refundId = refundId;
+    public void setStatus(String status) {
+        this.status = status;
     }
 
     public String getDescription() {

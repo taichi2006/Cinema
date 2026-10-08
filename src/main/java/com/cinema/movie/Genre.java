@@ -16,19 +16,19 @@ public class Genre {
     @Column(name = "genre_id")
     private Long genreId;
 
-    @Column(name = "genre_code", nullable = false, unique = true, length = 30)
-    private String genreCode;
-
     @Column(name = "genre_name", nullable = false, unique = true, length = 100)
     private String genreName;
+
+    @Column(name = "description", columnDefinition = "text")
+    private String description;
 
     public Genre() {
     }
 
-    public Genre(Long genreId, String genreCode, String genreName) {
+    public Genre(Long genreId, String genreName, String description) {
         this.genreId = genreId;
-        this.genreCode = genreCode;
         this.genreName = genreName;
+        this.description = description;
     }
 
     public Long getGenreId() {
@@ -39,19 +39,19 @@ public class Genre {
         this.genreId = genreId;
     }
 
-    public String getGenreCode() {
-        return genreCode;
-    }
-
-    public void setGenreCode(String genreCode) {
-        this.genreCode = genreCode;
-    }
-
     public String getGenreName() {
         return genreName;
     }
 
     public void setGenreName(String genreName) {
         this.genreName = genreName;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
     }
 }

@@ -1,3 +1,17 @@
 package com.cinema.auth.dto.request;
 
-public record ChangePasswordRequest(String oldPassword, String newPassword) {}
+import com.fasterxml.jackson.annotation.JsonAlias;
+
+public record ChangePasswordRequest(
+        @JsonAlias({"oldPassword"}) String currentPassword,
+        String newPassword,
+        String confirmPassword
+) {
+    public String currentPassword() {
+        return currentPassword;
+    }
+
+    public String oldPassword() {
+        return currentPassword;
+    }
+}
