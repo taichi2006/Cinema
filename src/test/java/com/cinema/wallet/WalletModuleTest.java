@@ -3,7 +3,7 @@ package com.cinema.wallet;
 import com.cinema.common.dto.CommonDTO.ApiResponse;
 import com.cinema.common.dto.CommonDTO.ErrorResponse;
 import com.cinema.common.dto.CommonDTO.PageMeta;
-import com.cinema.user.User;
+import com.cinema.user.entity.User;
 import com.cinema.wallet.dto.response.WalletResponse;
 import com.cinema.wallet.entity.Wallet;
 import com.cinema.wallet.entity.WalletTopup;
