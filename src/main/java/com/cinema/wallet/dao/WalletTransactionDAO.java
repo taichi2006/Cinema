@@ -70,7 +70,7 @@ public class WalletTransactionDAO {
             );
 
             if (type != null && !type.isBlank()) {
-                jpql.append("AND tx.transactionType = :type ");
+                jpql.append("AND tx.type = :type ");
             }
             if (from != null) {
                 jpql.append("AND tx.createdAt >= :from ");
@@ -85,7 +85,7 @@ public class WalletTransactionDAO {
                     .setParameter("walletId", walletId);
 
             if (type != null && !type.isBlank()) {
-                query.setParameter("type", type.toUpperCase());
+                query.setParameter("type", TransactionType.valueOf(type.toUpperCase()));
             }
             if (from != null) {
                 query.setParameter("from", from);
@@ -114,7 +114,7 @@ public class WalletTransactionDAO {
             );
 
             if (type != null && !type.isBlank()) {
-                jpql.append("AND tx.transactionType = :type ");
+                jpql.append("AND tx.type = :type ");
             }
             if (from != null) {
                 jpql.append("AND tx.createdAt >= :from ");
@@ -127,7 +127,7 @@ public class WalletTransactionDAO {
                     .setParameter("walletId", walletId);
 
             if (type != null && !type.isBlank()) {
-                query.setParameter("type", type.toUpperCase());
+                query.setParameter("type", TransactionType.valueOf(type.toUpperCase()));
             }
             if (from != null) {
                 query.setParameter("from", from);

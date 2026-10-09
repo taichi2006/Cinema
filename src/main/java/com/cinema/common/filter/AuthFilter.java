@@ -13,7 +13,16 @@ import jakarta.servlet.http.HttpServletResponse;
 
 import java.io.IOException;
 
-@WebFilter(urlPatterns = {"/user/*", "/booking/*", "/admin/*", "/wallet", "/wallet/*"}, dispatcherTypes = {DispatcherType.REQUEST, DispatcherType.FORWARD})
+@WebFilter(urlPatterns = {
+        "/user", "/user/*",
+        "/booking", "/booking/*", "/bookings", "/bookings/*",
+        "/wallet", "/wallet/*",
+        "/api/booking", "/api/booking/*", "/api/bookings", "/api/bookings/*",
+        "/api/wallet", "/api/wallet/*",
+        "/api/v1/booking", "/api/v1/booking/*", "/api/v1/bookings", "/api/v1/bookings/*",
+        "/api/v1/wallet", "/api/v1/wallet/*",
+        "/api/v1/auth/logout", "/api/auth/logout", "/auth/logout"
+}, dispatcherTypes = {DispatcherType.REQUEST, DispatcherType.FORWARD})
 public class AuthFilter implements Filter {
 
     @Override
@@ -23,24 +32,22 @@ public class AuthFilter implements Filter {
         HttpServletResponse resp = (HttpServletResponse) response;
 
         try {
-            // Đọc token từ Cookie hoặc từ header Authorization: Bearer <token> (chuẩn Swagger / Postman)
-            String token = JwtUtil.readCookie(req, JwtUtil.COOKIE_ACCESS);
+            String authHeader = req.getHeader("Authorization");
+            String token = null;
+            if (authHeader != null && authHeader.startsWith("Bearer ")) {
+                token = authHeader.substring(7);
+            }
             if (token == null) {
-                String authHeader = req.getHeader("Authorization");
-                if (authHeader != null && authHeader.startsWith("Bearer ")) {
-                    token = authHeader.substring(7).trim();
-                }
+                token = JwtUtil.readCookie(req, JwtUtil.COOKIE_ACCESS);
             }
             if (token == null)
                 throw AuthException.unauthorized();
 
             Claims claims = JwtUtil.parseAccessToken(token);
             long userId = Long.parseLong(claims.getSubject());
-            String role = claims.get("role", String.class);
 
             // Lưu vào Request Attribute để các Controller phía sau sử dụng
             req.setAttribute("userId", userId);
-            req.setAttribute("role", role);
 
             chain.doFilter(request, response);
 

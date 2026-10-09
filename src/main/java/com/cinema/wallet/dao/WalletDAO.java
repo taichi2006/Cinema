@@ -1,7 +1,7 @@
 package com.cinema.wallet.dao;
 
 import com.cinema.common.util.JPAUtil;
-import com.cinema.user.User;
+import com.cinema.user.entity.User;
 import com.cinema.wallet.entity.Wallet;
 import jakarta.persistence.EntityManager;
 
@@ -64,7 +64,6 @@ public class WalletDAO {
     public Wallet createDefaultWallet(User user, EntityManager em) {
         Wallet wallet = new Wallet(user);
         wallet.setBalance(0L);
-        wallet.setCurrency("VND");
         wallet.setStatus(WalletStatus.ACTIVE);
         em.persist(wallet);
         return wallet;

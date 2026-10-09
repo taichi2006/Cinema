@@ -9,6 +9,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -39,10 +40,10 @@ public class Movie {
     @Column(name = "age_limit", nullable = false)
     private Integer ageLimit = 0;
 
-    @Column(name = "age_rating", nullable = false, length = 10)
-    private String ageRating = "P";
+    @Transient
+    private String ageRating;
 
-    @Column(name = "default_format", nullable = false, length = 20)
+    @Column(name = "format", nullable = false, length = 50)
     private String defaultFormat = "2D";
 
     @Column(name = "language", nullable = false, length = 50)
@@ -54,7 +55,7 @@ public class Movie {
     @Column(name = "poster_url", columnDefinition = "text")
     private String posterUrl;
 
-    @Column(name = "trailer_url", columnDefinition = "text")
+    @Transient
     private String trailerUrl;
 
     @Column(name = "status", nullable = false, length = 20)
@@ -124,7 +125,11 @@ public class Movie {
     }
 
     public String getAgeRating() {
-        return ageRating;
+        if (ageLimit == null || ageLimit <= 0) return "P";
+        if (ageLimit < 13) return "K";
+        if (ageLimit < 16) return "T13";
+        if (ageLimit < 18) return "T16";
+        return "T18";
     }
 
     public void setAgeRating(String ageRating) {

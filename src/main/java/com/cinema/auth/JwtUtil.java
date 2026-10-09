@@ -34,13 +34,20 @@ public class JwtUtil {
         KEY = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
 
+    public static int getAccessTtlSeconds() {
+        return (int) (ACCESS_TTL_MS / 1000L);
+    }
+
+    public static int getRefreshTtlSeconds() {
+        return (int) (REFRESH_TTL_MS / 1000L);
+    }
+
     // ── Access Token ──────────────────────────────────────────────────────────
 
-    public static String generateAccessToken(long userId, String role) {
+    public static String generateAccessToken(long userId) {
         Date now = new Date();
         return Jwts.builder()
                 .subject(String.valueOf(userId))
-                .claim("role", role)
                 .issuedAt(now)
                 .expiration(new Date(now.getTime() + ACCESS_TTL_MS))
                 .signWith(KEY)
@@ -50,6 +57,39 @@ public class JwtUtil {
     public static Claims parseAccessToken(String token) {
         return Jwts.parser().verifyWith(KEY).build()
                 .parseSignedClaims(token).getPayload();
+    }
+
+    // ── Refresh Token ─────────────────────────────────────────────────────────
+
+    public static String generateRefreshToken(long userId) {
+        Date now = new Date();
+        return Jwts.builder()
+                .subject(String.valueOf(userId))
+                .claim("type", "refresh")
+                .id(java.util.UUID.randomUUID().toString())
+                .issuedAt(now)
+                .expiration(new Date(now.getTime() + REFRESH_TTL_MS))
+                .signWith(KEY)
+                .compact();
+    }
+
+    public static Claims parseRefreshToken(String token) {
+        Claims claims = Jwts.parser().verifyWith(KEY).build()
+                .parseSignedClaims(token).getPayload();
+        if (!"refresh".equals(claims.get("type", String.class))) {
+            throw new JwtException("Invalid token type");
+        }
+        return claims;
+    }
+
+    public static String hashToken(String token) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(token.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash);
+        } catch (Exception e) {
+            throw new RuntimeException("Lỗi hash token", e);
+        }
     }
 
 

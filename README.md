@@ -14,7 +14,7 @@ Một ứng dụng Backend Web phục vụ hệ thống quản lý rạp chiếu
 Dự án được tổ chức theo module tính năng, giúp dễ dàng mở rộng và bảo trì:
 ```text
 src/main/java/com/cinema/
-├── auth/          # Xử lý đăng nhập, phân quyền, token
+├── auth/          # Xử lý xác thực người dùng, JWT token
 ├── booking/       # Xử lý quy trình đặt vé, chọn ghế
 ├── movie/         # Quản lý danh sách phim (Movie, DTO, DAO, Service, Controller)
 ├── payment/       # Xử lý thanh toán

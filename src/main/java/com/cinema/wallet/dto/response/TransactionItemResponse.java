@@ -7,27 +7,18 @@ public class TransactionItemResponse {
 
     private String id;
     private String type;
-    private String direction;
+    private String status;
     private Long amount;
-    private Long balanceAfter;
-    private String currency;
-    private String referenceType;
-    private String referenceId;
     private String description;
     private String createdAt;
 
     public TransactionItemResponse() {}
 
-    public TransactionItemResponse(String id, String type, String direction, Long amount, Long balanceAfter,
-                                   String currency, String referenceType, String referenceId, String description, String createdAt) {
+    public TransactionItemResponse(String id, String type, String status, Long amount, String description, String createdAt) {
         this.id = id;
         this.type = type;
-        this.direction = direction;
+        this.status = status;
         this.amount = amount;
-        this.balanceAfter = balanceAfter;
-        this.currency = currency;
-        this.referenceType = referenceType;
-        this.referenceId = referenceId;
         this.description = description;
         this.createdAt = createdAt;
     }
@@ -49,12 +40,12 @@ public class TransactionItemResponse {
         this.type = type;
     }
 
-    public String getDirection() {
-        return direction;
+    public String getStatus() {
+        return status;
     }
 
-    public void setDirection(String direction) {
-        this.direction = direction;
+    public void setStatus(String status) {
+        this.status = status;
     }
 
     public Long getAmount() {
@@ -63,38 +54,6 @@ public class TransactionItemResponse {
 
     public void setAmount(Long amount) {
         this.amount = amount;
-    }
-
-    public Long getBalanceAfter() {
-        return balanceAfter;
-    }
-
-    public void setBalanceAfter(Long balanceAfter) {
-        this.balanceAfter = balanceAfter;
-    }
-
-    public String getCurrency() {
-        return currency;
-    }
-
-    public void setCurrency(String currency) {
-        this.currency = currency;
-    }
-
-    public String getReferenceType() {
-        return referenceType;
-    }
-
-    public void setReferenceType(String referenceType) {
-        this.referenceType = referenceType;
-    }
-
-    public String getReferenceId() {
-        return referenceId;
-    }
-
-    public void setReferenceId(String referenceId) {
-        this.referenceId = referenceId;
     }
 
     public String getDescription() {

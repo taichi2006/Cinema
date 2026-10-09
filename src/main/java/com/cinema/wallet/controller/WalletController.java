@@ -82,13 +82,8 @@ public class WalletController extends HttpServlet {
 
             // 1. POST /wallet/top-up: Nạp tiền vào ví
             if ("/top-up".equals(action)) {
-                String idempotencyKey = req.getHeader("Idempotency-Key");
-                if (idempotencyKey == null || idempotencyKey.isBlank()) {
-                    idempotencyKey = req.getHeader("idempotencyKey");
-                }
-
                 TopUpRequest body = json.readValue(req.getInputStream(), TopUpRequest.class);
-                var data = service.topUp(userId, body, idempotencyKey);
+                var data = service.topUp(userId, body);
 
                 writeJson(resp, HttpServletResponse.SC_CREATED, ApiResponse.ok(data));
                 return;
