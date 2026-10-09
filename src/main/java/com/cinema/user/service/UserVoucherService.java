@@ -1,6 +1,5 @@
 package com.cinema.user.service;
 
-import com.cinema.common.dto.CommonDTO;
 import com.cinema.common.exception.ApiException;
 import com.cinema.user.criteria.UserVoucherCriteria;
 import com.cinema.user.dao.UserVoucherDAO;
@@ -8,7 +7,6 @@ import com.cinema.user.dto.request.UserVoucherRequest;
 import com.cinema.user.dto.response.UserPageResponse;
 import com.cinema.user.dto.response.UserVoucherResponse;
 
-import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.logging.Level;
@@ -19,7 +17,7 @@ public class UserVoucherService {
     private static final Logger LOGGER = Logger.getLogger(UserVoucherService.class.getName());
     private static final int DEFAULT_PAGE = 0;
     private static final int DEFAULT_SIZE = 20;
-    private static final Set<String> STATUSES = Set.of("AVAILABLE", "USED", "EXPIRED");
+    private static final Set<String> STATUSES = Set.of("UNUSED", "USED", "EXPIRED");
 
     private final UserVoucherDAO voucherDAO;
 
@@ -37,39 +35,15 @@ public class UserVoucherService {
     ) {
         UserVoucherCriteria query = validateAndCreateCriteria(request);
         try {
-            long total = voucherDAO.count(userId, query);
-            List<UserVoucherDAO.VoucherRow> rows = voucherDAO.findPage(userId, query);
-            List<Long> voucherIds = rows.stream().map(UserVoucherDAO.VoucherRow::id).toList();
-            var cinemaIds = voucherDAO.findEligibleCinemaIds(voucherIds);
-            var movieIds = voucherDAO.findEligibleMovieIds(voucherIds);
-
-            var items = rows.stream()
+            var items = voucherDAO.findPage(userId, query).stream()
                     .map(row -> new UserVoucherResponse(
-                            String.valueOf(row.id()),
+                            row.voucherId(),
                             row.code(),
-                            row.description(),
-                            row.status(),
-                            row.discountType(),
-                            row.discountValue(),
-                            row.maxDiscountAmount(),
-                            row.minOrderAmount(),
-                            row.appliesTo(),
-                            cinemaIds.getOrDefault(row.id(), List.of()),
-                            movieIds.getOrDefault(row.id(), List.of()),
-                            row.remainingUses(),
-                            row.startsAt(),
-                            row.expiresAt(),
-                            "VND"
+                            row.status()
                     ))
                     .toList();
 
-            return new UserPageResponse<>(
-                    items,
-                    new CommonDTO.PageMeta(
-                            query.page(), query.size(), total,
-                            UserBookingService.totalPages(total, query.size())
-                    )
-            );
+            return new UserPageResponse<>(items);
         } catch (ApiException exception) {
             throw exception;
         } catch (RuntimeException exception) {
@@ -80,13 +54,14 @@ public class UserVoucherService {
 
     private UserVoucherCriteria validateAndCreateCriteria(UserVoucherRequest request) {
         if (request == null) {
-            throw ApiException.badRequest("Yêu cầu lọc voucher không hợp lệ");
+            return new UserVoucherCriteria(null, DEFAULT_PAGE, DEFAULT_SIZE);
         }
 
-        String status = request.status();
+        String status = optionalValue(request.status(), "status");
         if (status != null) {
-            if (status.isBlank()) {
-                throw ApiException.badRequest("status không được để trống");
+            status = status.toUpperCase();
+            if ("AVAILABLE".equals(status)) {
+                status = "UNUSED";
             }
             if (!STATUSES.contains(status)) {
                 throw ApiException.badRequest("Trạng thái voucher không hợp lệ");
@@ -101,14 +76,23 @@ public class UserVoucherService {
         if (size < 1 || size > 100) {
             throw ApiException.badRequest("size phải từ 1 đến 100");
         }
+
         return new UserVoucherCriteria(status, page, size);
+    }
+
+    private String optionalValue(String value, String name) {
+        if (value == null) return null;
+        if (value.isBlank()) {
+            throw ApiException.badRequest(name + " không được để trống");
+        }
+        return value.trim();
     }
 
     private int parseInteger(String value, int defaultValue, String name) {
         if (value == null) return defaultValue;
         if (value.isBlank()) throw ApiException.badRequest(name + " không được để trống");
         try {
-            return Integer.parseInt(value);
+            return Integer.parseInt(value.trim());
         } catch (NumberFormatException exception) {
             throw ApiException.badRequest(name + " phải là số nguyên");
         }

@@ -13,48 +13,33 @@ public class User {
     @Column(name = "user_id")
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "role_id", nullable = false)
-    private Role role;
-
-    @Column(name = "full_name", nullable = false, length = 100)
+    @Column(name = "full_name", nullable = false, length = 255)
     private String fullName;
 
-    @Column(nullable = false, unique = true, length = 254)
+    @Column(nullable = false, unique = true, length = 255)
     private String email;
 
     @Column(name = "password_hash", nullable = false, length = 255)
     private String passwordHash;
 
-    @Column(name = "phone", length = 16)
+    @Column(name = "phone", length = 20)
     private String phone;
 
-    @Column(name = "date_of_birth")
-    private LocalDate dateOfBirth;
+    @Column(name = "dob")
+    private LocalDate dob;
+
+    @Column(name = "avatar_url", length = 500)
+    private String avatarUrl;
 
     @Column(name = "status", nullable = false, length = 20)
     private String status = "ACTIVE";
 
-    @Column(name = "auth_version", nullable = false, insertable = false)
-    private Integer authVersion;
-
-    @Column(name = "created_at", nullable = false, insertable = false, updatable = false)
+    @Column(name = "created_at", insertable = false, updatable = false)
     private Instant createdAt;
-
-    @Column(name = "updated_at", nullable = false, insertable = false)
-    private Instant updatedAt;
-
-    @PreUpdate
-    private void updateTimestamp() {
-        updatedAt = Instant.now();
-    }
 
     // Getters / Setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
-
-    public Role getRole() { return role; }
-    public void setRole(Role role) { this.role = role; }
 
     public String getFullName() { return fullName; }
     public void setFullName(String fullName) { this.fullName = fullName; }
@@ -68,16 +53,19 @@ public class User {
     public String getPhone() { return phone; }
     public void setPhone(String phone) { this.phone = phone; }
 
-    public LocalDate getDateOfBirth() { return dateOfBirth; }
-    public void setDateOfBirth(LocalDate dateOfBirth) { this.dateOfBirth = dateOfBirth; }
+    public LocalDate getDob() { return dob; }
+    public void setDob(LocalDate dob) { this.dob = dob; }
+
+    // Alias cho dateOfBirth để tương thích ngược với UserDAO / UserService
+    public LocalDate getDateOfBirth() { return dob; }
+    public void setDateOfBirth(LocalDate dateOfBirth) { this.dob = dateOfBirth; }
+
+    public String getAvatarUrl() { return avatarUrl; }
+    public void setAvatarUrl(String avatarUrl) { this.avatarUrl = avatarUrl; }
 
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
 
-    public Integer getAuthVersion() { return authVersion; }
-    public void setAuthVersion(Integer authVersion) { this.authVersion = authVersion; }
-
     public Instant getCreatedAt() { return createdAt; }
-
-    public Instant getUpdatedAt() { return updatedAt; }
+    public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
 }

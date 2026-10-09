@@ -1,5 +1,6 @@
 package com.cinema.user.dto.request;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonFormat;
 
 import java.time.LocalDate;
@@ -8,12 +9,13 @@ public final class UpdateUserRequest {
     private String fullName;
     private String phone;
 
+    @JsonAlias({"dob", "dateOfBirth"})
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
-    private LocalDate dateOfBirth;
+    private LocalDate dob;
 
     private boolean fullNameProvided;
     private boolean phoneProvided;
-    private boolean dateOfBirthProvided;
+    private boolean dobProvided;
 
     public String getFullName() {
         return fullName;
@@ -33,13 +35,23 @@ public final class UpdateUserRequest {
         this.phoneProvided = true;
     }
 
+    public LocalDate getDob() {
+        return dob;
+    }
+
+    public void setDob(LocalDate dob) {
+        this.dob = dob;
+        this.dobProvided = true;
+    }
+
+    // Alias for dateOfBirth
     public LocalDate getDateOfBirth() {
-        return dateOfBirth;
+        return dob;
     }
 
     public void setDateOfBirth(LocalDate dateOfBirth) {
-        this.dateOfBirth = dateOfBirth;
-        this.dateOfBirthProvided = true;
+        this.dob = dateOfBirth;
+        this.dobProvided = true;
     }
 
     public boolean wasFullNameProvided() {
@@ -51,10 +63,14 @@ public final class UpdateUserRequest {
     }
 
     public boolean wasDateOfBirthProvided() {
-        return dateOfBirthProvided;
+        return dobProvided;
+    }
+
+    public boolean wasDobProvided() {
+        return dobProvided;
     }
 
     public boolean hasAnyProvidedField() {
-        return fullNameProvided || phoneProvided || dateOfBirthProvided;
+        return fullNameProvided || phoneProvided || dobProvided;
     }
 }

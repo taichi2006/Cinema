@@ -308,17 +308,20 @@ Xử lý tập trung qua `com.cinema.common.exception.ErrorHandler`:
 
 ```sql
 SELECT 
-    s.showtime_id, s.movie_id, c.cinema_id, c.cinema_name,
-    r.room_id, r.room_name, s.starts_at, s.ends_at,
-    s.format, s.language, s.base_price, s.status
-FROM cinema.showtimes s
+    s.show_time_id, s.movie_id, c.cinema_id, c.cinema_name,
+    r.room_id, r.room_name, 
+    (s.show_date + s.start_time) AS starts_at, 
+    (s.show_date + s.end_time) AS ends_at,
+    m.format, m.language, s.base_price, s.status
+FROM cinema.show_times s
 JOIN cinema.rooms r ON s.room_id = r.room_id
 JOIN cinema.cinemas c ON r.cinema_id = c.cinema_id
+JOIN cinema.movies m ON s.movie_id = m.movie_id
 WHERE s.movie_id = :movieId
-  AND s.status = 'OPEN'
-  AND CAST(s.starts_at AS date) = CAST(:showDate AS date)
+  AND s.status = 'SCHEDULED'
+  AND s.show_date = CAST(:showDate AS date)
   [AND c.cinema_id = :cinemaId]
-ORDER BY s.starts_at ASC
+ORDER BY s.show_date ASC, s.start_time ASC
 LIMIT :size OFFSET :offset
 ```
 
@@ -354,9 +357,7 @@ Cấu trúc flat JSON chuẩn hóa với `meta` ([`CommonDTO.PageMeta`](file:///
       "authorDisplayName": "Nguyễn Văn A",
       "rating": 5,
       "comment": "Phim rất hay, cảm động!",
-      "version": 1,
-      "createdAt": "2026-10-04T08:08:17.626Z",
-      "updatedAt": "2026-10-04T08:08:17.626Z"
+      "createdAt": "2026-10-04T08:08:17.626Z"
     }
   ],
   "meta": {
@@ -374,8 +375,7 @@ Cấu trúc flat JSON chuẩn hóa với `meta` ([`CommonDTO.PageMeta`](file:///
   - `authorDisplayName`: Tên hiển thị của tác giả đánh giá, trích xuất từ `u.full_name` qua liên kết với bảng `cinema.users`.
   - `rating`: Số sao đánh giá từ 1 đến 5 (`ur.rating`).
   - `comment`: Nội dung nhận xét của khán giả (`ur.comment`).
-  - `version`: Phiên bản đánh giá (`ur.version`).
-  - `createdAt`, `updatedAt`: Chuỗi thời gian định dạng ISO-8601.
+  - `createdAt`: Chuỗi thời gian định dạng ISO-8601.
 - `meta`: Thông tin phân trang dùng chung `CommonDTO.PageMeta` (`page`, `size`, `totalElements`, `totalPages`).
 
 ### 7.3. Phản Hồi Lỗi
@@ -409,9 +409,9 @@ Xử lý tập trung qua `com.cinema.common.exception.ErrorHandler`:
 
 ### 7.4. Kỹ Thuật Truy Vấn CSDL: `findReviews` & `countReviews` (`MovieDAO.java`)
 
-Trong CSDL PostgreSQL, bảng `cinema.user_reviews` gắn với đơn đặt vé `cinema.bookings`, qua đó suy ra `cinema.showtimes` (chứa `movie_id`) và `cinema.users` (chứa tên tác giả `full_name`).
+Trong CSDL PostgreSQL, bảng `cinema.reviews` kết nối trực tiếp với bảng `cinema.users` (chứa tên tác giả `full_name`).
 
-`MovieDAO` sử dụng Native SQL kết hợp 4 bảng để truy vấn trực tiếp mà không cần khởi tạo Entity JPA mới ngoài module `movie`:
+`MovieDAO` sử dụng Native SQL kết hợp 2 bảng để truy vấn trực tiếp mà không cần khởi tạo Entity JPA mới ngoài module `movie`:
 
 ```sql
 SELECT 
@@ -420,14 +420,10 @@ SELECT
     u.full_name,
     ur.rating,
     ur.comment,
-    ur.version,
-    ur.created_at,
-    ur.updated_at
-FROM cinema.user_reviews ur
-JOIN cinema.bookings b ON ur.booking_id = b.booking_id
-JOIN cinema.showtimes s ON b.showtime_id = s.showtime_id
-JOIN cinema.users u ON b.user_id = u.user_id
-WHERE s.movie_id = :movieId
+    ur.created_at
+FROM cinema.reviews ur
+JOIN cinema.users u ON ur.user_id = u.user_id
+WHERE ur.movie_id = :movieId
 ORDER BY ...
 LIMIT :size OFFSET :offset
 ```
@@ -441,10 +437,8 @@ LIMIT :size OFFSET :offset
 - **Truy vấn đếm tổng (`countReviews`):**
 ```sql
 SELECT COUNT(*)
-FROM cinema.user_reviews ur
-JOIN cinema.bookings b ON ur.booking_id = b.booking_id
-JOIN cinema.showtimes s ON b.showtime_id = s.showtime_id
-WHERE s.movie_id = :movieId
+FROM cinema.reviews ur
+WHERE ur.movie_id = :movieId
 ```
 
 ---

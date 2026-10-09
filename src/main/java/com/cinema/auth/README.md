@@ -1,92 +1,188 @@
-# Tài Liệu Kỹ Thuật: Module Auth & User
+# Tài Liệu Kỹ Thuật: Module Auth
 
-Tài liệu này mô tả chi tiết kiến trúc và luồng hoạt động của hệ thống Xác thực (Auth) và Người dùng (User). Phiên bản này đã được **tối giản hóa tối đa** để đảm bảo dễ hiểu, dễ maintain cho team, sử dụng **JPA (Hibernate)** thay vì JDBC thuần.
+Tài liệu mô tả chi tiết kiến trúc và chuẩn Request/Response của hệ thống Xác thực (Auth), đồng bộ 100% với đặc tả API của team (file Excel) và cơ sở dữ liệu PostgreSQL (schema `cinema`).
+
+> **Lưu ý kiến trúc quan trọng**:
+> - Hệ thống **KHÔNG CÓ ROLE** (bảng `cinema.roles` và trường `role_id` đã được loại bỏ hoàn toàn).
+> - Access Token chỉ chứa subject là `userId` (không chứa claim role).
+> - Thao tác trực tiếp với các bảng: `cinema.users`, `cinema.wallets` và `cinema.refresh_tokens`.
 
 ---
 
 ## 1. Kiến trúc chung
-Hệ thống sử dụng mô hình MVC với **Thin Controller** và **Thick Service**:
-- **Controller**: Chỉ làm nhiệm vụ tiếp nhận HTTP Request, parse JSON sang DTO, gọi Service, và trả về `ApiResponse`. Không chứa logic nghiệp vụ.
-- **Service**: Xử lý toàn bộ logic nghiệp vụ, gọi Database thông qua `JPAUtil.getEntityManager()`.
-- **Entity**: Đại diện cho cấu trúc bảng trong Database (Chỉ map các trường thật sự cần thiết).
-- **Filter**: Chặn ở cửa ngõ các API cần bảo mật để kiểm tra quyền truy cập.
+- **Route Prefix**: Hỗ trợ đồng thời `/api/v1/auth/*`, `/api/auth/*` và `/auth/*`.
+- **Controller (`AuthController`)**: Tiếp nhận HTTP Request, trích xuất IP / User-Agent, parse DTO, gọi Service, thiết lập Cookie và trả về JSON chuẩn.
+- **Service (`AuthService`)**: Xử lý logic đăng ký, đăng nhập, cấp phát/xoay vòng (rotate) refresh token, đăng xuất và đổi mật khẩu.
+- **DAO (`AuthDAO`)**: Thao tác dữ liệu với bảng `cinema.users`, `cinema.wallets` và `cinema.refresh_tokens`.
+- **JWT Helper (`JwtUtil`)**: Ký tạo và giải mã Access Token (15 phút), Refresh Token (7 ngày), tính hash SHA-256 cho refresh token và quản lý HTTP Cookie (HttpOnly).
+- **Filter (`AuthFilter` & `ApiPrefixFilter`)**: Kiểm tra JWT Access Token ở header `Authorization: Bearer <token>` hoặc Cookie `access_token`, trích xuất `userId` vào `request.setAttribute("userId", userId)`.
 
 ---
 
-## 2. Module `user` (Quản lý dữ liệu người dùng)
+## 2. Đặc tả API chuẩn theo team
 
-Để giảm thiểu sự phức tạp, các Entity chỉ ánh xạ (map) đúng những cột thật sự cần thiết phục vụ cho việc Đăng nhập và Quản lý Profile.
-
-- **`User.java`**: Map với bảng `cinema.users`. Chỉ chứa các trường: `id`, `role`, `email`, `passwordHash`, `fullName`, `status`. Tuyệt đối không nhồi nhét các logic thừa thãi.
-- **`Role.java`**: Map với bảng `cinema.roles` (quan hệ N-1 với User).
-- **`UserService.java`**: Xử lý các nghiệp vụ của User hiện tại (Lấy thông tin cá nhân `getMe`, Đổi tên `updateProfile`, Đổi mật khẩu `changePassword`). Sử dụng toàn bộ lệnh JPA thuần túy (`em.find()`, `user.set...`).
-
----
-
-## 3. Module `auth` (Hệ thống đăng nhập siêu tinh gọn)
-
-Chúng ta sử dụng cơ chế **JWT Cookie-based** với duy nhất **1 Access Token dài hạn (7 ngày)**, không cần Refresh Token hay bảng phụ trợ.
-
-### 3.1. Các Endpoint cung cấp
-1. **`POST /api/auth/register`**: Tạo tài khoản với mật khẩu được mã hóa tự động bằng `BCrypt`.
-2. **`POST /api/auth/login`**: Kiểm tra Email/Password và `status` (bị khóa hay không). Nếu thành công, Server tự tạo 1 Cookie chứa chuỗi JWT ném về cho trình duyệt.
-3. **`POST /api/auth/logout`**: Chỉ đơn giản là yêu cầu trình duyệt "xóa Cookie JWT đi". Không cần kết nối Database.
-
-### 3.2. Tiện ích `JwtUtil.java`
-- Chỉ đảm nhận 2 việc: Ký tạo (Generate) token và Đọc (Parse) token. 
-- Token chứa 2 thông tin cơ bản: `userId` và `role`.
-
----
-
-## 4. Bảo mật với `AuthFilter.java` (Cực kỳ quan trọng)
-
-Thay vì mỗi API phải tự kiểm tra xem User đã đăng nhập chưa, chúng ta sử dụng **Filter**.
-
-- `AuthFilter` được đăng ký để tự động "trấn lột" tất cả các Request đi vào `/user/*`, `/booking/*`, `/admin/*`.
-- Khi có Request đi qua, nó sẽ tự động chui vào Cookie, lấy JWT ra giải mã.
-- **Nếu Token hợp lệ**: Nó nhét `userId` và `role` vào `request.setAttribute` rồi mở cửa cho đi tiếp vào Controller.
-- **Nếu Token sai / hết hạn / không có**: Nó ném lỗi `401 Unauthorized` và đuổi về ngay lập tức. Cửa đóng.
-
-**💡 Hệ quả cực hay dành cho Developer:**
-Bất cứ khi nào bạn viết một API mới (ví dụ Lấy danh sách vé đã đặt), bạn không cần quan tâm đến JWT hay bảo mật nữa. Bạn chỉ cần gõ đúng 1 dòng:
-```java
-long userId = (long) req.getAttribute("userId");
-```
-Là bạn đã có trong tay ID của người đang gọi API!
-
----
-
-## 5. Xử lý lỗi & Trả về (Module `common`)
-
-- Mọi API thành công phải được bọc trong `ApiResponse.ok(data)` hoặc `ApiResponse.success("Thông báo")`.
-- Nếu có lỗi nghiệp vụ (Vd: Dữ liệu sai), không dùng `if-else` trả về HTTP status. Hãy quăng lỗi trực tiếp: 
-  ```java
-  throw ApiException.badRequest("Mật khẩu không đúng");
-  ```
-- **`ErrorHandler.java`** sẽ tự động "hứng" toàn bộ các lỗi bị quăng ra này, và biến nó thành chuỗi JSON chuẩn có dạng:
+### 2.1. Đăng ký tài khoản (`POST /api/v1/auth/register`)
+- **Mô tả**: Đăng ký người dùng mới, tự động khởi tạo ví (balance = 0.00, status = ACTIVE).
+- **Auth (Middleware)**: Không
+- **Status Codes**: `201`, `400`, `409`
+- **Request Body (JSON)**:
   ```json
-  { "success": false, "status": 400, "error": "Mật khẩu không đúng" }
+  {
+    "fullName": "Nguyễn Văn A",
+    "email": "a@gmail.com",
+    "phone": "0901234567",
+    "password": "P@ssw0rd123",
+    "dob": "2000-01-15"
+  }
   ```
-
-### 5.1. Quản lý lỗi Xác thực (`AuthException.java`)
-Để code được gọn gàng và tránh hardcode các câu thông báo lỗi xác thực ở nhiều nơi, toàn bộ lỗi liên quan đến Auth đã được gom chung vào class `AuthException` (kế thừa từ `ApiException`):
-
-Thay vì viết dài dòng:
-```java
-throw ApiException.unauthorized("Tài khoản đã bị khóa");
-```
-Bây giờ chỉ cần gọi:
-```java
-throw AuthException.accountLocked();
-```
-Các hàm đã được định nghĩa sẵn bao gồm:
-- `unauthorized()`: Chưa đăng nhập.
-- `invalidCredentials()`: Sai email hoặc mật khẩu.
-- `accountLocked()`: Tài khoản bị khóa.
-- `invalidToken()`: Token sai hoặc hết hạn.
+- **Response Success (HTTP 201)**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "userId": 1,
+      "fullName": "Nguyễn Văn A",
+      "email": "a@gmail.com",
+      "status": "ACTIVE"
+    }
+  }
+  ```
+- **Response Error (HTTP 409)**:
+  ```json
+  {
+    "success": false,
+    "status": 409,
+    "error": "Email đã được đăng ký"
+  }
+  ```
 
 ---
 
-## Lời khuyên cho Frontend Team
-- **Tuyệt đối không lưu Token vào `localStorage`**.
-- Hãy bật cấu hình `credentials: 'include'` (với Fetch) hoặc `withCredentials: true` (với Axios). Khi đó trình duyệt sẽ tự động gửi Cookie lên Server một cách an toàn và vô hình!
+### 2.2. Đăng nhập (`POST /api/v1/auth/login`)
+- **Mô tả**: Xác thực tài khoản, trả về token và lưu cookie `access_token`, `refresh_token`.
+- **Auth (Middleware)**: Không
+- **Status Codes**: `200`, `401`, `403`
+- **Request Body (JSON)**:
+  ```json
+  {
+    "email": "a@gmail.com",
+    "password": "P@ssw0rd123"
+  }
+  ```
+- **Response Success (HTTP 200)**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "accessToken": "eyJ...",
+      "refreshToken": "eyJ...",
+      "tokenType": "Bearer",
+      "expiresIn": 900,
+      "user": {
+        "userId": 1,
+        "email": "a@gmail.com"
+      }
+    }
+  }
+  ```
+- **Response Error (HTTP 401)**:
+  ```json
+  {
+    "success": false,
+    "status": 401,
+    "error": "Email hoặc mật khẩu không đúng"
+  }
+  ```
+- **Response Error (HTTP 403)**:
+  ```json
+  {
+    "success": false,
+    "status": 403,
+    "error": "Tài khoản đã bị khóa"
+  }
+  ```
+
+---
+
+### 2.3. Làm mới access token (`POST /api/v1/auth/refresh`)
+- **Mô tả**: Cấp access token mới từ refresh token (hỗ trợ đọc từ body hoặc cookie).
+- **Auth (Middleware)**: Không
+- **Status Codes**: `200`, `401`
+- **Request Body (JSON)**:
+  ```json
+  {
+    "refreshToken": "eyJ..."
+  }
+  ```
+- **Response Success (HTTP 200)**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "accessToken": "eyJ...",
+      "refreshToken": "eyJ...",
+      "expiresIn": 900
+    }
+  }
+  ```
+- **Response Error (HTTP 401)**:
+  ```json
+  {
+    "success": false,
+    "status": 401,
+    "error": "Refresh token đã hết hạn"
+  }
+  ```
+
+---
+
+### 2.4. Đăng xuất (`POST /api/v1/auth/logout`)
+- **Mô tả**: Thu hồi refresh token trong DB và xóa cookie trên client.
+- **Auth (Middleware)**: Có (Bearer JWT hoặc Cookie `access_token`)
+- **Status Codes**: `200`, `401`
+- **Request Body (JSON)**: Không có
+- **Response Success (HTTP 200)**:
+  ```json
+  {
+    "success": true,
+    "data": null
+  }
+  ```
+- **Response Error (HTTP 401)**:
+  ```json
+  {
+    "success": false,
+    "status": 401,
+    "error": "Chưa đăng nhập"
+  }
+  ```
+
+---
+
+### 2.5. Đổi mật khẩu (`POST /api/user/change-password` hoặc `POST /user/change-password`)
+- **Mô tả**: Đổi mật khẩu tài khoản và thu hồi toàn bộ refresh token hiện có.
+- **Auth (Middleware)**: Có (Bearer JWT)
+- **Status Codes**: `200`, `400`, `401`, `422`
+- **Request Body (JSON)**:
+  ```json
+  {
+    "currentPassword": "P@ssw0rd123",
+    "newPassword": "NewP@ssw0rd456",
+    "confirmPassword": "NewP@ssw0rd456"
+  }
+  ```
+- **Response Success (HTTP 200)**:
+  ```json
+  {
+    "success": true,
+    "data": null
+  }
+  ```
+- **Response Error (HTTP 422)**:
+  ```json
+  {
+    "success": false,
+    "status": 422,
+    "error": "Mật khẩu hiện tại không đúng"
+  }
+  ```

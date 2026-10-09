@@ -14,11 +14,12 @@
         <provider>
             org.hibernate.jpa.HibernatePersistenceProvider
         </provider>
+        <class>com.cinema.cinema.entity.Cinema</class>
         <class>com.cinema.movie.entity.Movie</class>
         <class>com.cinema.movie.entity.Genre</class>
-        <class>com.cinema.cinema.entity.Cinema</class>
-        <class>com.cinema.user.entity.Role</class>
         <class>com.cinema.user.entity.User</class>
+        <class>com.cinema.wallet.Wallet</class>
+        <class>com.cinema.wallet.WalletTransaction</class>
 
         <properties>
 

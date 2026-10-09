@@ -63,7 +63,6 @@ public class WalletDAO {
     public Wallet createDefaultWallet(User user, EntityManager em) {
         Wallet wallet = new Wallet(user);
         wallet.setBalance(0L);
-        wallet.setCurrency("VND");
         wallet.setStatus(WalletStatus.ACTIVE);
         em.persist(wallet);
         return wallet;

@@ -9,9 +9,7 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
         "authorDisplayName",
         "rating",
         "comment",
-        "version",
-        "createdAt",
-        "updatedAt"
+        "createdAt"
 })
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class ReviewResponse {
@@ -21,9 +19,7 @@ public class ReviewResponse {
     private String authorDisplayName;
     private Integer rating;
     private String comment;
-    private Integer version;
     private String createdAt;
-    private String updatedAt;
 
     public ReviewResponse() {
     }
@@ -34,18 +30,14 @@ public class ReviewResponse {
             String authorDisplayName,
             Integer rating,
             String comment,
-            Integer version,
-            String createdAt,
-            String updatedAt
+            String createdAt
     ) {
         this.id = id;
         this.movieId = movieId;
         this.authorDisplayName = authorDisplayName;
         this.rating = rating;
         this.comment = comment;
-        this.version = version;
         this.createdAt = createdAt;
-        this.updatedAt = updatedAt;
     }
 
     public String getId() {
@@ -88,27 +80,11 @@ public class ReviewResponse {
         this.comment = comment;
     }
 
-    public Integer getVersion() {
-        return version;
-    }
-
-    public void setVersion(Integer version) {
-        this.version = version;
-    }
-
     public String getCreatedAt() {
         return createdAt;
     }
 
     public void setCreatedAt(String createdAt) {
         this.createdAt = createdAt;
-    }
-
-    public String getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(String updatedAt) {
-        this.updatedAt = updatedAt;
     }
 }

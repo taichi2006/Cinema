@@ -7,7 +7,6 @@ public class TopUpResponse {
 
     private String id;
     private Long amount;
-    private String currency;
     private String method;
     private String status;
     private String checkoutUrl;
@@ -18,11 +17,10 @@ public class TopUpResponse {
 
     public TopUpResponse() {}
 
-    public TopUpResponse(String id, Long amount, String currency, String method, String status,
+    public TopUpResponse(String id, Long amount, String method, String status,
                          String checkoutUrl, String expiresAt, String createdAt, String completedAt, String failureCode) {
         this.id = id;
         this.amount = amount;
-        this.currency = currency;
         this.method = method;
         this.status = status;
         this.checkoutUrl = checkoutUrl;
@@ -48,14 +46,6 @@ public class TopUpResponse {
         this.amount = amount;
     }
 
-
-    public String getCurrency() {
-        return currency;
-    }
-
-    public void setCurrency(String currency) {
-        this.currency = currency;
-    }
 
     public String getMethod() {
         return method;
