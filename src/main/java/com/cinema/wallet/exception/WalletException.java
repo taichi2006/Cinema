@@ -3,7 +3,7 @@ package com.cinema.wallet.exception;
 import com.cinema.common.exception.ApiException;
 
 /**
- * Exception nghiệp vụ
+ * Exception nghiệp vụ cho Module Wallet
  */
 public class WalletException extends ApiException {
 
@@ -18,30 +18,23 @@ public class WalletException extends ApiException {
         return code;
     }
 
-
-
     public static WalletException walletSuspended() {
-        return new WalletException(403, "WALLET_SUSPENDED", "Ví của bạn đang bị tạm khóa (SUSPENDED), không thể thực hiện giao dịch");
+        return new WalletException(403, "WALLET_SUSPENDED", "Ví của bạn đang bị tạm khóa (SUSPENDED)");
     }
 
     public static WalletException invalidAmount(String message) {
-        return new WalletException(422, "TOP_UP_AMOUNT_INVALID", message);
+        return new WalletException(422, "INVALID_AMOUNT", message);
     }
 
-    public static WalletException resourceNotFound(String message) {
-        return new WalletException(404, "RESOURCE_NOT_FOUND", message);
-    }
-
-    public static WalletException invalidFilter(String message, String field) {
-        return new WalletException(400, "INVALID_FILTER", message);
+    public static WalletException invalidMethod(String message) {
+        return new WalletException(400, "INVALID_METHOD", message);
     }
 
     public static WalletException invalidFilter(String message) {
         return new WalletException(400, "INVALID_FILTER", message);
     }
 
-    public static WalletException forbidden(String message) {
-        return new WalletException(403, "FORBIDDEN", message);
+    public static WalletException resourceNotFound(String message) {
+        return new WalletException(404, "RESOURCE_NOT_FOUND", message);
     }
 }
-

@@ -1,12 +1,11 @@
 package com.cinema.wallet.entity;
 
+import com.cinema.wallet.enums.TransactionStatus;
+import com.cinema.wallet.enums.TransactionType;
 import jakarta.persistence.*;
+import java.math.BigDecimal;
 import java.time.Instant;
 
-/**
- * Thực thể Bút toán giao dịch ví
- * Sổ cái biến động số dư
- */
 @Entity
 @Table(name = "wallet_transactions", schema = "cinema")
 public class WalletTransaction {
@@ -20,17 +19,18 @@ public class WalletTransaction {
     @JoinColumn(name = "wallet_id", nullable = false)
     private Wallet wallet;
 
-    @Column(nullable = false)
-    private Long amount;
+    @Column(name = "amount", nullable = false, precision = 15, scale = 2)
+    private BigDecimal amount;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "transaction_type", nullable = false, length = 20)
     private TransactionType type;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
-    private String status = "PENDING";
+    private TransactionStatus status = TransactionStatus.PENDING;
 
-    @Column(name = "description", columnDefinition = "text")
+    @Column(name = "description", length = 500)
     private String description;
 
     @Column(name = "created_at", insertable = false, updatable = false)
@@ -54,6 +54,14 @@ public class WalletTransaction {
         this.wallet = wallet;
     }
 
+    public BigDecimal getAmount() {
+        return amount;
+    }
+
+    public void setAmount(BigDecimal amount) {
+        this.amount = amount;
+    }
+
     public TransactionType getType() {
         return type;
     }
@@ -62,19 +70,11 @@ public class WalletTransaction {
         this.type = type;
     }
 
-    public Long getAmount() {
-        return amount;
-    }
-
-    public void setAmount(Long amount) {
-        this.amount = amount;
-    }
-
-    public String getStatus() {
+    public TransactionStatus getStatus() {
         return status;
     }
 
-    public void setStatus(String status) {
+    public void setStatus(TransactionStatus status) {
         this.status = status;
     }
 
@@ -94,4 +94,3 @@ public class WalletTransaction {
         this.createdAt = createdAt;
     }
 }
-

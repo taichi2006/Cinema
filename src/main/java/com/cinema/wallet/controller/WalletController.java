@@ -16,10 +16,9 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * - GET  /wallet             : Xem thông tin và số dư ví
- * - POST /wallet/top-up      : Nạp tiền vào ví 
- * - GET  /wallet/top-up/{id} : Theo dõi kết quả nạp tiền
- * - GET  /wallet/transaction : Lịch sử bút toán ví đã hoàn tất
+ * 1. GET  /wallet              : Xem số dư ví
+ * 2. GET  /wallet/transactions : Lịch sử giao dịch ví (phân trang và lọc)
+ * 3. POST /wallet/top-up       : Nạp tiền vào ví
  */
 @WebServlet(urlPatterns = {"/wallet", "/wallet/*"})
 public class WalletController extends HttpServlet {
@@ -33,15 +32,15 @@ public class WalletController extends HttpServlet {
             long userId = getUserId(req);
             String action = pathInfo(req);
 
-            // 1. GET /wallet
+            // 1. GET /wallet: Thông tin số dư ví
             if ("/".equals(action) || action.isEmpty()) {
                 var data = service.getMyWallet(userId);
                 writeJson(resp, HttpServletResponse.SC_OK, ApiResponse.ok(data));
                 return;
             }
 
-            // 2. GET /wallet/transaction (Phân trang danh sách giao dịch)
-            if ("/transaction".equals(action)) {
+            // 2. GET /wallet/transactions: Phân trang lịch sử giao dịch
+            if ("/transactions".equals(action)) {
                 String type = req.getParameter("type");
                 String from = req.getParameter("from");
                 String to = req.getParameter("to");
@@ -49,21 +48,11 @@ public class WalletController extends HttpServlet {
                 int size = parseQueryInt(req.getParameter("size"), 20);
 
                 var history = service.getTransactionHistory(userId, type, from, to, page, size);
-                Map<String, Object> result = new LinkedHashMap<>();
-                result.put("success", true);
-                result.put("data", history.getItems());
-                result.put("meta", history.getMeta());
+                Map<String, Object> pageData = new LinkedHashMap<>();
+                pageData.put("items", history.getItems());
+                pageData.put("meta", history.getMeta());
 
-                writeJson(resp, HttpServletResponse.SC_OK, result);
-                return;
-            }
-
-            // 3. GET /wallet/top-up/{id}
-            if (action.startsWith("/top-up/")) {
-                String idStr = action.substring("/top-up/".length());
-                long txId = parseLongId(idStr);
-                var data = service.getTopUpStatus(userId, txId);
-                writeJson(resp, HttpServletResponse.SC_OK, ApiResponse.ok(data));
+                writeJson(resp, HttpServletResponse.SC_OK, ApiResponse.ok(pageData));
                 return;
             }
 
@@ -80,7 +69,7 @@ public class WalletController extends HttpServlet {
             long userId = getUserId(req);
             String action = pathInfo(req);
 
-            // 1. POST /wallet/top-up: Nạp tiền vào ví
+            // 3. POST /wallet/top-up: Nạp tiền vào ví
             if ("/top-up".equals(action)) {
                 TopUpRequest body = json.readValue(req.getInputStream(), TopUpRequest.class);
                 var data = service.topUp(userId, body);
@@ -114,14 +103,6 @@ public class WalletController extends HttpServlet {
         throw ApiException.unauthorized("Chưa đăng nhập hoặc thiếu token xác thực");
     }
 
-    private long parseLongId(String idStr) {
-        try {
-            return Long.parseLong(idStr.trim());
-        } catch (Exception e) {
-            throw ApiException.notFound("Mã định danh không hợp lệ: " + idStr);
-        }
-    }
-
     private int parseQueryInt(String val, int defaultVal) {
         if (val == null || val.isBlank()) return defaultVal;
         try {
@@ -137,4 +118,3 @@ public class WalletController extends HttpServlet {
         json.writeValue(resp.getWriter(), body);
     }
 }
-

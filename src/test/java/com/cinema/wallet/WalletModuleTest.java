@@ -4,17 +4,18 @@ import com.cinema.common.dto.CommonDTO.ApiResponse;
 import com.cinema.common.dto.CommonDTO.ErrorResponse;
 import com.cinema.common.dto.CommonDTO.PageMeta;
 import com.cinema.user.entity.User;
+import com.cinema.wallet.dto.response.TransactionItemResponse;
 import com.cinema.wallet.dto.response.WalletResponse;
 import com.cinema.wallet.entity.Wallet;
-import com.cinema.wallet.entity.WalletTopup;
 import com.cinema.wallet.entity.WalletTransaction;
+import com.cinema.wallet.enums.TransactionStatus;
 import com.cinema.wallet.enums.TransactionType;
 import com.cinema.wallet.enums.WalletStatus;
-import com.cinema.wallet.enums.WalletTopupStatus;
 import com.cinema.wallet.exception.WalletException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -33,27 +34,9 @@ public class WalletModuleTest {
         user.setEmail("test@cinema.com");
 
         Wallet wallet = new Wallet(user);
-        assertEquals(0L, wallet.getBalance());
-        assertEquals("VND", wallet.getCurrency());
+        assertEquals(BigDecimal.ZERO, wallet.getBalance());
         assertEquals(WalletStatus.ACTIVE, wallet.getStatus());
         assertEquals(user, wallet.getUser());
-    }
-
-    @Test
-    void testWalletTopupEntity() {
-        Wallet wallet = new Wallet();
-        wallet.setId(1L);
-
-        WalletTopup topup = new WalletTopup();
-        topup.setWallet(wallet);
-        topup.setAmount(100000L);
-        topup.setCurrency("VND");
-        topup.setStatus(WalletTopupStatus.PENDING);
-
-        assertEquals(100000L, topup.getAmount());
-        assertEquals("VND", topup.getCurrency());
-        assertEquals(WalletTopupStatus.PENDING, topup.getStatus());
-        assertEquals(wallet, topup.getWallet());
     }
 
     @Test
@@ -63,68 +46,72 @@ public class WalletModuleTest {
 
         WalletTransaction tx = new WalletTransaction();
         tx.setWallet(wallet);
-        tx.setTransactionType(TransactionType.TOP_UP.name());
-        tx.setDirection(TransactionType.TOP_UP.getDirection());
-        tx.setAmount(50000L);
-        tx.setBalanceAfter(50000L);
-        tx.setCurrency("VND");
-        tx.setTopupId(10L);
+        tx.setType(TransactionType.ADD_MONEY);
+        tx.setStatus(TransactionStatus.SUCCESSFUL);
+        tx.setAmount(BigDecimal.valueOf(50000L));
         tx.setDescription("Nạp tiền ví");
 
-        assertEquals("TOP_UP", tx.getTransactionType());
-        assertEquals("CREDIT", tx.getDirection());
-        assertEquals(50000L, tx.getAmount());
-        assertEquals(50000L, tx.getBalanceAfter());
-        assertEquals(10L, tx.getTopupId());
-        assertEquals("VND", tx.getCurrency());
+        assertEquals(TransactionType.ADD_MONEY, tx.getType());
+        assertEquals(TransactionStatus.SUCCESSFUL, tx.getStatus());
+        assertEquals(BigDecimal.valueOf(50000L), tx.getAmount());
+        assertEquals("Nạp tiền ví", tx.getDescription());
+        assertEquals(wallet, tx.getWallet());
     }
 
     @Test
     void testWalletDTOApiResponseSerialization() throws Exception {
         WalletResponse walletResp = new WalletResponse(
-                "1",
-                150000L,
-                "VND",
-                Instant.now().toString()
+                1L,
+                10L,
+                BigDecimal.valueOf(150000L),
+                WalletStatus.ACTIVE
         );
 
         ApiResponse<WalletResponse> response = ApiResponse.ok(walletResp);
 
         String jsonStr = json.writeValueAsString(response);
         assertTrue(jsonStr.contains("\"success\":true"));
-        assertTrue(jsonStr.contains("\"currency\":\"VND\""));
+        assertTrue(jsonStr.contains("\"walletId\":1"));
+        assertTrue(jsonStr.contains("\"userId\":10"));
         assertTrue(jsonStr.contains("\"balance\":150000"));
+        assertTrue(jsonStr.contains("\"status\":\"ACTIVE\""));
     }
 
     @Test
     void testWalletPaginationSerialization() throws Exception {
-        WalletResponse walletResp = new WalletResponse(
-                "1",
-                150000L,
-                "VND",
+        TransactionItemResponse item = new TransactionItemResponse(
+                1L,
+                1L,
+                BigDecimal.valueOf(100000L),
+                TransactionType.ADD_MONEY,
+                TransactionStatus.SUCCESSFUL,
+                "Nạp tiền ví",
                 Instant.now().toString()
         );
 
         PageMeta meta = new PageMeta(0, 20, 1L, 1);
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("success", true);
-        result.put("data", List.of(walletResp));
-        result.put("meta", meta);
+        Map<String, Object> pageData = new LinkedHashMap<>();
+        pageData.put("items", List.of(item));
+        pageData.put("meta", meta);
 
-        String jsonStr = json.writeValueAsString(result);
+        ApiResponse<Map<String, Object>> response = ApiResponse.ok(pageData);
+
+        String jsonStr = json.writeValueAsString(response);
         assertTrue(jsonStr.contains("\"success\":true"));
+        assertTrue(jsonStr.contains("\"transactionId\":1"));
+        assertTrue(jsonStr.contains("\"transactionType\":\"ADD_MONEY\""));
         assertTrue(jsonStr.contains("\"page\":0"));
         assertTrue(jsonStr.contains("\"totalElements\":1"));
     }
 
     @Test
     void testWalletErrorResponseSerialization() throws Exception {
-        WalletException ex = WalletException.idempotencyKeyRequired();
+        WalletException ex = WalletException.walletSuspended();
         ErrorResponse errResp = new ErrorResponse(ex.getStatus(), ex.getMessage());
 
         String jsonStr = json.writeValueAsString(errResp);
         assertTrue(jsonStr.contains("\"success\":false"));
-        assertTrue(jsonStr.contains("\"status\":400"));
-        assertTrue(jsonStr.contains("Idempotency-Key"));
+        assertTrue(jsonStr.contains("\"status\":403"));
+        assertTrue(jsonStr.contains("SUSPENDED"));
     }
 }

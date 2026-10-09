@@ -1,490 +1,522 @@
-# 📋 Kế hoạch triển khai Module `wallet`
+# 📋 Kế hoạch triển khai & Cập nhật Module `wallet`
 
-> 
+> **Tài liệu tham chiếu chuẩn duy nhất của Cơ sở Dữ liệu**:
+> - [cinema sql.txt](file:///d:/IT1_UTE/HK5_26_27/lap_trinh_web/project/cinema_system/cinema%20sql.txt) (File thể hiện chuẩn CSDL PostgreSQL hiện tại)
+> - [swagger_cinema.yaml](file:///d:/IT1_UTE/HK5_26_27/lap_trinh_web/project/cinema_system/swagger_cinema.yaml) (Đặc tả API)
+> - [UMLClassDiagram.drawio.png](file:///d:/IT1_UTE/HK5_26_27/lap_trinh_web/project/cinema_system/UMLClassDiagram.drawio.png) (Mô hình lớp)
 
+---
 
-## 1. Vị trí trong dự án
+## 1. Chi tiết Thay đổi CSDL so với thiết kế cũ
 
-Tổ chức thư mục `dto/` được phân tách khoa học thành 3 phần rõ ràng:
-1. `envelope/`: Các lớp Envelope chuẩn Swagger (`SuccessEnvelope`, `ErrorEnvelope`, `PageMeta`, `FieldError`)
-2. `request/`: Các lớp DTO đầu vào (`TopUpRequest`)
-3. `response/`: Các lớp DTO đầu ra (`WalletResponse`, `TopUpResponse`, `TransactionItemResponse`)
+Đối chiếu trực tiếp với [cinema sql.txt](file:///d:/IT1_UTE/HK5_26_27/lap_trinh_web/project/cinema_system/cinema%20sql.txt):
+
+### 1.1 Bảng `cinema.wallets`
+* **Định nghĩa chuẩn trong `cinema sql.txt`**:
+  ```sql
+  CREATE TABLE wallets (
+      wallet_id   SERIAL PRIMARY KEY,
+      user_id     INT NOT NULL UNIQUE,
+      balance     DECIMAL(15,2) DEFAULT 0.00 CHECK (balance >= 0),
+      status      VARCHAR(20) DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE','SUSPENDED')),
+      FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+  );
+  ```
+* **Chi tiết thay đổi từng thuộc tính (Attributes)**:
+  - `wallet_id`: `SERIAL` (`INT`) - Khóa chính.
+  - `user_id`: `INT NOT NULL UNIQUE` - Khóa ngoại 1-1 với `users(user_id)`.
+  - `balance`: Kiểu **`DECIMAL(15,2)`** (Java dùng `BigDecimal`), mặc định `0.00`, ràng buộc `CHECK (balance >= 0)`.
+  - `status`: `VARCHAR(20)` với ràng buộc `CHECK (status IN ('ACTIVE','SUSPENDED'))`.
+  - ❌ **ĐÃ BỎ**: `currency` (không còn cột này).
+  - ❌ **ĐÃ BỎ**: `created_at`, `updated_at` (bảng `wallets` trong `cinema sql.txt` không còn 2 cột này).
+
+---
+
+### 1.2 Bảng `cinema.wallet_transactions`
+* **Định nghĩa chuẩn trong `cinema sql.txt`**:
+  ```sql
+  CREATE TABLE wallet_transactions (
+      transaction_id    SERIAL PRIMARY KEY,
+      wallet_id         INT NOT NULL,
+      amount            DECIMAL(15,2) NOT NULL CHECK (amount > 0),
+      transaction_type  VARCHAR(20) NOT NULL CHECK (transaction_type IN ('ADD_MONEY','PAYMENT','REFUND')),
+      status            VARCHAR(20) DEFAULT 'PENDING' CHECK (status IN ('SUCCESSFUL','FAILED','PENDING')),
+      description       VARCHAR(500),
+      created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (wallet_id) REFERENCES wallets(wallet_id) ON DELETE RESTRICT
+  );
+  ```
+* **Chi tiết thay đổi từng thuộc tính (Attributes)**:
+  - `transaction_id`: Đổi tên từ `wallet_transaction_id` thành **`transaction_id`** (`SERIAL` / `INT`).
+  - `wallet_id`: `INT NOT NULL` (Khóa ngoại trỏ đến `wallets.wallet_id`).
+  - `amount`: Kiểu **`DECIMAL(15,2)`** (Java dùng `BigDecimal`), ràng buộc `CHECK (amount > 0)`.
+  - `transaction_type`: Đổi giá trị nạp tiền từ `TOP_UP` thành **`ADD_MONEY`** (`ADD_MONEY`, `PAYMENT`, `REFUND`).
+  - ⭐ **THUỘC TÍNH MỚI**: Thêm cột **`status`** `VARCHAR(20)` mặc định `'PENDING'`, ràng buộc `CHECK (status IN ('SUCCESSFUL','FAILED','PENDING'))`.
+  - `description`: Đổi kiểu từ `TEXT` thành **`VARCHAR(500)`**.
+  - `created_at`: `TIMESTAMP DEFAULT CURRENT_TIMESTAMP`.
+  - ❌ **ĐÃ BỎ**: `balance_after` (không còn lưu số dư sau giao dịch).
+  - ❌ **ĐÃ BỎ**: `direction` (không còn cột `IN`/`OUT` hay `CREDIT`/`DEBIT`).
+  - ❌ **ĐÃ BỎ**: `currency` (không còn cột tiền tệ).
+  - ❌ **ĐÃ BỎ**: `topup_id` (không còn bảng `wallet_topups`).
+  - ❌ **ĐÃ BỎ**: `payment_id`, `refund_id` (quan hệ thanh toán hiện tại được lưu ở bảng `payments` với cột `payments.wallet_transaction_id` trỏ ngược về bảng này).
+
+---
+
+### 1.3 Bảng `WalletTopUp`
+* ❌ **ĐÃ BỊ XÓA HOÀN TOÀN TRONG CSDL**:
+  Trong [cinema sql.txt](file:///d:/IT1_UTE/HK5_26_27/lap_trinh_web/project/cinema_system/cinema%20sql.txt), bảng `cinema.wallet_topups` không còn tồn tại.
+  Nghiệp vụ nạp ví được ghi trực tiếp vào `wallet_transactions` với `transaction_type = 'ADD_MONEY'`, và thông tin thanh toán nạp tiền được quản lý tại bảng `cinema.payments` (`payment_type = 'TOPUP'`).
+
+---
+
+## 2. Cấu trúc thư mục Module `wallet`
+
+Xóa bỏ triệt để các file liên quan đến `WalletTopup` và tinh gọn cấu trúc module:
 
 ```
-src/main/java/com/cinema/
-└── wallet/
-    ├── controller/
-    │   └── WalletController.java      ← Servlet @WebServlet(urlPatterns = {"/wallet", "/wallet/*"})
-    ├── service/
-    │   └── WalletService.java         ← Logic nghiệp vụ & Data Mapping
-    ├── dao/
-    │   ├── WalletDAO.java             ← Truy vấn CSDL cho Wallet
-    │   ├── WalletTopupDAO.java        ← Truy vấn CSDL cho WalletTopup
-    │   └── WalletTransactionDAO.java  ← Truy vấn CSDL cho WalletTransaction
-    ├── entity/
-    │   ├── Wallet.java                ← JPA Entity (bảng cinema.wallets)
-    │   ├── WalletTopup.java           ← JPA Entity (bảng cinema.wallet_topups)
-    │   └── WalletTransaction.java     ← JPA Entity (bảng cinema.wallet_transactions)
-    ├── enums/
-    │   ├── WalletStatus.java          ← Enum: ACTIVE | SUSPENDED
-    │   ├── WalletTopupStatus.java     ← Enum: PENDING | SUCCEEDED | FAILED | EXPIRED | REVERSAL_PENDING | REVERSED
-    │   └── TransactionType.java       ← Enum: TOP_UP | PAYMENT | REFUND
-    ├── exception/
-    │   └── WalletException.java       ← Exception nghiệp vụ ví kế thừa ApiException
-    ├── dto/
-    │   ├── request/
-    │   │   └── TopUpRequest.java
-    │   └── response/
-    │       ├── WalletResponse.java
-    │       ├── TopUpResponse.java
-    │       └── TransactionItemResponse.java
-    ├── docs/
-    │   ├── PLAN.md                    ← File kế hoạch này
-    │   └── POSTMAN_GUIDE.md           ← Hướng dẫn test API chi tiết
-    └── test/
-        └── wallet_postman.json        ← Postman Collection
+src/main/java/com/cinema/wallet/
+├── controller/
+│   └── WalletController.java          ← Servlet @WebServlet(urlPatterns = {"/wallet", "/wallet/*"})
+├── service/
+│   └── WalletService.java             ← Logic nghiệp vụ ví & giao dịch
+├── dao/
+│   ├── WalletDAO.java                 ← DAO thao tác bảng cinema.wallets
+│   └── WalletTransactionDAO.java      ← DAO thao tác bảng cinema.wallet_transactions
+├── entity/
+│   ├── Wallet.java                    ← JPA Entity khớp bảng cinema.wallets
+│   └── WalletTransaction.java         ← JPA Entity khớp bảng cinema.wallet_transactions
+├── enums/
+│   ├── WalletStatus.java              ← Enum: ACTIVE, SUSPENDED
+│   ├── TransactionType.java           ← Enum: ADD_MONEY, PAYMENT, REFUND
+│   └── TransactionStatus.java         ← Enum: SUCCESSFUL, FAILED, PENDING
+├── exception/
+│   └── WalletException.java           ← Ngoại lệ nghiệp vụ ví
+├── dto/
+│   ├── request/
+│   │   └── TopUpRequest.java          ← DTO nạp tiền (amount, method)
+│   └── response/
+│       ├── WalletResponse.java        ← DTO thông tin ví (walletId, userId, balance, status)
+│       ├── TopUpResponse.java         ← DTO phản hồi nạp tiền
+│       └── TransactionItemResponse.java ← DTO chi tiết giao dịch
+│       (Phân trang dùng chung CommonDTO.PageMeta từ module common)
+├── docs/
+│   ├── PLAN.md                        ← Kế hoạch thiết kế & triển khai này
+│   └── POSTMAN_GUIDE.md               ← Hướng dẫn test Postman
+└── test/
+    └── wallet_postman.json            ← Postman Collection kiểm thử
 ```
 
 ---
 
-## 2. Thiết kế cơ sở dữ liệu (Khớp 100% với PostgreSQL Neon)
+## 3. Thiết kế Các Lớp Java & Entity
 
-### Bảng `cinema.wallets`
+### 3.1 Các Enum chuẩn
+```java
+// com.cinema.wallet.enums.WalletStatus
+public enum WalletStatus {
+    ACTIVE,
+    SUSPENDED
+}
 
-| Cột | Kiểu | Ràng buộc | Ghi chú |
-|-----|------|-----------|---------|
-| `wallet_id` | `int8` | PK, Identity | Khóa chính |
-| `user_id` | `int8` | FK → `users.user_id`, UNIQUE, NOT NULL | Mỗi user có đúng 1 ví |
-| `balance` | `int8` | NOT NULL, DEFAULT 0 | Số dư nguyên VND (Long) |
-| `status` | `varchar(20)` | NOT NULL, DEFAULT `'ACTIVE'` | `ACTIVE` \| `SUSPENDED` |
+// com.cinema.wallet.enums.TransactionType
+public enum TransactionType {
+    ADD_MONEY,
+    PAYMENT,
+    REFUND
+}
 
----
-
-### Bảng `cinema.wallet_transactions` (Sổ cái Ledger)
-
-| Cột | Kiểu | Ràng buộc | Ghi chú |
-|-----|------|-----------|---------|
-| `transaction_id` | `int8` | PK, Identity | Khóa chính |
-| `wallet_id` | `int8` | FK → `wallets.wallet_id`, NOT NULL | Ví liên quan |
-| `amount` | `int8` | NOT NULL, CHECK > 0 | Số tiền biến động VND |
-| `transaction_type` | `varchar(20)` | NOT NULL | `ADD_MONEY`, `PAYMENT`, `REFUND` |
-| `status` | `varchar(20)` | NOT NULL, DEFAULT `'PENDING'` | `PENDING`, `SUCCESSFUL`, `FAILED` |
-| `description` | `text` | NULLABLE | Ghi chú biến động số dư |
-| `created_at` | `timestamptz` | NOT NULL, DEFAULT `now()` | |
-
----
-
-### Quan hệ thực thể
+// com.cinema.wallet.enums.TransactionStatus
+public enum TransactionStatus {
+    SUCCESSFUL,
+    FAILED,
+    PENDING
+}
 ```
-users (1) ──────── (1) wallets
-wallets (1) ─────── (0..*) wallet_transactions
-```
-
----
-
-## 3. Các lớp Java & Kiến trúc
-
-### 3.1 Các Enum
-* **`WalletStatus`**: `ACTIVE`, `SUSPENDED`
-* **`TransactionType`**: `ADD_MONEY`, `PAYMENT`, `REFUND`
 
 ---
 
 ### 3.2 Entity `Wallet.java`
+Map chính xác 100% với bảng `cinema.wallets` trong `cinema sql.txt`:
 ```java
+package com.cinema.wallet.entity;
+
+import com.cinema.user.entity.User;
+import com.cinema.wallet.enums.WalletStatus;
+import jakarta.persistence.*;
+import java.math.BigDecimal;
+
 @Entity
 @Table(name = "wallets", schema = "cinema")
 public class Wallet {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "wallet_id")
-    private Long walletId;
+    private Long id;
 
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", unique = true, nullable = false)
     private User user;
 
-    @Column(nullable = false, precision = 15, scale = 2)
+    @Column(name = "balance", nullable = false, precision = 15, scale = 2)
     private BigDecimal balance = BigDecimal.ZERO;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @Column(name = "status", nullable = false, length = 20)
     private WalletStatus status = WalletStatus.ACTIVE;
-    // Getters, Setters, Constructors
+
+    public Wallet() {}
+
+    public Wallet(User user) {
+        this.user = user;
+        this.balance = BigDecimal.ZERO;
+        this.status = WalletStatus.ACTIVE;
+    }
+
+    // Getters và Setters
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+
+    public User getUser() { return user; }
+    public void setUser(User user) { this.user = user; }
+
+    public BigDecimal getBalance() { return balance; }
+    public void setBalance(BigDecimal balance) { this.balance = balance; }
+
+    public WalletStatus getStatus() { return status; }
+    public void setStatus(WalletStatus status) { this.status = status; }
 }
 ```
 
 ---
 
 ### 3.3 Entity `WalletTransaction.java`
+Map chính xác 100% với bảng `cinema.wallet_transactions` trong `cinema sql.txt`:
 ```java
+package com.cinema.wallet.entity;
+
+import com.cinema.wallet.enums.TransactionStatus;
+import com.cinema.wallet.enums.TransactionType;
+import jakarta.persistence.*;
+import java.math.BigDecimal;
+import java.time.Instant;
+
 @Entity
 @Table(name = "wallet_transactions", schema = "cinema")
 public class WalletTransaction {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "transaction_id")
-    private Long transactionId;
+    private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "wallet_id", nullable = false)
     private Wallet wallet;
 
-    @Column(nullable = false, precision = 15, scale = 2)
+    @Column(name = "amount", nullable = false, precision = 15, scale = 2)
     private BigDecimal amount;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "transaction_type", nullable = false, length = 20)
     private TransactionType type;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
-    private String status = "PENDING";
+    private TransactionStatus status = TransactionStatus.PENDING;
 
-    @Column(name = "description", columnDefinition = "text")
+    @Column(name = "description", length = 500)
     private String description;
 
     @Column(name = "created_at", insertable = false, updatable = false)
     private Instant createdAt;
-    // Getters, Setters, Constructors
+
+    public WalletTransaction() {}
+
+    // Getters và Setters
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+
+    public Wallet getWallet() { return wallet; }
+    public void setWallet(Wallet wallet) { this.wallet = wallet; }
+
+    public BigDecimal getAmount() { return amount; }
+    public void setAmount(BigDecimal amount) { this.amount = amount; }
+
+    public TransactionType getType() { return type; }
+    public void setType(TransactionType type) { this.type = type; }
+
+    public TransactionStatus getStatus() { return status; }
+    public void setStatus(TransactionStatus status) { this.status = status; }
+
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
+
+    public Instant getCreatedAt() { return createdAt; }
+    public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
 }
 ```
 
 ---
 
-### 3.4 Data Transfer Objects (`WalletDTO.java`)
+### 3.4 Data Transfer Objects (DTO)
+Khớp chuẩn với `swagger_cinema.yaml`:
 
-Sử dụng Java `record` tinh gọn để map giữa Entity và JSON response chuẩn của nhóm:
+1. **`WalletResponse`**:
+   ```java
+   public record WalletResponse(
+       Long walletId,
+       Long userId,
+       BigDecimal balance,
+       WalletStatus status
+   ) {}
+   ```
 
-```java
-    public class WalletDTO {
-    // Response cho GET /wallet
-    public record WalletResponse(String id, BigDecimal balance) {}
+2. **`TopUpRequest`**:
+   ```java
+   public record TopUpRequest(
+       BigDecimal amount,
+       String method
+   ) {}
+   ```
 
-    // Request cho POST /wallet/top-up
-    public record TopUpRequest(BigDecimal amount, String method) {}
+3. **`TopUpResponse`**:
+   ```java
+   public record TopUpResponse(
+       Long transactionId,
+       BigDecimal amount,
+       String method,
+       String status,
+       Instant createdAt
+   ) {}
+   ```
 
-    // Response cho POST /wallet/top-up và GET /wallet/top-up/{id}
-    public record TopUpResponse(
-        String id,
-        BigDecimal amount,
-        String method,
-        String status,
-        String checkoutUrl,
-        Instant expiresAt,
-        Instant createdAt,
-        Instant completedAt,
-        String failureCode
-    ) {}
+4. **`TransactionItemResponse`**:
+   ```java
+   public record TransactionItemResponse(
+       Long transactionId,
+       Long walletId,
+       BigDecimal amount,
+       TransactionType transactionType,
+       TransactionStatus status,
+       String description,
+       Instant createdAt
+   ) {}
+   ```
 
-    // Response cho từng item trong GET /wallet/transaction
-    public record TransactionItemResponse(
-        String id,
-        String type,
-        String status,
-        BigDecimal amount,
-        String description,
-        Instant createdAt
-    ) {}
-}
-```
-
-**Nguyên tắc chuyển đổi (Mapping Rules)**:
-* `id`: Chuyển từ `Long` sang chuỗi `String.valueOf(id)`.
-* `checkoutUrl`: Sinh chuỗi `"/wallet/top-up/" + id`.
-* `expiresAt`: Tính bằng `createdAt + 15 phút`.
-
----
-
-### 3.5 Data Access Object (DAO)
-
-**`WalletDAO`**:
-- `findByUserId(long userId)`: Tìm ví theo `userId`.
-- `findById(long walletId)`: Tìm ví theo `walletId`.
-- `save(Wallet wallet)`: Lưu ví mới hoặc cập nhật.
-- `updateBalance(long walletId, BigDecimal newBalance)`: Cập nhật số dư và `updated_at`.
-
-**`WalletTransactionDAO`**:
-- `save(WalletTransaction tx)`: Lưu bản ghi giao dịch.
-- `findById(long id)`: Tìm giao dịch theo `transactionId`.
-- `findHistory(long walletId, String type, Instant from, Instant to, int page, int size)`: Lấy lịch sử giao dịch, hỗ trợ lọc theo loại và khoảng thời gian.
-- `countHistory(long walletId, String type, Instant from, Instant to)`: Đếm tổng số giao dịch thỏa điều kiện.
+5. **Phân trang (Pagination Response)**:
+   Sử dụng trực tiếp lớp dùng chung của toàn hệ thống `com.cinema.common.dto.CommonDTO.PageMeta` (chứa `page`, `size`, `totalElements`, `totalPages`), không cần sinh thêm file riêng `PageOfWalletTransaction.java`.
 
 ---
 
-### 3.6 Nghiệp vụ `WalletService.java`
+## 4. Chi tiết Request & Response của từng Endpoint (Theo chuẩn `swagger_cinema.yaml`)
 
-| Phương thức | Nghiệp vụ chi tiết |
-|---|---|
-| `createWalletForUser(User user, EntityManager em)` | Khởi tạo ví mới với `balance = 0`, `status = ACTIVE` khi đăng ký tài khoản. |
-| `getMyWallet(long userId)` | Lấy thông tin ví của user. Nếu user cũ chưa có ví trong DB, hệ thống sẽ tự động khởi tạo ví (auto-provision) cho user đó. |
-| `topUp(long userId, TopUpRequest req)` | 1. Kiểm tra trạng thái ví: Nếu `SUSPENDED` → ném lỗi `WALLET_SUSPENDED` (HTTP 403).<br>2. Validate `10,000 <= amount <= 50,000,000 VND`.<br>3. Tạo `WalletTransaction` với `type = ADD_MONEY` và `status = SUCCESSFUL`, tự động cộng tiền vào ví `wallets`.<br>4. Trả về `TopUpResponse`. |
-| `getTopUpStatus(long userId, long topupId)` | Lấy chi tiết trạng thái nạp tiền trực tiếp từ `WalletTransaction`. |
-| `getTransactionHistory(long userId, String typeStr, String fromDate, String toDate, int page, int size)` | Lấy danh sách bút toán của ví từ `wallet_transactions`, hỗ trợ lọc theo `type`, khoảng ngày, kèm metadata phân trang. |
+Format chuẩn của hệ thống:
+- Thành công: `{ "success": true, "data": ... }` hoặc `{ "success": true, "data": ..., "meta": ... }`
+- Thất bại: `{ "success": false, "status": <HTTP_CODE>, "error": "<Thông báo lỗi>" }`
 
 ---
 
-### 3.7 Bộ điều khiển `WalletController.java` (`@WebServlet("/wallet/*")`)
+### 4.1 Endpoint: `GET /wallet` (Xem số dư ví)
+* **Quyền**: Yêu cầu đăng nhập (`BearerAuth`).
+* **Headers**: `Authorization: Bearer <token>`
+* **Request Body**: Không có.
 
-Được bảo vệ bởi `AuthFilter`. Sinh `traceId` tự động cho mỗi request.
-
-| HTTP Method | Path Pattern | Quyền | Phương thức xử lý | Mô tả |
-|:---|:---|:---:|:---|:---|
-| `GET` | `/wallet` | USER / ADMIN | `getMyWallet()` | Xem thông tin và số dư ví của tài khoản đang đăng nhập |
-| `POST` | `/wallet/top-up` | USER / ADMIN | `topUp()` | Nạp tiền vào ví (tự động nạp thành công ngay lập tức) |
-| `GET` | `/wallet/top-up/{id}` | USER / ADMIN | `getTopUpStatus()` | Theo dõi kết quả nạp tiền của giao dịch `{id}` |
-| `GET` | `/wallet/transaction` | USER / ADMIN | `getTransactionHistory()` | Xem lịch sử biến động số dư đã hoàn tất |
-
----
-
-## 4. Chi tiết Request / Response API 
-
-### 4.1 `GET /wallet`
-* **Quyền**: Mọi user đã đăng nhập.
-* **Response 200 OK**:
-```json
-{
-  "success": true,
-  "data": {
-    "id": "1",
-    "balance": 150000.00
-  },
-  "meta": {},
-  "traceId": "string"
-}
-```
-
-* **Response 401 UNAUTHORIZED/TOKEN_EXPIRED**:
-```json
-{
-  "success": false,
-  "error": {
-    "code": "UNAUTHORIZED",
-    "message": "Thiếu token xác thực"
-  },
-  "traceId": "req-abc-123"
-}
-```
-
----
-
-### 4.2 `POST /wallet/top-up`
-* **Quyền**: User sở hữu ví (Ví không bị `SUSPENDED`).
-* **Request Body**:
-```json
-{
-  "amount": 100000.00,
-  "method": "GATEWAY"
-}
-```
-
-* **Response 201 Created**:
-```json
-{
-  "success": true,
-  "data": {
-    "id": "101",
-    "amount": 100000.00,
-    "method": "GATEWAY",
-    "status": "SUCCESSFUL",
-    "checkoutUrl": "/wallet/top-up/101",
-    "expiresAt": "2026-10-04T09:23:42.102Z",
-    "createdAt": "2026-10-04T09:08:42.102Z",
-    "completedAt": null,
-    "failureCode": null
-  },
-  "meta": {},
-  "traceId": "string"
-}
-```
-
-* **Lỗi 401 `UNAUTHORIZED`**:
-```json
-{
-  "success": false,
-  "error": {
-    "code": "UNAUTHORIZED",
-    "message": "Thiếu token xác thực"
-  },
-  "traceId": "req-abc-123"
-}
-```
-
-* **Lỗi 403 `WALLET_SUSPENDED`** *(nếu ví bị khóa)*:
-```json
-{
-  "success": false,
-  "error": {
-    "code": "WALLET_SUSPENDED",
-    "message": "Ví của bạn đang bị tạm khóa (SUSPENDED), không thể thực hiện giao dịch",
-    "fieldErrors": [],
-    "details": {}
-  },
-  "traceId": "string"
-}
-```
-
-* **Lỗi 422 `TOP_UP_AMOUNT_INVALID`**:
-```json
-{
-  "success": false,
-  "error": {
-    "code": "TOP_UP_AMOUNT_INVALID",
-    "message": "Số tiền nạp không hợp lệ (phải lớn hơn 0)",
-    "fieldErrors": [
-      {
-        "field": "amount",
-        "message": "Số tiền nạp tối thiểu là 10,000 VND"
-      }
-    ],
-    "details": {}
-  },
-  "traceId": "string"
-}
-```
-
-* **Lỗi 503 `PAYMENT_PROVIDER_UNAVAILABLE`**:
-```json
-{
-  "success": false,
-  "error": {
-    "code": "PAYMENT_PROVIDER_UNAVAILABLE",
-    "message": "Cổng thanh toán tạm thời không khả dụng, vui lòng thử lại sau",
-    "fieldErrors": [],
-    "details": {}
-  },
-  "traceId": "string"
-}
-```
-
----
-
-### 4.3 `GET /wallet/top-up/{id}`
-* **Quyền**: Chủ ví sở hữu giao dịch.
-* **Parameters**:
-  - `id` (path): `string` (ID của giao dịch)
-
-* **Response 200 OK**:
-```json
-{
-  "success": true,
-  "data": {
-    "id": "101",
-    "amount": 100000.00,
-    "method": "GATEWAY",
-    "status": "SUCCESSFUL",
-    "checkoutUrl": "/wallet/top-up/101",
-    "expiresAt": "2026-10-04T09:23:42.102Z",
-    "createdAt": "2026-10-04T09:08:42.102Z",
-    "completedAt": null,
-    "failureCode": null
-  },
-  "meta": {},
-  "traceId": "string"
-}
-```
-
-* **Response 401 `UNAUTHORIZED`**:
-```json
-{
-  "success": false,
-  "error": {
-    "code": "UNAUTHORIZED",
-    "message": "Thiếu token xác thực"
-  },
-  "traceId": "req-abc-123"
-}
-```
-
-* **Response 404 `RESOURCE_NOT_FOUND`**:
-```json
-{
-  "success": false,
-  "error": {
-    "code": "RESOURCE_NOT_FOUND",
-    "message": "Không tìm thấy giao dịch nạp tiền với ID đã cung cấp",
-    "fieldErrors": [],
-    "details": {}
-  },
-  "traceId": "string"
-}
-```
-
----
-
-### 4.4 `GET /wallet/transaction`
-* **Quyền**: Chủ ví.
-* **Parameters**:
-  - `type` (query): `string` (Available values: `TOP_UP`, `PAYMENT`, `REFUND`)
-  - `from` (query): `string($date)` (Định dạng YYYY-MM-DD)
-  - `to` (query): `string($date)` (Định dạng YYYY-MM-DD)
-  - `page` (query): `integer` (0-based, mặc định là 0)
-  - `size` (query): `integer` (Mặc định là 20)
-
-* **Response 200 OK**:
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": "98",
-      "type": "ADD_MONEY",
-      "status": "SUCCESSFUL",
-      "amount": 100000.00,
-      "description": "Nạp tiền ví qua chuyển khoản",
-      "createdAt": "2026-10-04T09:17:32.374Z"
+#### Các trường hợp Response:
+* **HTTP 200 OK (Thành công)**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "walletId": 1,
+      "userId": 1,
+      "balance": 500000,
+      "status": "ACTIVE"
     }
-  ],
-  "meta": {
-    "page": 0, 
-    "size": 20, 
-    "totalElements": 1,
-    "totalPages": 1
-  },
-  "traceId": "string"
-}
-```
+  }
+  ```
 
-* **Response 400 `INVALID_FILTER`**:
-```json
-{
-  "success": false,
-  "error": {
-    "code": "INVALID_FILTER",
-    "message": "Tham số lọc ngày hoặc phân trang không hợp lệ",
-    "fieldErrors": [
-      {
-        "field": "from",
-        "message": "Ngày bắt đầu không được lớn hơn ngày kết thúc"
+* **HTTP 401 Unauthorized (Chưa đăng nhập / Token không hợp lệ)**:
+  ```json
+  {
+    "success": false,
+    "status": 401,
+    "error": "Chua dang nhap"
+  }
+  ```
+
+* **HTTP 403 Forbidden (Ví bị khóa)**:
+  ```json
+  {
+    "success": false,
+    "status": 403,
+    "error": "Ví của bạn đang bị tạm khóa (SUSPENDED)"
+  }
+  ```
+
+---
+
+### 4.2 Endpoint: `GET /wallet/transactions` (Lịch sử giao dịch ví)
+* **Quyền**: Yêu cầu đăng nhập (`BearerAuth`).
+* **Headers**: `Authorization: Bearer <token>`
+* **Query Parameters**:
+  - `type` (optional, string): `ADD_MONEY` | `PAYMENT` | `REFUND`
+  - `page` (optional, integer): Số trang (bắt đầu từ 0, mặc định `0`)
+  - `size` (optional, integer): Số phần tử trên trang (mặc định `20`, tối đa `100`)
+* **Request Body**: Không có.
+
+#### Các trường hợp Response:
+* **HTTP 200 OK (Thành công - Có phân trang `meta` theo `CommonDTO.PageMeta`)**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "items": [
+        {
+          "transactionId": 1,
+          "walletId": 1,
+          "amount": 500000,
+          "transactionType": "ADD_MONEY",
+          "status": "SUCCESSFUL",
+          "description": "Nap tien vao vi",
+          "createdAt": "2024-07-15T18:30:00Z"
+        }
+      ],
+      "meta": {
+        "page": 0,
+        "size": 20,
+        "totalElements": 1,
+        "totalPages": 1
       }
-    ],
-    "details": {}
-  },
-  "traceId": "string"
-}
-```
+    }
+  }
+  ```
 
-* **Response 401 `UNAUTHORIZED`**:
-```json
-{
-  "success": false,
-  "error": {
-    "code": "UNAUTHORIZED",
-    "message": "Thiếu token xác thực"
-  },
-  "traceId": "req-abc-123"
-}
-```
+* **HTTP 400 Bad Request (Tham số lọc không hợp lệ)**:
+  ```json
+  {
+    "success": false,
+    "status": 400,
+    "error": "Tham so loc type, page hoac size khong hop le"
+  }
+  ```
+
+* **HTTP 401 Unauthorized (Chưa đăng nhập)**:
+  ```json
+  {
+    "success": false,
+    "status": 401,
+    "error": "Chua dang nhap"
+  }
+  ```
+
+---
+
+### 4.3 Endpoint: `POST /wallet/top-up` (Tạo giao dịch nạp ví)
+* **Quyền**: Yêu cầu đăng nhập (`BearerAuth`).
+* **Headers**:
+  - `Authorization: Bearer <token>`
+  - `Content-Type: application/json`
+* **Request Body** (JSON - `TopUpRequest`):
+  - `amount` (integer, bắt buộc): Số tiền nạp VND (từ `10000` đến `10000000`)
+  - `method` (string, bắt buộc): Phương thức nạp (`QR_CODE`, `MOMO`, `VNPAY`)
+  ```json
+  {
+    "amount": 500000,
+    "method": "MOMO"
+  }
+  ```
+
+#### Các trường hợp Response:
+* **HTTP 201 Created (Tạo nạp tiền thành công)**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "paymentId": 501,
+      "bookingId": null,
+      "amount": 500000,
+      "method": "MOMO",
+      "status": "SUCCESSFUL",
+      "paymentType": "TOPUP",
+      "paymentDate": "2024-07-15T18:30:00Z",
+      "expiredAt": null,
+      "gatewayTransactionId": null,
+      "walletTransactionId": 1,
+      "failureReason": null
+    }
+  }
+  ```
+
+* **HTTP 400 Bad Request (Dữ liệu không hợp lệ / Phương thức không hỗ trợ)**:
+  ```json
+  {
+    "success": false,
+    "status": 400,
+    "error": "Phuong thuc thanh toan khong hop le"
+  }
+  ```
+
+* **HTTP 401 Unauthorized (Chưa đăng nhập)**:
+  ```json
+  {
+    "success": false,
+    "status": 401,
+    "error": "Chua dang nhap"
+  }
+  ```
+
+* **HTTP 403 Forbidden (Ví bị khóa SUSPENDED)**:
+  ```json
+  {
+    "success": false,
+    "status": 403,
+    "error": "Ví của bạn đang bị tạm khóa (SUSPENDED), không thể nạp tiền"
+  }
+  ```
+
+* **HTTP 422 Unprocessable Entity - Trường hợp 1 (Số tiền quá nhỏ < 10.000 VND)**:
+  ```json
+  {
+    "success": false,
+    "status": 422,
+    "error": "So tien nap toi thieu 10.000 VND"
+  }
+  ```
+
+* **HTTP 422 Unprocessable Entity - Trường hợp 2 (Số tiền quá lớn > 10.000.000 VND)**:
+  ```json
+  {
+    "success": false,
+    "status": 422,
+    "error": "So tien nap toi da 10.000.000 VND"
+  }
+  ```
 
 ---
 
----
+## 5. Kế hoạch Thực hiện Cập nhật Code Module `wallet`
 
-## 5. Danh sách thay đổi ở các file hiện có
+Thực hiện nghiêm ngặt trong nội bộ module `wallet` theo nguyên tắc đã cam kết:
 
-| STT | Tệp tin | Vị trí / Nội dung thay đổi |
-|:---:|:---|:---|
-| 1 | `AuthFilter.java` | Bổ sung `"/wallet/*"` vào `@WebFilter(urlPatterns = {..., "/wallet/*"})` |
-| 2 | `persistence.xml` | Khai báo 2 Entity: `<class>com.cinema.wallet.Wallet</class>` và `<class>com.cinema.wallet.WalletTransaction</class>` |
-| 3 | `AuthService.java` | Tại hàm `register(...)`, sau khi `em.persist(u)` tiến hành tạo sẵn ví rỗng cho user mới |
-
----
+1. **Tạo Enum mới**: `enums/TransactionStatus.java` (`SUCCESSFUL`, `FAILED`, `PENDING`).
+2. **Xóa 3 file thừa**:
+   - `entity/WalletTopup.java`
+   - `dao/WalletTopupDAO.java`
+   - `enums/WalletTopupStatus.java`
+3. **Cập nhật Entity**:
+   - `entity/Wallet.java`: Chuyển `balance` sang `BigDecimal`, bỏ các trường không tồn tại trong `cinema sql.txt`.
+   - `entity/WalletTransaction.java`: Cập nhật `transaction_id`, `amount` (`BigDecimal`), `TransactionType`, `TransactionStatus`, `description` (`VARCHAR(500)`).
+4. **Cập nhật DTO**:
+   - `dto/request/TopUpRequest.java`
+   - `dto/response/WalletResponse.java`
+   - `dto/response/TopUpResponse.java`
+   - `dto/response/TransactionItemResponse.java`
+   *(Phân trang tái sử dụng `CommonDTO.PageMeta` có sẵn, không tạo thêm file mới)*
+5. **Cập nhật DAO & Service**:
+   - `dao/WalletDAO.java` & `dao/WalletTransactionDAO.java`: Dùng `BigDecimal`, hỗ trợ filter `TransactionType`, phân trang kết hợp `PageMeta`.
+   - `service/WalletService.java`: Logic cộng tiền với `BigDecimal`, ghi nhận `WalletTransaction` (`ADD_MONEY`, `SUCCESSFUL`).
+6. **Cập nhật Controller**:
+   - `controller/WalletController.java`: Định tuyến `/wallet/transactions`, trả về `data` và `meta` theo `CommonDTO.PageMeta`.
+7. **Cập nhật Unit Test**:
+   - Cập nhật các test case trong `src/test/java/com/cinema/wallet/` để đảm bảo build và chạy thành công 100%.

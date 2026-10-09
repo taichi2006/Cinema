@@ -18,7 +18,6 @@
         <class>com.cinema.user.entity.User</class>
         <!-- Module Wallet: Ví người dùng, nạp tiền và lịch sử bút toán giao dịch -->
         <class>com.cinema.wallet.entity.Wallet</class>
-        <class>com.cinema.wallet.entity.WalletTopup</class>
         <class>com.cinema.wallet.entity.WalletTransaction</class>
 
         <properties>
