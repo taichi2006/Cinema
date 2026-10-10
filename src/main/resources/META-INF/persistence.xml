@@ -19,6 +19,8 @@
         <!-- Module Wallet: Ví người dùng, nạp tiền và lịch sử bút toán giao dịch -->
         <class>com.cinema.wallet.entity.Wallet</class>
         <class>com.cinema.wallet.entity.WalletTransaction</class>
+        <!-- Module Product: Danh mục sản phẩm F&B -->
+        <class>com.cinema.product.Product</class>
 
         <properties>
 
