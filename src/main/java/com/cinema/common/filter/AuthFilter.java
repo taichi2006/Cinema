@@ -17,10 +17,13 @@ import java.io.IOException;
         "/user", "/user/*",
         "/booking", "/booking/*", "/bookings", "/bookings/*",
         "/wallet", "/wallet/*",
+        "/tickets", "/tickets/*",
         "/api/booking", "/api/booking/*", "/api/bookings", "/api/bookings/*",
         "/api/wallet", "/api/wallet/*",
+        "/api/tickets", "/api/tickets/*",
         "/api/v1/booking", "/api/v1/booking/*", "/api/v1/bookings", "/api/v1/bookings/*",
         "/api/v1/wallet", "/api/v1/wallet/*",
+        "/api/v1/tickets", "/api/v1/tickets/*",
         "/api/v1/auth/logout", "/api/auth/logout", "/auth/logout"
 }, dispatcherTypes = {DispatcherType.REQUEST, DispatcherType.FORWARD})
 public class AuthFilter implements Filter {
