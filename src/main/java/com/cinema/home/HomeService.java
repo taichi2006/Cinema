@@ -32,7 +32,7 @@ public class HomeService {
     public Map<String, Object> getHomeData() {
         // 1. Phim đang chiếu (gọi từ MovieService)
         Map<String, Object> nowShowingResult = movieService.getMovies(
-                new MovieRequest(null, null, "NOW_SHOWING", 0, DEFAULT_LIMIT, "releaseDate,desc")
+                new MovieRequest(null, null, "ACTIVE", 0, DEFAULT_LIMIT, "releaseDate,desc")
         );
         Object nowShowing = extractMovieItems(nowShowingResult);
 
