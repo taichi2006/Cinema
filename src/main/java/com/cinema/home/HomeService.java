@@ -34,13 +34,13 @@ public class HomeService {
         Map<String, Object> nowShowingResult = movieService.getMovies(
                 new MovieRequest(null, null, "NOW_SHOWING", 0, DEFAULT_LIMIT, "releaseDate,desc")
         );
-        Object nowShowing = nowShowingResult.getOrDefault("data", Collections.emptyList());
+        Object nowShowing = extractMovieItems(nowShowingResult);
 
         // 2. Phim sắp chiếu (gọi từ MovieService)
         Map<String, Object> comingSoonResult = movieService.getMovies(
                 new MovieRequest(null, null, "COMING_SOON", 0, DEFAULT_LIMIT, "releaseDate,asc")
         );
-        Object comingSoon = comingSoonResult.getOrDefault("data", Collections.emptyList());
+        Object comingSoon = extractMovieItems(comingSoonResult);
 
         // 3. Rạp nổi bật (gọi từ CinemaService)
         Map<String, Object> cinemaResult = cinemaService.getCinemas(
@@ -84,5 +84,16 @@ public class HomeService {
         result.put("data", data);
         result.put("meta", Collections.emptyMap());
         return result;
+    }
+
+    private Object extractMovieItems(Map<String, Object> result) {
+        if (result == null) {
+            return Collections.emptyList();
+        }
+        Object data = result.get("data");
+        if (data instanceof Map<?, ?> dataMap && dataMap.containsKey("items")) {
+            return dataMap.get("items");
+        }
+        return data != null ? data : Collections.emptyList();
     }
 }

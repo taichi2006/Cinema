@@ -8,6 +8,7 @@ import com.cinema.movie.entity.Genre;
 import com.cinema.movie.entity.Movie;
 
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.EntityTransaction;
 import jakarta.persistence.TypedQuery;
 
 import java.time.LocalDate;
@@ -38,6 +39,10 @@ public class MovieDAO {
         }
     }
 
+    public List<ShowtimeResponse> findShowtimes(Long movieId, LocalDate date, Long cinemaId) {
+        return findShowtimes(movieId, date, cinemaId, 0, Integer.MAX_VALUE);
+    }
+
     public List<ShowtimeResponse> findShowtimes(Long movieId, LocalDate date, Long cinemaId, int page, int size) {
         EntityManager entityManager = JPAUtil.getEntityManager();
         try {
@@ -45,30 +50,23 @@ public class MovieDAO {
                     "SELECT " +
                     "s.show_time_id, " +
                     "s.movie_id, " +
-                    "c.cinema_id, " +
-                    "c.cinema_name, " +
-                    "r.room_id, " +
-                    "r.room_name, " +
-                    "(s.show_date + s.start_time) AS starts_at, " +
-                    "(s.show_date + s.end_time) AS ends_at, " +
-                    "m.format, " +
-                    "m.language, " +
+                    "s.room_id, " +
+                    "CAST(s.show_date AS TEXT), " +
+                    "CAST(s.start_time AS TEXT), " +
+                    "CAST(s.end_time AS TEXT), " +
                     "s.base_price, " +
                     "s.status " +
                     "FROM cinema.show_times s " +
                     "JOIN cinema.rooms r ON s.room_id = r.room_id " +
-                    "JOIN cinema.cinemas c ON r.cinema_id = c.cinema_id " +
-                    "JOIN cinema.movies m ON s.movie_id = m.movie_id " +
                     "WHERE s.movie_id = :movieId " +
-                    "AND s.status = 'SCHEDULED' " +
                     "AND s.show_date = CAST(:showDate AS date) "
             );
 
             if (cinemaId != null) {
-                sql.append("AND c.cinema_id = :cinemaId ");
+                sql.append("AND r.cinema_id = :cinemaId ");
             }
 
-            sql.append("ORDER BY s.show_date ASC, s.start_time ASC");
+            sql.append("ORDER BY s.start_time ASC");
 
             var query = entityManager.createNativeQuery(sql.toString());
             query.setParameter("movieId", movieId);
@@ -77,29 +75,27 @@ public class MovieDAO {
                 query.setParameter("cinemaId", cinemaId);
             }
 
-            int offset = Math.max(0, page) * Math.max(1, size);
-            query.setFirstResult(offset);
-            query.setMaxResults(size);
+            if (size > 0 && size < Integer.MAX_VALUE) {
+                int offset = Math.max(0, page) * size;
+                query.setFirstResult(offset);
+                query.setMaxResults(size);
+            }
 
             List<?> rawResults = query.getResultList();
             List<ShowtimeResponse> responses = new ArrayList<>();
             for (Object rowObj : rawResults) {
                 Object[] row = (Object[]) rowObj;
-                String showtimeId = row[0] != null ? row[0].toString() : null;
-                String mId = row[1] != null ? row[1].toString() : null;
-                String cId = row[2] != null ? row[2].toString() : null;
-                String cName = row[3] != null ? row[3].toString() : null;
-                String rId = row[4] != null ? row[4].toString() : null;
-                String rName = row[5] != null ? row[5].toString() : null;
-                String startsAt = formatTimestamp(row[6]);
-                String endsAt = formatTimestamp(row[7]);
-                String format = row[8] != null ? row[8].toString() : null;
-                String language = row[9] != null ? row[9].toString() : null;
-                Long basePrice = row[10] != null ? ((Number) row[10]).longValue() : null;
-                String status = row[11] != null ? row[11].toString() : null;
+                Long showtimeId = row[0] != null ? ((Number) row[0]).longValue() : null;
+                Long mId = row[1] != null ? ((Number) row[1]).longValue() : null;
+                Long rId = row[2] != null ? ((Number) row[2]).longValue() : null;
+                String showDate = row[3] != null ? row[3].toString() : null;
+                String startTime = row[4] != null ? row[4].toString() : null;
+                String endTime = row[5] != null ? row[5].toString() : null;
+                Double basePrice = row[6] != null ? ((Number) row[6]).doubleValue() : null;
+                String status = row[7] != null ? row[7].toString() : null;
 
                 responses.add(new ShowtimeResponse(
-                        showtimeId, mId, cId, cName, rId, rName, startsAt, endsAt, format, language, basePrice, status
+                        showtimeId, mId, rId, showDate, startTime, endTime, basePrice, status
                 ));
             }
             return responses;
@@ -139,6 +135,13 @@ public class MovieDAO {
         }
     }
 
+    public enum ReviewEligibility {
+        ELIGIBLE,
+        NOT_WATCHED,
+        NOT_PAID,
+        NOT_ENDED
+    }
+
     public List<ReviewResponse> findReviews(Long movieId, String sort, int page, int size) {
         EntityManager entityManager = JPAUtil.getEntityManager();
         try {
@@ -146,12 +149,11 @@ public class MovieDAO {
                     "SELECT " +
                     "ur.review_id, " +
                     "ur.movie_id, " +
-                    "u.full_name, " +
+                    "ur.user_id, " +
                     "ur.rating, " +
                     "ur.comment, " +
                     "ur.created_at " +
                     "FROM cinema.reviews ur " +
-                    "JOIN cinema.users u ON ur.user_id = u.user_id " +
                     "WHERE ur.movie_id = :movieId "
             );
 
@@ -176,18 +178,109 @@ public class MovieDAO {
             List<ReviewResponse> responses = new ArrayList<>();
             for (Object rowObj : rawResults) {
                 Object[] row = (Object[]) rowObj;
-                String reviewId = row[0] != null ? row[0].toString() : null;
-                String mId = row[1] != null ? row[1].toString() : null;
-                String authorName = row[2] != null ? row[2].toString() : null;
+                Long reviewId = row[0] != null ? ((Number) row[0]).longValue() : null;
+                Long mId = row[1] != null ? ((Number) row[1]).longValue() : null;
+                Long userId = row[2] != null ? ((Number) row[2]).longValue() : null;
                 Integer rating = row[3] != null ? ((Number) row[3]).intValue() : null;
                 String comment = row[4] != null ? row[4].toString() : null;
                 String createdAt = formatTimestamp(row[5]);
 
                 responses.add(new ReviewResponse(
-                        reviewId, mId, authorName, rating, comment, createdAt
+                        reviewId, mId, userId, rating, comment, createdAt
                 ));
             }
             return responses;
+        } finally {
+            entityManager.close();
+        }
+    }
+
+    public List<ReviewResponse> findReviews(Long movieId, int page, int size) {
+        return findReviews(movieId, "createdAt,desc", page, size);
+    }
+
+    public ReviewEligibility checkUserReviewEligibility(Long userId, Long movieId) {
+        EntityManager entityManager = JPAUtil.getEntityManager();
+        try {
+            String sql = "SELECT " +
+                    "b.status AS booking_status, " +
+                    "COALESCE(t.status, 'NO_TICKET') AS ticket_status " +
+                    "FROM cinema.bookings b " +
+                    "JOIN cinema.show_time_seats sts ON b.booking_id = sts.booking_id " +
+                    "JOIN cinema.show_times st ON sts.show_time_id = st.show_time_id " +
+                    "LEFT JOIN cinema.tickets t ON sts.id = t.show_time_seat_id " +
+                    "WHERE b.user_id = :userId AND st.movie_id = :movieId";
+
+            var query = entityManager.createNativeQuery(sql);
+            query.setParameter("userId", userId);
+            query.setParameter("movieId", movieId);
+
+            List<?> rows = query.getResultList();
+            if (rows.isEmpty()) {
+                return ReviewEligibility.NOT_WATCHED;
+            }
+
+            boolean hasUsedTicket = false;
+            boolean hasConfirmedBooking = false;
+
+            for (Object rowObj : rows) {
+                Object[] row = (Object[]) rowObj;
+                String bookingStatus = row[0] != null ? row[0].toString() : "";
+                String ticketStatus = row[1] != null ? row[1].toString() : "";
+
+                if ("USED".equalsIgnoreCase(ticketStatus)) {
+                    hasUsedTicket = true;
+                }
+                if ("CONFIRMED".equalsIgnoreCase(bookingStatus)) {
+                    hasConfirmedBooking = true;
+                }
+            }
+
+            if (hasUsedTicket) {
+                return ReviewEligibility.ELIGIBLE;
+            }
+            if (!hasConfirmedBooking) {
+                return ReviewEligibility.NOT_PAID;
+            }
+            return ReviewEligibility.NOT_ENDED;
+        } finally {
+            entityManager.close();
+        }
+    }
+
+    public ReviewResponse upsertReview(Long movieId, Long userId, Integer rating, String comment) {
+        EntityManager entityManager = JPAUtil.getEntityManager();
+        EntityTransaction transaction = entityManager.getTransaction();
+        try {
+            transaction.begin();
+            String sql = "INSERT INTO cinema.reviews (movie_id, user_id, rating, comment, created_at) " +
+                    "VALUES (:movieId, :userId, :rating, :comment, CURRENT_TIMESTAMP) " +
+                    "ON CONFLICT (user_id, movie_id) " +
+                    "DO UPDATE SET rating = EXCLUDED.rating, comment = EXCLUDED.comment, created_at = CURRENT_TIMESTAMP " +
+                    "RETURNING review_id, movie_id, user_id, rating, comment, created_at";
+
+            var query = entityManager.createNativeQuery(sql);
+            query.setParameter("movieId", movieId);
+            query.setParameter("userId", userId);
+            query.setParameter("rating", rating);
+            query.setParameter("comment", comment);
+
+            Object[] row = (Object[]) query.getSingleResult();
+            transaction.commit();
+
+            Long reviewId = row[0] != null ? ((Number) row[0]).longValue() : null;
+            Long mId = row[1] != null ? ((Number) row[1]).longValue() : null;
+            Long uId = row[2] != null ? ((Number) row[2]).longValue() : null;
+            Integer r = row[3] != null ? ((Number) row[3]).intValue() : null;
+            String c = row[4] != null ? row[4].toString() : null;
+            String createdAt = formatTimestamp(row[5]);
+
+            return new ReviewResponse(reviewId, mId, uId, r, c, createdAt);
+        } catch (Exception e) {
+            if (transaction.isActive()) {
+                transaction.rollback();
+            }
+            throw e;
         } finally {
             entityManager.close();
         }
@@ -246,19 +339,28 @@ public class MovieDAO {
             // Bước 1: Truy vấn phân trang lấy danh sách phim (không fetch collection
             // genres)
             StringBuilder jpql = new StringBuilder("SELECT DISTINCT m FROM Movie m ");
-            boolean hasGenre = filter.getGenre() != null && !filter.getGenre().trim().isEmpty();
-            if (hasGenre) {
+            boolean hasKeyword = (filter.getKeyword() != null && !filter.getKeyword().trim().isEmpty())
+                    || (filter.getQ() != null && !filter.getQ().trim().isEmpty());
+            String keywordVal = filter.getKeyword() != null && !filter.getKeyword().trim().isEmpty()
+                    ? filter.getKeyword().trim().toLowerCase()
+                    : (filter.getQ() != null ? filter.getQ().trim().toLowerCase() : "");
+
+            boolean hasGenreId = filter.getGenreId() != null;
+            boolean hasGenre = !hasGenreId && filter.getGenre() != null && !filter.getGenre().trim().isEmpty();
+
+            if (hasGenreId || hasGenre) {
                 jpql.append("JOIN m.genres g ");
             }
 
             jpql.append("WHERE 1=1 ");
 
-            boolean hasQ = filter.getQ() != null && !filter.getQ().trim().isEmpty();
-            if (hasQ) {
-                jpql.append("AND LOWER(m.title) LIKE :q ");
+            if (hasKeyword) {
+                jpql.append("AND LOWER(m.title) LIKE :keyword ");
             }
 
-            if (hasGenre) {
+            if (hasGenreId) {
+                jpql.append("AND g.genreId = :genreId ");
+            } else if (hasGenre) {
                 jpql.append("AND LOWER(g.genreName) = :genre ");
             }
 
@@ -271,10 +373,12 @@ public class MovieDAO {
 
             TypedQuery<Movie> query = entityManager.createQuery(jpql.toString(), Movie.class);
 
-            if (hasQ) {
-                query.setParameter("q", "%" + filter.getQ().trim().toLowerCase() + "%");
+            if (hasKeyword) {
+                query.setParameter("keyword", "%" + keywordVal + "%");
             }
-            if (hasGenre) {
+            if (hasGenreId) {
+                query.setParameter("genreId", filter.getGenreId().longValue());
+            } else if (hasGenre) {
                 query.setParameter("genre", filter.getGenre().trim().toLowerCase());
             }
             if (hasStatus) {
@@ -323,19 +427,28 @@ public class MovieDAO {
         EntityManager entityManager = JPAUtil.getEntityManager();
         try {
             StringBuilder jpql = new StringBuilder("SELECT COUNT(DISTINCT m) FROM Movie m ");
-            boolean hasGenre = filter.getGenre() != null && !filter.getGenre().trim().isEmpty();
-            if (hasGenre) {
+            boolean hasKeyword = (filter.getKeyword() != null && !filter.getKeyword().trim().isEmpty())
+                    || (filter.getQ() != null && !filter.getQ().trim().isEmpty());
+            String keywordVal = filter.getKeyword() != null && !filter.getKeyword().trim().isEmpty()
+                    ? filter.getKeyword().trim().toLowerCase()
+                    : (filter.getQ() != null ? filter.getQ().trim().toLowerCase() : "");
+
+            boolean hasGenreId = filter.getGenreId() != null;
+            boolean hasGenre = !hasGenreId && filter.getGenre() != null && !filter.getGenre().trim().isEmpty();
+
+            if (hasGenreId || hasGenre) {
                 jpql.append("JOIN m.genres g ");
             }
 
             jpql.append("WHERE 1=1 ");
 
-            boolean hasQ = filter.getQ() != null && !filter.getQ().trim().isEmpty();
-            if (hasQ) {
-                jpql.append("AND LOWER(m.title) LIKE :q ");
+            if (hasKeyword) {
+                jpql.append("AND LOWER(m.title) LIKE :keyword ");
             }
 
-            if (hasGenre) {
+            if (hasGenreId) {
+                jpql.append("AND g.genreId = :genreId ");
+            } else if (hasGenre) {
                 jpql.append("AND LOWER(g.genreName) = :genre ");
             }
 
@@ -346,10 +459,12 @@ public class MovieDAO {
 
             TypedQuery<Long> query = entityManager.createQuery(jpql.toString(), Long.class);
 
-            if (hasQ) {
-                query.setParameter("q", "%" + filter.getQ().trim().toLowerCase() + "%");
+            if (hasKeyword) {
+                query.setParameter("keyword", "%" + keywordVal + "%");
             }
-            if (hasGenre) {
+            if (hasGenreId) {
+                query.setParameter("genreId", filter.getGenreId().longValue());
+            } else if (hasGenre) {
                 query.setParameter("genre", filter.getGenre().trim().toLowerCase());
             }
             if (hasStatus) {

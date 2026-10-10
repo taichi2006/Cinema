@@ -2,7 +2,9 @@ package com.cinema.movie.dto.request;
 
 public class MovieRequest {
 
+    private String keyword;
     private String q;
+    private Integer genreId;
     private String genre;
     private String status;
     private int page = 0;
@@ -12,21 +14,45 @@ public class MovieRequest {
     public MovieRequest() {
     }
 
-    public MovieRequest(String q, String genre, String status, int page, int size, String sort) {
-        this.q = q;
-        this.genre = genre;
+
+    public MovieRequest(String keyword, Integer genreId, String status, int page, int size, String sort) {
+        this.keyword = keyword;
+        this.q = keyword;
+        this.genreId = genreId;
         this.status = status;
         this.page = page;
         this.size = size;
         this.sort = sort;
     }
 
+    public String getKeyword() {
+        return keyword != null ? keyword : q;
+    }
+
+    public void setKeyword(String keyword) {
+        this.keyword = keyword;
+        if (this.q == null) {
+            this.q = keyword;
+        }
+    }
+
     public String getQ() {
-        return q;
+        return q != null ? q : keyword;
     }
 
     public void setQ(String q) {
         this.q = q;
+        if (this.keyword == null) {
+            this.keyword = q;
+        }
+    }
+
+    public Integer getGenreId() {
+        return genreId;
+    }
+
+    public void setGenreId(Integer genreId) {
+        this.genreId = genreId;
     }
 
     public String getGenre() {

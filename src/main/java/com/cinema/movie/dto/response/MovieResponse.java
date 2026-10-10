@@ -1,5 +1,6 @@
 package com.cinema.movie.dto.response;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 
@@ -8,42 +9,70 @@ import java.util.ArrayList;
 import java.util.List;
 
 @JsonPropertyOrder({
-        "id",
+        "movieId",
         "title",
-        "description",
+        "directorId",
         "durationMinutes",
-        "releaseDate",
-        "posterUrl",
-        "trailerUrl",
-        "language",
-        "defaultFormat",
-        "ageRating",
         "ageLimit",
-        "status",
-        "genres",
-        "averageRating",
-        "reviewCount"
+        "format",
+        "description",
+        "language",
+        "posterUrl",
+        "releaseDate",
+        "status"
 })
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class MovieResponse {
 
-    private String id;
+    private Long movieId;
     private String title;
-    private String description;
+    private Long directorId;
     private Integer durationMinutes;
-    private LocalDate releaseDate;
-    private String posterUrl;
-    private String trailerUrl;
-    private String language;
-    private String defaultFormat;
-    private String ageRating;
     private Integer ageLimit;
+    private String format;
+    private String description;
+    private String language;
+    private String posterUrl;
+    private LocalDate releaseDate;
     private String status;
-    private List<String> genres = new ArrayList<>();
-    private Double averageRating = 0.0;
-    private Integer reviewCount = 0;
+
+    private String id;
+    private String defaultFormat;
+    private String trailerUrl;
+    private String ageRating;
+    private List<String> genres;
+    private Double averageRating;
+    private Integer reviewCount;
 
     public MovieResponse() {
+    }
+
+    public MovieResponse(
+            Long movieId,
+            String title,
+            Long directorId,
+            Integer durationMinutes,
+            Integer ageLimit,
+            String format,
+            String description,
+            String language,
+            String posterUrl,
+            LocalDate releaseDate,
+            String status
+    ) {
+        this.movieId = movieId;
+        this.id = movieId != null ? String.valueOf(movieId) : null;
+        this.title = title;
+        this.directorId = directorId;
+        this.durationMinutes = durationMinutes;
+        this.ageLimit = ageLimit;
+        this.format = format;
+        this.defaultFormat = format;
+        this.description = description;
+        this.language = language;
+        this.posterUrl = posterUrl;
+        this.releaseDate = releaseDate;
+        this.status = status;
     }
 
     public MovieResponse(
@@ -79,6 +108,9 @@ public class MovieResponse {
             Integer reviewCount
     ) {
         this.id = id;
+        try {
+            this.movieId = id != null ? Long.parseLong(id) : null;
+        } catch (NumberFormatException ignored) {}
         this.title = title;
         this.description = description;
         this.durationMinutes = durationMinutes;
@@ -86,23 +118,56 @@ public class MovieResponse {
         this.posterUrl = posterUrl;
         this.trailerUrl = trailerUrl;
         this.language = language;
+        this.format = defaultFormat;
         this.defaultFormat = defaultFormat;
         this.ageRating = ageRating;
         this.ageLimit = ageLimit;
         this.status = status;
-        if (genres != null) {
-            this.genres = genres;
-        }
-        this.averageRating = averageRating != null ? averageRating : 0.0;
-        this.reviewCount = reviewCount != null ? reviewCount : 0;
+        this.genres = genres;
+        this.averageRating = averageRating;
+        this.reviewCount = reviewCount;
     }
 
+    public Long getMovieId() {
+        return movieId;
+    }
+
+    public void setMovieId(Long movieId) {
+        this.movieId = movieId;
+        if (this.id == null && movieId != null) {
+            this.id = String.valueOf(movieId);
+        }
+    }
+
+    public Long getDirectorId() {
+        return directorId;
+    }
+
+    public void setDirectorId(Long directorId) {
+        this.directorId = directorId;
+    }
+
+    public String getFormat() {
+        return format != null ? format : defaultFormat;
+    }
+
+    public void setFormat(String format) {
+        this.format = format;
+        this.defaultFormat = format;
+    }
+
+    @JsonIgnore
     public String getId() {
-        return id;
+        return id != null ? id : (movieId != null ? String.valueOf(movieId) : null);
     }
 
     public void setId(String id) {
         this.id = id;
+        try {
+            if (this.movieId == null && id != null) {
+                this.movieId = Long.parseLong(id);
+            }
+        } catch (NumberFormatException ignored) {}
     }
 
     public String getTitle() {
@@ -161,12 +226,13 @@ public class MovieResponse {
         this.language = language;
     }
 
+    @JsonIgnore
     public String getDefaultFormat() {
-        return defaultFormat;
+        return getFormat();
     }
 
     public void setDefaultFormat(String defaultFormat) {
-        this.defaultFormat = defaultFormat;
+        setFormat(defaultFormat);
     }
 
     public String getAgeRating() {
@@ -206,7 +272,7 @@ public class MovieResponse {
     }
 
     public void setAverageRating(Double averageRating) {
-        this.averageRating = averageRating != null ? averageRating : 0.0;
+        this.averageRating = averageRating;
     }
 
     public Integer getReviewCount() {
@@ -214,6 +280,6 @@ public class MovieResponse {
     }
 
     public void setReviewCount(Integer reviewCount) {
-        this.reviewCount = reviewCount != null ? reviewCount : 0;
+        this.reviewCount = reviewCount;
     }
 }

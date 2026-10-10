@@ -5,6 +5,7 @@ import com.cinema.common.dto.CommonDTO.PageMeta;
 import com.cinema.common.exception.ApiException;
 import com.cinema.movie.dao.MovieDAO;
 import com.cinema.movie.dto.request.MovieRequest;
+import com.cinema.movie.dto.request.ReviewRequest;
 import com.cinema.movie.dto.response.MovieResponse;
 import com.cinema.movie.dto.response.ReviewResponse;
 import com.cinema.movie.dto.response.ShowtimeResponse;
@@ -22,7 +23,9 @@ import java.util.Set;
 
 public class MovieService {
 
-    private static final Set<String> ALLOWED_STATUSES = Set.of("NOW_SHOWING", "COMING_SOON", "ENDED");
+    private static final Set<String> ALLOWED_STATUSES = Set.of(
+            "ACTIVE", "INACTIVE", "COMING_SOON", "ENDED"
+    );
     private static final Set<String> ALLOWED_SORTS = Set.of(
             "releaseDate,asc", "releaseDate,desc",
             "title,asc", "title,desc"
@@ -45,7 +48,7 @@ public class MovieService {
     public ApiResponse<MovieResponse> getMovieById(String idStr) {
         Long movieId = parseAndValidateMovieId(idStr);
         Movie movie = movieDAO.findById(movieId)
-                .orElseThrow(() -> ApiException.notFound("Không tìm thấy phim"));
+                .orElseThrow(() -> ApiException.notFound("Khong tim thay phim"));
 
         Set<String> genreNames = new LinkedHashSet<>();
         if (movie.getGenres() != null) {
@@ -57,21 +60,17 @@ public class MovieService {
         }
 
         MovieResponse response = new MovieResponse(
-                String.valueOf(movie.getMovieId()),
+                movie.getMovieId(),
                 movie.getTitle(),
-                movie.getDescription(),
+                movie.getDirectorId(),
                 movie.getDurationMinutes(),
-                movie.getReleaseDate(),
-                movie.getPosterUrl(),
-                movie.getTrailerUrl(),
-                movie.getLanguage(),
-                movie.getDefaultFormat(),
-                movie.getAgeRating(),
                 movie.getAgeLimit(),
-                movie.getStatus(),
-                new ArrayList<>(genreNames),
-                0.0,
-                0
+                movie.getDefaultFormat(),
+                movie.getDescription(),
+                movie.getLanguage(),
+                movie.getPosterUrl(),
+                movie.getReleaseDate(),
+                movie.getStatus()
         );
 
         return ApiResponse.ok(response);
@@ -80,16 +79,14 @@ public class MovieService {
     public Map<String, Object> getMovieShowtimes(
             String idStr,
             String dateStr,
-            String cinemaIdStr,
-            int page,
-            int size
+            String cinemaIdStr
     ) {
         Long movieId = parseAndValidateMovieId(idStr);
         movieDAO.findById(movieId)
-                .orElseThrow(() -> ApiException.notFound("Không tìm thấy phim"));
+                .orElseThrow(() -> ApiException.notFound("Khong tim thay phim"));
 
         if (dateStr == null || dateStr.trim().isEmpty()) {
-            throw ApiException.badRequest("Thiếu tham số bắt buộc: date");
+            throw ApiException.badRequest("Tham so date la bat buoc");
         }
 
         LocalDate date;
@@ -111,29 +108,28 @@ public class MovieService {
             }
         }
 
-        if (page < 0) {
-            throw ApiException.badRequest("Số trang 'page' phải lớn hơn hoặc bằng 0.");
-        }
-        if (size < 1 || size > 50) {
-            throw ApiException.badRequest("Kích thước trang 'size' phải nằm trong khoảng từ 1 đến 50.");
-        }
+        List<ShowtimeResponse> showtimes = movieDAO.findShowtimes(movieId, date, cinemaId);
 
-        List<ShowtimeResponse> showtimes = movieDAO.findShowtimes(movieId, date, cinemaId, page, size);
-        long totalElements = movieDAO.countShowtimes(movieId, date, cinemaId);
-        int totalPages = size > 0 ? (int) Math.ceil((double) totalElements / size) : 0;
-
-        PageMeta meta = new PageMeta(page, size, totalElements, totalPages);
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("success", true);
         result.put("data", showtimes);
-        result.put("meta", meta);
         return result;
+    }
+
+    public Map<String, Object> getMovieShowtimes(
+            String idStr,
+            String dateStr,
+            String cinemaIdStr,
+            int page,
+            int size
+    ) {
+        return getMovieShowtimes(idStr, dateStr, cinemaIdStr);
     }
 
     public Map<String, Object> getMovieReviews(String idStr, String sort, int page, int size) {
         Long movieId = parseAndValidateMovieId(idStr);
         movieDAO.findById(movieId)
-                .orElseThrow(() -> ApiException.notFound("Không tìm thấy phim"));
+                .orElseThrow(() -> ApiException.notFound("Khong tim thay phim"));
 
         if (sort != null && !sort.trim().isEmpty()) {
             if (!ALLOWED_REVIEW_SORTS.contains(sort.trim())) {
@@ -158,29 +154,69 @@ public class MovieService {
         int totalPages = size > 0 ? (int) Math.ceil((double) totalElements / size) : 0;
 
         PageMeta meta = new PageMeta(page, size, totalElements, totalPages);
+        Map<String, Object> pageData = new LinkedHashMap<>();
+        pageData.put("items", reviews);
+        pageData.put("meta", meta);
+
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("success", true);
-        result.put("data", reviews);
-        result.put("meta", meta);
+        result.put("data", pageData);
         return result;
+    }
+
+    public Map<String, Object> getMovieReviews(String idStr, int page, int size) {
+        return getMovieReviews(idStr, "createdAt,desc", page, size);
     }
 
     public Map<String, Object> getMovieReviews(String idStr) {
         return getMovieReviews(idStr, "createdAt,desc", 0, 20);
     }
 
+    public Map<String, Object> createOrUpdateReview(String idStr, Long userId, ReviewRequest req) {
+        if (userId == null) {
+            throw new ApiException(401, "Chua dang nhap");
+        }
+
+        Long movieId = parseAndValidateMovieId(idStr);
+        movieDAO.findById(movieId)
+                .orElseThrow(() -> ApiException.notFound("Khong tim thay phim"));
+
+        if (req == null || req.getRating() == null || req.getRating() < 1 || req.getRating() > 5) {
+            throw ApiException.badRequest("So sao phai tu 1-5");
+        }
+
+        if (req.getComment() != null && req.getComment().length() > 2000) {
+            throw ApiException.badRequest("Binh luan toi da 2000 ky tu");
+        }
+
+        MovieDAO.ReviewEligibility eligibility = movieDAO.checkUserReviewEligibility(userId, movieId);
+        switch (eligibility) {
+            case NOT_WATCHED -> throw new ApiException(422, "Ban chua xem phim nay");
+            case NOT_PAID -> throw new ApiException(422, "Chi danh gia don da thanh toan");
+            case NOT_ENDED -> throw new ApiException(422, "Chi danh gia sau khi suat chieu ket thuc");
+            case ELIGIBLE -> {}
+        }
+
+        ReviewResponse response = movieDAO.upsertReview(movieId, userId, req.getRating(), req.getComment());
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("success", true);
+        result.put("data", response);
+        return result;
+    }
+
     private Long parseAndValidateMovieId(String idStr) {
         if (idStr == null || idStr.trim().isEmpty()) {
-            throw ApiException.badRequest("Mã phim 'id' không được để trống.");
+            throw ApiException.badRequest("Mã phim 'movieId' không được để trống.");
         }
         try {
             long id = Long.parseLong(idStr.trim());
             if (id <= 0) {
-                throw ApiException.badRequest("Mã phim 'id' phải là số nguyên dương.");
+                throw ApiException.badRequest("Mã phim 'movieId' phải là số nguyên dương.");
             }
             return id;
         } catch (NumberFormatException e) {
-            throw ApiException.badRequest("Mã phim 'id' không hợp lệ: " + idStr);
+            throw ApiException.badRequest("Mã phim 'movieId' không hợp lệ: " + idStr);
         }
     }
 
@@ -195,53 +231,51 @@ public class MovieService {
 
         List<MovieResponse> movieResponses = new ArrayList<>();
         for (Movie movie : movies) {
-            Set<String> genreNames = new LinkedHashSet<>();
-            if (movie.getGenres() != null) {
-                for (Genre genre : movie.getGenres()) {
-                    if (genre.getGenreName() != null) {
-                        genreNames.add(genre.getGenreName());
-                    }
-                }
-            }
-
-            String id = String.valueOf(movie.getMovieId());
-            Double averageRating = 0.0;
-            Integer reviewCount = 0;
-
             MovieResponse response = new MovieResponse(
-                    id,
+                    movie.getMovieId(),
                     movie.getTitle(),
-                    movie.getPosterUrl(),
+                    movie.getDirectorId(),
                     movie.getDurationMinutes(),
+                    movie.getAgeLimit(),
+                    movie.getDefaultFormat(),
+                    movie.getDescription(),
+                    movie.getLanguage(),
+                    movie.getPosterUrl(),
                     movie.getReleaseDate(),
-                    new ArrayList<>(genreNames),
-                    movie.getStatus(),
-                    movie.getAgeRating(),
-                    averageRating,
-                    reviewCount
+                    movie.getStatus()
             );
             movieResponses.add(response);
         }
 
         PageMeta meta = new PageMeta(request.getPage(), request.getSize(), totalElements, totalPages);
+        Map<String, Object> pageData = new LinkedHashMap<>();
+        pageData.put("items", movieResponses);
+        pageData.put("meta", meta);
+
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("success", true);
-        result.put("data", movieResponses);
-        result.put("meta", meta);
+        result.put("data", pageData);
         return result;
     }
 
     private void validateRequest(MovieRequest request) {
-        if (request.getQ() != null && request.getQ().trim().length() > 100) {
-            throw ApiException.badRequest("Từ khóa tìm kiếm 'q' không được vượt quá 100 ký tự.");
+        String keyword = request.getKeyword();
+        if (keyword != null && keyword.trim().length() > 100) {
+            throw ApiException.badRequest("Từ khóa tìm kiếm không được vượt quá 100 ký tự.");
+        }
+
+        if (request.getGenreId() != null && request.getGenreId() <= 0) {
+            throw ApiException.badRequest("Mã thể loại 'genreId' phải là số nguyên dương.");
         }
 
         if (request.getStatus() != null && !request.getStatus().trim().isEmpty()) {
-            if (!ALLOWED_STATUSES.contains(request.getStatus().trim())) {
-                throw ApiException.badRequest(
-                        "Trạng thái 'status' không hợp lệ: " + request.getStatus() +
-                                ". Các giá trị hợp lệ: [NOW_SHOWING, COMING_SOON, ENDED]"
-                );
+            String status = request.getStatus().trim().toUpperCase();
+            if ("NOW_SHOWING".equals(status)) {
+                request.setStatus("NOW_SHOWING");
+            } else if (!ALLOWED_STATUSES.contains(status)) {
+                throw ApiException.badRequest("Trang thai phim khong hop le");
+            } else {
+                request.setStatus(status);
             }
         }
 

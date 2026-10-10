@@ -4,151 +4,103 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 
 @JsonPropertyOrder({
-        "id",
+        "showTimeId",
         "movieId",
-        "cinemaId",
-        "cinemaName",
         "roomId",
-        "roomName",
-        "startsAt",
-        "endsAt",
-        "format",
-        "language",
+        "showDate",
+        "startTime",
+        "endTime",
         "basePrice",
         "status"
 })
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class ShowtimeResponse {
 
-    private String id;
-    private String movieId;
-    private String cinemaId;
-    private String cinemaName;
-    private String roomId;
-    private String roomName;
-    private String startsAt;
-    private String endsAt;
-    private String format;
-    private String language;
-    private Long basePrice;
+    private Long showTimeId;
+    private Long movieId;
+    private Long roomId;
+    private String showDate;
+    private String startTime;
+    private String endTime;
+    private Double basePrice;
     private String status;
 
     public ShowtimeResponse() {
     }
 
     public ShowtimeResponse(
-            String id,
-            String movieId,
-            String cinemaId,
-            String cinemaName,
-            String roomId,
-            String roomName,
-            String startsAt,
-            String endsAt,
-            String format,
-            String language,
-            Long basePrice,
+            Long showTimeId,
+            Long movieId,
+            Long roomId,
+            String showDate,
+            String startTime,
+            String endTime,
+            Double basePrice,
             String status
     ) {
-        this.id = id;
+        this.showTimeId = showTimeId;
         this.movieId = movieId;
-        this.cinemaId = cinemaId;
-        this.cinemaName = cinemaName;
         this.roomId = roomId;
-        this.roomName = roomName;
-        this.startsAt = startsAt;
-        this.endsAt = endsAt;
-        this.format = format;
-        this.language = language;
+        this.showDate = showDate;
+        this.startTime = startTime;
+        this.endTime = endTime;
         this.basePrice = basePrice;
         this.status = status;
     }
 
-    public String getId() {
-        return id;
+    public Long getShowTimeId() {
+        return showTimeId;
     }
 
-    public void setId(String id) {
-        this.id = id;
+    public void setShowTimeId(Long showTimeId) {
+        this.showTimeId = showTimeId;
     }
 
-    public String getMovieId() {
+    public Long getMovieId() {
         return movieId;
     }
 
-    public void setMovieId(String movieId) {
+    public void setMovieId(Long movieId) {
         this.movieId = movieId;
     }
 
-    public String getCinemaId() {
-        return cinemaId;
-    }
-
-    public void setCinemaId(String cinemaId) {
-        this.cinemaId = cinemaId;
-    }
-
-    public String getCinemaName() {
-        return cinemaName;
-    }
-
-    public void setCinemaName(String cinemaName) {
-        this.cinemaName = cinemaName;
-    }
-
-    public String getRoomId() {
+    public Long getRoomId() {
         return roomId;
     }
 
-    public void setRoomId(String roomId) {
+    public void setRoomId(Long roomId) {
         this.roomId = roomId;
     }
 
-    public String getRoomName() {
-        return roomName;
+    public String getShowDate() {
+        return showDate;
     }
 
-    public void setRoomName(String roomName) {
-        this.roomName = roomName;
+    public void setShowDate(String showDate) {
+        this.showDate = showDate;
     }
 
-    public String getStartsAt() {
-        return startsAt;
+    public String getStartTime() {
+        return startTime;
     }
 
-    public void setStartsAt(String startsAt) {
-        this.startsAt = startsAt;
+    public void setStartTime(String startTime) {
+        this.startTime = startTime;
     }
 
-    public String getEndsAt() {
-        return endsAt;
+    public String getEndTime() {
+        return endTime;
     }
 
-    public void setEndsAt(String endsAt) {
-        this.endsAt = endsAt;
+    public void setEndTime(String endTime) {
+        this.endTime = endTime;
     }
 
-    public String getFormat() {
-        return format;
-    }
-
-    public void setFormat(String format) {
-        this.format = format;
-    }
-
-    public String getLanguage() {
-        return language;
-    }
-
-    public void setLanguage(String language) {
-        this.language = language;
-    }
-
-    public Long getBasePrice() {
+    public Double getBasePrice() {
         return basePrice;
     }
 
-    public void setBasePrice(Long basePrice) {
+    public void setBasePrice(Double basePrice) {
         this.basePrice = basePrice;
     }
 

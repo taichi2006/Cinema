@@ -1,12 +1,13 @@
 package com.cinema.movie.dto.response;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 
 @JsonPropertyOrder({
-        "id",
+        "reviewId",
         "movieId",
-        "authorDisplayName",
+        "userId",
         "rating",
         "comment",
         "createdAt"
@@ -14,14 +15,34 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class ReviewResponse {
 
-    private String id;
-    private String movieId;
-    private String authorDisplayName;
+    private Long reviewId;
+    private Long movieId;
+    private Long userId;
     private Integer rating;
     private String comment;
     private String createdAt;
 
+    private String id;
+    private String authorDisplayName;
+
     public ReviewResponse() {
+    }
+
+    public ReviewResponse(
+            Long reviewId,
+            Long movieId,
+            Long userId,
+            Integer rating,
+            String comment,
+            String createdAt
+    ) {
+        this.reviewId = reviewId;
+        this.id = reviewId != null ? String.valueOf(reviewId) : null;
+        this.movieId = movieId;
+        this.userId = userId;
+        this.rating = rating;
+        this.comment = comment;
+        this.createdAt = createdAt;
     }
 
     public ReviewResponse(
@@ -33,35 +54,43 @@ public class ReviewResponse {
             String createdAt
     ) {
         this.id = id;
-        this.movieId = movieId;
+        try {
+            this.reviewId = id != null ? Long.parseLong(id) : null;
+        } catch (NumberFormatException ignored) {}
+        try {
+            this.movieId = movieId != null ? Long.parseLong(movieId) : null;
+        } catch (NumberFormatException ignored) {}
         this.authorDisplayName = authorDisplayName;
         this.rating = rating;
         this.comment = comment;
         this.createdAt = createdAt;
     }
 
-    public String getId() {
-        return id;
+    public Long getReviewId() {
+        return reviewId;
     }
 
-    public void setId(String id) {
-        this.id = id;
+    public void setReviewId(Long reviewId) {
+        this.reviewId = reviewId;
+        if (this.id == null && reviewId != null) {
+            this.id = String.valueOf(reviewId);
+        }
     }
 
-    public String getMovieId() {
+    public Long getMovieId() {
         return movieId;
     }
 
-    public void setMovieId(String movieId) {
+    public void setMovieId(Long movieId) {
         this.movieId = movieId;
     }
 
-    public String getAuthorDisplayName() {
-        return authorDisplayName;
+    public Long getUserId() {
+        return userId;
     }
 
-    public void setAuthorDisplayName(String authorDisplayName) {
-        this.authorDisplayName = authorDisplayName;
+    public void setUserId(Long userId) {
+        this.userId = userId;
     }
 
     public Integer getRating() {
@@ -86,5 +115,28 @@ public class ReviewResponse {
 
     public void setCreatedAt(String createdAt) {
         this.createdAt = createdAt;
+    }
+
+    @JsonIgnore
+    public String getId() {
+        return id != null ? id : (reviewId != null ? String.valueOf(reviewId) : null);
+    }
+
+    public void setId(String id) {
+        this.id = id;
+        try {
+            if (this.reviewId == null && id != null) {
+                this.reviewId = Long.parseLong(id);
+            }
+        } catch (NumberFormatException ignored) {}
+    }
+
+    @JsonIgnore
+    public String getAuthorDisplayName() {
+        return authorDisplayName;
+    }
+
+    public void setAuthorDisplayName(String authorDisplayName) {
+        this.authorDisplayName = authorDisplayName;
     }
 }
