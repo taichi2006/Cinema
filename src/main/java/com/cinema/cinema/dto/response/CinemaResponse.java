@@ -4,84 +4,60 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 
 @JsonPropertyOrder({
-        "id",
-        "name",
-        "cityCode",
-        "cityName",
+        "cinemaId",
+        "cinemaName",
         "address",
+        "city",
         "phone",
-        "imageUrl",
-        "latitude",
-        "longitude"
+        "email",
+        "status"
 })
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class CinemaResponse {
 
-    private String id;
-    private String name;
-    private String cityCode;
-    private String cityName;
+    private Long cinemaId;
+    private String cinemaName;
     private String address;
+    private String city;
     private String phone;
-    private String imageUrl;
-    private Double latitude;
-    private Double longitude;
+    private String email;
+    private String status;
 
     public CinemaResponse() {
     }
 
     public CinemaResponse(
-            String id,
-            String name,
-            String cityCode,
-            String cityName,
+            Long cinemaId,
+            String cinemaName,
             String address,
+            String city,
             String phone,
-            String imageUrl,
-            Double latitude,
-            Double longitude
+            String email,
+            String status
     ) {
-        this.id = id;
-        this.name = name;
-        this.cityCode = cityCode;
-        this.cityName = cityName;
+        this.cinemaId = cinemaId;
+        this.cinemaName = cinemaName;
         this.address = address;
+        this.city = city;
         this.phone = phone;
-        this.imageUrl = imageUrl;
-        this.latitude = latitude;
-        this.longitude = longitude;
+        this.email = email;
+        this.status = status;
     }
 
-    public String getId() {
-        return id;
+    public Long getCinemaId() {
+        return cinemaId;
     }
 
-    public void setId(String id) {
-        this.id = id;
+    public void setCinemaId(Long cinemaId) {
+        this.cinemaId = cinemaId;
     }
 
-    public String getName() {
-        return name;
+    public String getCinemaName() {
+        return cinemaName;
     }
 
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public String getCityCode() {
-        return cityCode;
-    }
-
-    public void setCityCode(String cityCode) {
-        this.cityCode = cityCode;
-    }
-
-    public String getCityName() {
-        return cityName;
-    }
-
-    public void setCityName(String cityName) {
-        this.cityName = cityName;
+    public void setCinemaName(String cinemaName) {
+        this.cinemaName = cinemaName;
     }
 
     public String getAddress() {
@@ -92,6 +68,14 @@ public class CinemaResponse {
         this.address = address;
     }
 
+    public String getCity() {
+        return city;
+    }
+
+    public void setCity(String city) {
+        this.city = city;
+    }
+
     public String getPhone() {
         return phone;
     }
@@ -100,27 +84,19 @@ public class CinemaResponse {
         this.phone = phone;
     }
 
-    public String getImageUrl() {
-        return imageUrl;
+    public String getEmail() {
+        return email;
     }
 
-    public void setImageUrl(String imageUrl) {
-        this.imageUrl = imageUrl;
+    public void setEmail(String email) {
+        this.email = email;
     }
 
-    public Double getLatitude() {
-        return latitude;
+    public String getStatus() {
+        return status;
     }
 
-    public void setLatitude(Double latitude) {
-        this.latitude = latitude;
-    }
-
-    public Double getLongitude() {
-        return longitude;
-    }
-
-    public void setLongitude(Double longitude) {
-        this.longitude = longitude;
+    public void setStatus(String status) {
+        this.status = status;
     }
 }

@@ -44,9 +44,9 @@ public class HomeService {
 
         // 3. Rạp nổi bật (gọi từ CinemaService)
         Map<String, Object> cinemaResult = cinemaService.getCinemas(
-                new CinemaRequest(null, null, 0, DEFAULT_LIMIT, "name,asc")
+                new CinemaRequest(null, "ACTIVE", 0, DEFAULT_LIMIT)
         );
-        Object featuredCinemas = cinemaResult.getOrDefault("data", Collections.emptyList());
+        Object featuredCinemas = extractCinemaItems(cinemaResult);
 
         // 4. Thể loại phim (gọi từ MovieService)
         List<Genre> rawGenres = movieService.getGenres();
@@ -87,6 +87,17 @@ public class HomeService {
     }
 
     private Object extractMovieItems(Map<String, Object> result) {
+        if (result == null) {
+            return Collections.emptyList();
+        }
+        Object data = result.get("data");
+        if (data instanceof Map<?, ?> dataMap && dataMap.containsKey("items")) {
+            return dataMap.get("items");
+        }
+        return data != null ? data : Collections.emptyList();
+    }
+
+    private Object extractCinemaItems(Map<String, Object> result) {
         if (result == null) {
             return Collections.emptyList();
         }

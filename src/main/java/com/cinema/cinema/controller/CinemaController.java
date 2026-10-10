@@ -14,7 +14,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Map;
 
-@WebServlet(urlPatterns = {"/cinema", "/cinema/*"})
+@WebServlet(urlPatterns = {"/cinemas", "/cinemas/*", "/cinema", "/cinema/*"})
 public class CinemaController extends HttpServlet {
 
     private final CinemaService cinemaService = new CinemaService();
@@ -39,7 +39,7 @@ public class CinemaController extends HttpServlet {
                     .toArray(String[]::new);
 
             if (segments.length == 1) {
-                // GET /cinema/{id}
+                // GET /cinemas/{id}
                 handleGetCinemaDetail(request, response, segments[0]);
             } else if (segments.length == 2) {
                 String id = segments[0];
@@ -59,8 +59,7 @@ public class CinemaController extends HttpServlet {
 
     private void handleGetCinemas(HttpServletRequest request, HttpServletResponse response) throws Exception {
         String city = request.getParameter("city");
-        String q = request.getParameter("q");
-        String sort = request.getParameter("sort");
+        String status = request.getParameter("status");
         String pageStr = request.getParameter("page");
         String sizeStr = request.getParameter("size");
 
@@ -82,7 +81,7 @@ public class CinemaController extends HttpServlet {
             }
         }
 
-        CinemaRequest cinemaRequest = new CinemaRequest(city, q, page, size, sort);
+        CinemaRequest cinemaRequest = new CinemaRequest(city, status, page, size);
         Map<String, Object> result = cinemaService.getCinemas(cinemaRequest);
 
         response.setStatus(HttpServletResponse.SC_OK);
@@ -98,28 +97,8 @@ public class CinemaController extends HttpServlet {
     private void handleGetCinemaShowtimes(HttpServletRequest request, HttpServletResponse response, String id) throws Exception {
         String date = request.getParameter("date");
         String movieId = request.getParameter("movieId");
-        String pageStr = request.getParameter("page");
-        String sizeStr = request.getParameter("size");
 
-        int page = 0;
-        if (pageStr != null && !pageStr.trim().isEmpty()) {
-            try {
-                page = Integer.parseInt(pageStr.trim());
-            } catch (NumberFormatException exception) {
-                throw ApiException.badRequest("Tham số 'page' phải là một số nguyên hợp lệ.");
-            }
-        }
-
-        int size = 20;
-        if (sizeStr != null && !sizeStr.trim().isEmpty()) {
-            try {
-                size = Integer.parseInt(sizeStr.trim());
-            } catch (NumberFormatException exception) {
-                throw ApiException.badRequest("Tham số 'size' phải là một số nguyên hợp lệ.");
-            }
-        }
-
-        Map<String, Object> result = cinemaService.getCinemaShowtimes(id, date, movieId, page, size);
+        Map<String, Object> result = cinemaService.getCinemaShowtimes(id, date, movieId);
         response.setStatus(HttpServletResponse.SC_OK);
         objectMapper.writeValue(response.getWriter(), result);
     }

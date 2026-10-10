@@ -4,15 +4,14 @@ import com.cinema.cinema.dao.CinemaDAO;
 import com.cinema.cinema.dao.CinemaDAO.CityItem;
 import com.cinema.cinema.dto.request.CinemaRequest;
 import com.cinema.cinema.dto.response.CinemaResponse;
-import com.cinema.cinema.dto.response.CinemaShowtimeResponse;
 import com.cinema.cinema.entity.Cinema;
 import com.cinema.common.dto.CommonDTO.PageMeta;
 import com.cinema.common.exception.ApiException;
+import com.cinema.movie.dto.response.ShowtimeResponse;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -20,7 +19,7 @@ import java.util.Set;
 
 public class CinemaService {
 
-    private static final Set<String> ALLOWED_SORTS = Set.of("name,asc", "name,desc");
+    private static final Set<String> ALLOWED_STATUSES = Set.of("ACTIVE", "INACTIVE", "MAINTENANCE");
 
     private final CinemaDAO cinemaDAO;
 
@@ -44,24 +43,25 @@ public class CinemaService {
         List<CinemaResponse> cinemaResponses = new ArrayList<>();
         for (Cinema cinema : cinemas) {
             CinemaResponse response = new CinemaResponse(
-                    String.valueOf(cinema.getCinemaId()),
+                    cinema.getCinemaId(),
                     cinema.getCinemaName(),
-                    cinema.getCityCode(),
-                    cinema.getCityName(),
                     cinema.getAddress(),
+                    cinema.getCity(),
                     cinema.getPhone(),
-                    cinema.getImageUrl(),
-                    cinema.getLatitude(),
-                    cinema.getLongitude()
+                    cinema.getEmail(),
+                    cinema.getStatus()
             );
             cinemaResponses.add(response);
         }
 
         PageMeta meta = new PageMeta(request.getPage(), request.getSize(), totalElements, totalPages);
+        Map<String, Object> pageData = new LinkedHashMap<>();
+        pageData.put("items", cinemaResponses);
+        pageData.put("meta", meta);
+
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("success", true);
-        result.put("data", cinemaResponses);
-        result.put("meta", meta);
+        result.put("data", pageData);
         return result;
     }
 
@@ -69,43 +69,40 @@ public class CinemaService {
         Long cinemaId = parseAndValidateCinemaId(idStr);
         Cinema cinema = cinemaDAO.findById(cinemaId)
                 .filter(c -> "ACTIVE".equalsIgnoreCase(c.getStatus()))
-                .orElseThrow(() -> ApiException.notFound("Không tìm thấy rạp"));
+                .orElseThrow(() -> ApiException.notFound("Khong tim thay rap"));
 
         CinemaResponse response = new CinemaResponse(
-                String.valueOf(cinema.getCinemaId()),
+                cinema.getCinemaId(),
                 cinema.getCinemaName(),
-                cinema.getCityCode(),
-                cinema.getCityName(),
                 cinema.getAddress(),
+                cinema.getCity(),
                 cinema.getPhone(),
-                cinema.getImageUrl(),
-                cinema.getLatitude(),
-                cinema.getLongitude()
+                cinema.getEmail(),
+                cinema.getStatus()
         );
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("success", true);
         result.put("data", response);
-        result.put("meta", Collections.emptyMap());
         return result;
     }
 
-    public Map<String, Object> getCinemaShowtimes(String idStr, String dateStr, String movieIdStr, int page, int size) {
+    public Map<String, Object> getCinemaShowtimes(String idStr, String dateStr, String movieIdStr) {
         Long cinemaId = parseAndValidateCinemaId(idStr);
 
         cinemaDAO.findById(cinemaId)
                 .filter(c -> "ACTIVE".equalsIgnoreCase(c.getStatus()))
-                .orElseThrow(() -> ApiException.notFound("Không tìm thấy rạp"));
+                .orElseThrow(() -> ApiException.notFound("Khong tim thay rap"));
 
         if (dateStr == null || dateStr.trim().isEmpty()) {
-            throw ApiException.badRequest("Tham số 'date' là bắt buộc (định dạng YYYY-MM-DD).");
+            throw ApiException.badRequest("Tham so date la bat buoc");
         }
 
         LocalDate date;
         try {
             date = LocalDate.parse(dateStr.trim());
         } catch (DateTimeParseException e) {
-            throw ApiException.badRequest("Tham số 'date' không hợp lệ hoặc sai định dạng YYYY-MM-DD: " + dateStr);
+            throw ApiException.badRequest("Định dạng ngày 'date' không hợp lệ (yêu cầu: YYYY-MM-DD): " + dateStr);
         }
 
         Long movieId = null;
@@ -113,69 +110,51 @@ public class CinemaService {
             try {
                 movieId = Long.parseLong(movieIdStr.trim());
                 if (movieId <= 0) {
-                    throw ApiException.badRequest("Tham số 'movieId' phải là số nguyên dương.");
+                    throw ApiException.badRequest("Mã phim 'movieId' phải là số nguyên dương.");
                 }
             } catch (NumberFormatException e) {
-                throw ApiException.badRequest("Tham số 'movieId' không hợp lệ: " + movieIdStr);
+                throw ApiException.badRequest("Mã phim 'movieId' không hợp lệ: " + movieIdStr);
             }
         }
 
-        if (page < 0) {
-            throw ApiException.badRequest("Số trang 'page' phải lớn hơn hoặc bằng 0.");
-        }
+        List<ShowtimeResponse> showtimes = cinemaDAO.findShowtimes(cinemaId, date, movieId);
 
-        if (size < 1 || size > 50) {
-            throw ApiException.badRequest("Kích thước trang 'size' phải nằm trong khoảng từ 1 đến 50.");
-        }
-
-        long offset = (long) page * size;
-        if (offset > Integer.MAX_VALUE || offset < 0) {
-            throw ApiException.badRequest("Vị trí phân trang vượt quá giới hạn cho phép.");
-        }
-
-        List<CinemaShowtimeResponse> showtimes = cinemaDAO.findShowtimes(cinemaId, date, movieId, page, size);
-        long totalElements = cinemaDAO.countShowtimes(cinemaId, date, movieId);
-        int totalPages = size > 0
-                ? (int) Math.ceil((double) totalElements / size)
-                : 0;
-
-        PageMeta meta = new PageMeta(page, size, totalElements, totalPages);
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("success", true);
         result.put("data", showtimes);
-        result.put("meta", meta);
         return result;
+    }
+
+    // Overload hỗ trợ code cũ nếu có
+    public Map<String, Object> getCinemaShowtimes(String idStr, String dateStr, String movieIdStr, int page, int size) {
+        return getCinemaShowtimes(idStr, dateStr, movieIdStr);
     }
 
     private Long parseAndValidateCinemaId(String idStr) {
         if (idStr == null || idStr.trim().isEmpty()) {
-            throw ApiException.badRequest("Mã rạp 'id' không được để trống.");
+            throw ApiException.badRequest("Mã rạp 'cinemaId' không được để trống.");
         }
         try {
             long id = Long.parseLong(idStr.trim());
             if (id <= 0) {
-                throw ApiException.badRequest("Mã rạp 'id' phải là số nguyên dương.");
+                throw ApiException.badRequest("Mã rạp 'cinemaId' phải là số nguyên dương.");
             }
             return id;
         } catch (NumberFormatException e) {
-            throw ApiException.badRequest("Mã rạp 'id' không hợp lệ: " + idStr);
+            throw ApiException.badRequest("Mã rạp 'cinemaId' không hợp lệ: " + idStr);
         }
     }
 
     private void validateRequest(CinemaRequest request) {
-        if (request.getQ() != null && request.getQ().trim().length() > 100) {
-            throw ApiException.badRequest("Từ khóa tìm kiếm 'q' không được vượt quá 100 ký tự.");
-        }
-
-        if (request.getSort() != null && !request.getSort().trim().isEmpty()) {
-            if (!ALLOWED_SORTS.contains(request.getSort().trim())) {
+        if (request.getStatus() != null && !request.getStatus().trim().isEmpty()) {
+            String upperStatus = request.getStatus().trim().toUpperCase();
+            if (!ALLOWED_STATUSES.contains(upperStatus)) {
                 throw ApiException.badRequest(
-                        "Tham số 'sort' không hợp lệ: " + request.getSort() +
-                                ". Các giá trị hợp lệ: [name,asc, name,desc]"
+                        "Trạng thái rạp 'status' không hợp lệ: " + request.getStatus() +
+                                ". Các giá trị hợp lệ: " + ALLOWED_STATUSES
                 );
             }
-        } else {
-            request.setSort("name,asc");
+            request.setStatus(upperStatus);
         }
 
         if (request.getPage() < 0) {
@@ -192,7 +171,7 @@ public class CinemaService {
         }
     }
 
-    public List<CinemaDAO.CityItem> getCities() {
+    public List<CityItem> getCities() {
         return cinemaDAO.findDistinctCities();
     }
 }

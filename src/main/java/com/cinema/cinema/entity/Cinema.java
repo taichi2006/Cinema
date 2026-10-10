@@ -16,29 +16,20 @@ public class Cinema {
     @Column(name = "cinema_id")
     private Long cinemaId;
 
-    @Column(name = "cinema_name", nullable = false, length = 150)
+    @Column(name = "cinema_name", nullable = false, length = 255)
     private String cinemaName;
 
-    @Column(name = "address", nullable = false, length = 300)
+    @Column(name = "address", columnDefinition = "text")
     private String address;
 
-    @Column(name = "city_code", nullable = false, length = 30)
-    private String cityCode;
+    @Column(name = "city", length = 100)
+    private String city;
 
-    @Column(name = "city_name", nullable = false, length = 100)
-    private String cityName;
-
-    @Column(name = "phone", length = 30)
+    @Column(name = "phone", length = 20)
     private String phone;
 
-    @Column(name = "image_url", columnDefinition = "text")
-    private String imageUrl;
-
-    @Column(name = "latitude")
-    private Double latitude;
-
-    @Column(name = "longitude")
-    private Double longitude;
+    @Column(name = "email", length = 255)
+    private String email;
 
     @Column(name = "status", nullable = false, length = 20)
     private String status = "ACTIVE";
@@ -50,23 +41,17 @@ public class Cinema {
             Long cinemaId,
             String cinemaName,
             String address,
-            String cityCode,
-            String cityName,
+            String city,
             String phone,
-            String imageUrl,
-            Double latitude,
-            Double longitude,
+            String email,
             String status
     ) {
         this.cinemaId = cinemaId;
         this.cinemaName = cinemaName;
         this.address = address;
-        this.cityCode = cityCode;
-        this.cityName = cityName;
+        this.city = city;
         this.phone = phone;
-        this.imageUrl = imageUrl;
-        this.latitude = latitude;
-        this.longitude = longitude;
+        this.email = email;
         this.status = status;
     }
 
@@ -94,20 +79,12 @@ public class Cinema {
         this.address = address;
     }
 
-    public String getCityCode() {
-        return cityCode;
+    public String getCity() {
+        return city;
     }
 
-    public void setCityCode(String cityCode) {
-        this.cityCode = cityCode;
-    }
-
-    public String getCityName() {
-        return cityName;
-    }
-
-    public void setCityName(String cityName) {
-        this.cityName = cityName;
+    public void setCity(String city) {
+        this.city = city;
     }
 
     public String getPhone() {
@@ -118,28 +95,12 @@ public class Cinema {
         this.phone = phone;
     }
 
-    public String getImageUrl() {
-        return imageUrl;
+    public String getEmail() {
+        return email;
     }
 
-    public void setImageUrl(String imageUrl) {
-        this.imageUrl = imageUrl;
-    }
-
-    public Double getLatitude() {
-        return latitude;
-    }
-
-    public void setLatitude(Double latitude) {
-        this.latitude = latitude;
-    }
-
-    public Double getLongitude() {
-        return longitude;
-    }
-
-    public void setLongitude(Double longitude) {
-        this.longitude = longitude;
+    public void setEmail(String email) {
+        this.email = email;
     }
 
     public String getStatus() {
