@@ -8,8 +8,4 @@ public record LoginResponse(
         UserInfo user
 ) {
     public record UserInfo(long userId, String email) {}
-
-    public LoginResponse(String accessToken, String refreshToken, long expiresIn, UserInfo user) {
-        this(accessToken, refreshToken, "Bearer", expiresIn, user);
-    }
 }

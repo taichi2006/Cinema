@@ -3,7 +3,6 @@ package com.cinema.common.filter;
 import com.cinema.auth.AuthException;
 import com.cinema.auth.JwtUtil;
 import com.cinema.common.exception.ApiException;
-import com.cinema.common.exception.ErrorHandler;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.*;
@@ -11,6 +10,7 @@ import jakarta.servlet.annotation.WebFilter;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
+import jakarta.servlet.ServletException;
 import java.io.IOException;
 
 @WebFilter(urlPatterns = {
@@ -52,9 +52,9 @@ public class AuthFilter implements Filter {
             chain.doFilter(request, response);
 
         } catch (JwtException | IllegalArgumentException e) {
-            ErrorHandler.handle(resp, AuthException.invalidToken());
+            throw new ServletException(AuthException.invalidToken());
         } catch (Exception ex) {
-            ErrorHandler.handle(resp, ex);
+            throw new ServletException(ex);
         }
     }
 }

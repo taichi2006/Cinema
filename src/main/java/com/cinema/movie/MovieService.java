@@ -1,7 +1,8 @@
 package com.cinema.movie;
 
-import com.cinema.common.dto.CommonDTO.ApiResponse;
-import com.cinema.common.dto.CommonDTO.PageMeta;
+import com.cinema.common.dto.ApiResponse;
+import com.cinema.common.dto.PageMeta;
+import com.cinema.common.dto.PageResponse;
 import com.cinema.common.exception.ApiException;
 import com.cinema.movie.DTO.Request.MovieRequest;
 import com.cinema.movie.DTO.Response.MovieResponse;
@@ -9,12 +10,9 @@ import com.cinema.movie.DTO.Response.ReviewResponse;
 import com.cinema.movie.DTO.Response.ShowtimeResponse;
 
 import java.time.LocalDate;
-import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 public class MovieService {
@@ -39,8 +37,7 @@ public class MovieService {
         this.movieDAO = movieDAO;
     }
 
-    public ApiResponse<MovieResponse> getMovieById(String idStr) {
-        Long movieId = parseAndValidateMovieId(idStr);
+    public ApiResponse<MovieResponse> getMovieById(long movieId) {
         Movie movie = movieDAO.findById(movieId)
                 .orElseThrow(() -> ApiException.notFound("Không tìm thấy phim"));
 
@@ -74,39 +71,15 @@ public class MovieService {
         return ApiResponse.ok(response);
     }
 
-    public Map<String, Object> getMovieShowtimes(
-            String idStr,
-            String dateStr,
-            String cinemaIdStr,
+    public PageResponse<ShowtimeResponse> getMovieShowtimes(
+            long movieId,
+            LocalDate date,
+            Long cinemaId,
             int page,
             int size
     ) {
-        Long movieId = parseAndValidateMovieId(idStr);
         movieDAO.findById(movieId)
                 .orElseThrow(() -> ApiException.notFound("Không tìm thấy phim"));
-
-        if (dateStr == null || dateStr.trim().isEmpty()) {
-            throw ApiException.badRequest("Thiếu tham số bắt buộc: date");
-        }
-
-        LocalDate date;
-        try {
-            date = LocalDate.parse(dateStr.trim());
-        } catch (DateTimeParseException e) {
-            throw ApiException.badRequest("Định dạng ngày 'date' không hợp lệ (yêu cầu: YYYY-MM-DD): " + dateStr);
-        }
-
-        Long cinemaId = null;
-        if (cinemaIdStr != null && !cinemaIdStr.trim().isEmpty()) {
-            try {
-                cinemaId = Long.parseLong(cinemaIdStr.trim());
-                if (cinemaId <= 0) {
-                    throw ApiException.badRequest("Mã rạp 'cinemaId' phải là số nguyên dương.");
-                }
-            } catch (NumberFormatException e) {
-                throw ApiException.badRequest("Mã rạp 'cinemaId' không hợp lệ: " + cinemaIdStr);
-            }
-        }
 
         if (page < 0) {
             throw ApiException.badRequest("Số trang 'page' phải lớn hơn hoặc bằng 0.");
@@ -117,18 +90,12 @@ public class MovieService {
 
         List<ShowtimeResponse> showtimes = movieDAO.findShowtimes(movieId, date, cinemaId, page, size);
         long totalElements = movieDAO.countShowtimes(movieId, date, cinemaId);
-        int totalPages = size > 0 ? (int) Math.ceil((double) totalElements / size) : 0;
 
-        PageMeta meta = new PageMeta(page, size, totalElements, totalPages);
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("success", true);
-        result.put("data", showtimes);
-        result.put("meta", meta);
-        return result;
+        PageMeta meta = new PageMeta(page, size, totalElements);
+        return PageResponse.of(showtimes, meta);
     }
 
-    public Map<String, Object> getMovieReviews(String idStr, String sort, int page, int size) {
-        Long movieId = parseAndValidateMovieId(idStr);
+    public PageResponse<ReviewResponse> getMovieReviews(long movieId, String sort, int page, int size) {
         movieDAO.findById(movieId)
                 .orElseThrow(() -> ApiException.notFound("Không tìm thấy phim"));
 
@@ -152,43 +119,16 @@ public class MovieService {
 
         List<ReviewResponse> reviews = movieDAO.findReviews(movieId, sort.trim(), page, size);
         long totalElements = movieDAO.countReviews(movieId);
-        int totalPages = size > 0 ? (int) Math.ceil((double) totalElements / size) : 0;
 
-        PageMeta meta = new PageMeta(page, size, totalElements, totalPages);
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("success", true);
-        result.put("data", reviews);
-        result.put("meta", meta);
-        return result;
+        PageMeta meta = new PageMeta(page, size, totalElements);
+        return PageResponse.of(reviews, meta);
     }
 
-    public Map<String, Object> getMovieReviews(String idStr) {
-        return getMovieReviews(idStr, "createdAt,desc", 0, 20);
-    }
-
-    private Long parseAndValidateMovieId(String idStr) {
-        if (idStr == null || idStr.trim().isEmpty()) {
-            throw ApiException.badRequest("Mã phim 'id' không được để trống.");
-        }
-        try {
-            long id = Long.parseLong(idStr.trim());
-            if (id <= 0) {
-                throw ApiException.badRequest("Mã phim 'id' phải là số nguyên dương.");
-            }
-            return id;
-        } catch (NumberFormatException e) {
-            throw ApiException.badRequest("Mã phim 'id' không hợp lệ: " + idStr);
-        }
-    }
-
-    public Map<String, Object> getMovies(MovieRequest request) {
+    public PageResponse<MovieResponse> getMovies(MovieRequest request) {
         validateRequest(request);
 
         List<Movie> movies = movieDAO.findMovies(request);
         long totalElements = movieDAO.countMovies(request);
-        int totalPages = request.getSize() > 0
-                ? (int) Math.ceil((double) totalElements / request.getSize())
-                : 0;
 
         List<MovieResponse> movieResponses = new ArrayList<>();
         for (Movie movie : movies) {
@@ -220,12 +160,8 @@ public class MovieService {
             movieResponses.add(response);
         }
 
-        PageMeta meta = new PageMeta(request.getPage(), request.getSize(), totalElements, totalPages);
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("success", true);
-        result.put("data", movieResponses);
-        result.put("meta", meta);
-        return result;
+        PageMeta meta = new PageMeta(request.getPage(), request.getSize(), totalElements);
+        return PageResponse.of(movieResponses, meta);
     }
 
     private void validateRequest(MovieRequest request) {

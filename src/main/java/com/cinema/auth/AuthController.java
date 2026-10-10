@@ -1,13 +1,13 @@
 package com.cinema.auth;
 
-import com.cinema.common.dto.CommonDTO.ApiResponse;
+import com.cinema.common.dto.ApiResponse;
 import com.cinema.common.exception.ApiException;
-import com.cinema.common.exception.ErrorHandler;
+import com.cinema.common.web.BaseServlet;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.jsonwebtoken.Claims;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.*;
 
+import jakarta.servlet.ServletException;
 import java.io.IOException;
 
 import com.cinema.auth.dto.request.ChangePasswordRequest;
@@ -23,7 +23,7 @@ import com.cinema.auth.dto.response.RefreshResponse;
         "/api/auth", "/api/auth/*",
         "/api/v1/auth", "/api/v1/auth/*"
 })
-public class AuthController extends HttpServlet {
+public class AuthController extends BaseServlet {
 
     private final AuthService  service = new AuthService();
     private final ObjectMapper json    = new ObjectMapper();
@@ -31,40 +31,31 @@ public class AuthController extends HttpServlet {
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         resp.setContentType("application/json;charset=UTF-8");
-        String action = req.getPathInfo();
-        if (action == null || action.isBlank() || "/".equals(action)) {
-            String fullPath = req.getRequestURI().substring(req.getContextPath().length());
-            action = fullPath.replaceAll("^/(api/v1|api)?/auth", "");
-        }
-        if (action.endsWith("/") && action.length() > 1) {
-            action = action.substring(0, action.length() - 1);
+        String[] segments = getPathSegments(req);
+        String action = segments.length > 0 ? segments[0] : "";
+
+        switch (action) {
+            case "register"        -> doRegister(req, resp);
+            case "login"           -> doLogin(req, resp);
+            case "logout"          -> doLogout(req, resp);
+            case "refresh"         -> doRefresh(req, resp);
+            case "change-password" -> doChangePassword(req, resp);
+            default -> throw ApiException.notFound("Endpoint không tồn tại");
         }
 
-        try {
-            switch (action) {
-                case "/register"        -> doRegister(req, resp);
-                case "/login"           -> doLogin(req, resp);
-                case "/logout"          -> doLogout(req, resp);
-                case "/refresh"         -> doRefresh(req, resp);
-                case "/change-password" -> doChangePassword(req, resp);
-                default -> throw ApiException.notFound("Endpoint không tồn tại");
-            }
-        } catch (Exception ex) {
-            ErrorHandler.handle(resp, ex);
-        }
     }
 
-    // ── Handlers ──────────────────────────────────────────────────────────────
+    // ------------------- Handlers -------------------
 
-    private void doRegister(HttpServletRequest req, HttpServletResponse resp) throws Exception {
-        var body = json.readValue(req.getInputStream(), RegisterRequest.class);
+    private void doRegister(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        var body = parseBody(req, RegisterRequest.class);
         AuthUserResponse user = service.register(body);
         resp.setStatus(HttpServletResponse.SC_CREATED); // 201
         write(resp, ApiResponse.ok(user));
     }
 
-    private void doLogin(HttpServletRequest req, HttpServletResponse resp) throws Exception {
-        var body = json.readValue(req.getInputStream(), LoginRequest.class);
+    private void doLogin(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        var body = parseBody(req, LoginRequest.class);
         String userAgent = req.getHeader("User-Agent");
         String ipAddress = getClientIp(req);
 
@@ -75,16 +66,13 @@ public class AuthController extends HttpServlet {
         write(resp, ApiResponse.ok(result));
     }
 
-    private void doLogout(HttpServletRequest req, HttpServletResponse resp) throws Exception {
-        Long userId = getAuthenticatedUserId(req);
-        if (userId == null) {
-            throw AuthException.unauthorized();
-        }
+    private void doLogout(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        long userId = getAuthenticatedUserId(req);
 
         String refreshToken = JwtUtil.readCookie(req, JwtUtil.COOKIE_REFRESH);
         if ((refreshToken == null || refreshToken.isBlank()) && req.getContentLengthLong() > 0) {
             try {
-                var body = json.readValue(req.getInputStream(), RefreshRequest.class);
+                var body = parseBody(req, RefreshRequest.class);
                 refreshToken = body.refreshToken();
             } catch (Exception ignored) {}
         }
@@ -96,11 +84,11 @@ public class AuthController extends HttpServlet {
         write(resp, ApiResponse.ok(null));
     }
 
-    private void doRefresh(HttpServletRequest req, HttpServletResponse resp) throws Exception {
+    private void doRefresh(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         String refreshToken = null;
         if (req.getContentLengthLong() > 0) {
             try {
-                var body = json.readValue(req.getInputStream(), RefreshRequest.class);
+                var body = parseBody(req, RefreshRequest.class);
                 if (body != null) {
                     refreshToken = body.refreshToken();
                 }
@@ -125,41 +113,16 @@ public class AuthController extends HttpServlet {
         write(resp, ApiResponse.ok(result));
     }
 
-    private void doChangePassword(HttpServletRequest req, HttpServletResponse resp) throws Exception {
-        Long userId = getAuthenticatedUserId(req);
-        if (userId == null) {
-            throw AuthException.unauthorized();
-        }
+    private void doChangePassword(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        long userId = getAuthenticatedUserId(req);
 
-        var body = json.readValue(req.getInputStream(), ChangePasswordRequest.class);
+        var body = parseBody(req, ChangePasswordRequest.class);
         service.changePassword(userId, body);
         write(resp, ApiResponse.ok(null));
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
+    // ------------------- Helpers -------------------
 
-    private Long getAuthenticatedUserId(HttpServletRequest req) {
-        Object userIdAttr = req.getAttribute("userId");
-        if (userIdAttr instanceof Number num) {
-            return num.longValue();
-        }
-
-        String token = null;
-        String authHeader = req.getHeader("Authorization");
-        if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            token = authHeader.substring(7);
-        }
-        if (token == null || token.isBlank()) {
-            token = JwtUtil.readCookie(req, JwtUtil.COOKIE_ACCESS);
-        }
-        if (token != null && !token.isBlank()) {
-            try {
-                Claims claims = JwtUtil.parseAccessToken(token);
-                return Long.parseLong(claims.getSubject());
-            } catch (Exception ignored) {}
-        }
-        return null;
-    }
 
     private String getClientIp(HttpServletRequest req) {
         String header = req.getHeader("X-Forwarded-For");
@@ -170,6 +133,6 @@ public class AuthController extends HttpServlet {
     }
 
     private void write(HttpServletResponse resp, Object body) throws IOException {
-        json.writeValue(resp.getWriter(), body);
+        sendJson(resp, body);
     }
 }

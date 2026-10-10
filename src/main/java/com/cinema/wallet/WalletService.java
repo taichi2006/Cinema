@@ -1,6 +1,6 @@
 package com.cinema.wallet;
 
-import com.cinema.common.dto.CommonDTO.PageMeta;
+import com.cinema.common.dto.PageMeta;
 import com.cinema.common.exception.ApiException;
 import com.cinema.common.util.JPAUtil;
 import com.cinema.user.entity.User;
@@ -19,9 +19,9 @@ import java.util.List;
 /**
  * Service xử lý toàn bộ nghiệp vụ của module Wallet:
  * - Xem số dư ví 
- * - Nạp tiền vào ví tự động thành công 
- * - Theo dõi kết quả nạp tiền 
- * - Xem lịch sử bút toán ví đã hoàn tất 
+ * - NÃ¡ÂºÂ¡p tiÃ¡Â»Ân vÃƒÂ o ví tự Ã„â€˜Ã¡Â»â„¢ng thành công 
+ * - Theo dõi kết quả nạp tiÃ¡Â»Ân 
+ * - Xem lÃ¡Â»â€¹ch sÃ¡Â»Â­ bÃƒÂºt toÃƒÂ¡n ví Ã„â€˜ÃƒÂ£ hoÃƒÂ n tÃ¡ÂºÂ¥t 
  */
 public class WalletService {
 
@@ -29,7 +29,7 @@ public class WalletService {
     private final WalletTransactionDAO txDAO = new WalletTransactionDAO();
 
     /**
-     * Lấy ví của user, nếu chưa có (user cũ tạo trước khi có module ví) thì tự động tạo mới ví rỗng.
+     * LÃ¡ÂºÂ¥y ví cÃ¡Â»Â§a user, nếu chÃ†Â°a cÃƒÂ³ (user cÃ…Â© tÃ¡ÂºÂ¡o trÃ†Â°Ã¡Â»â€ºc khi cÃƒÂ³ module ví) thÃƒÂ¬ tự Ã„â€˜Ã¡Â»â„¢ng tÃ¡ÂºÂ¡o mÃ¡Â»â€ºi ví rÃ¡Â»â€”ng.
      */
     public Wallet getOrCreateWallet(long userId) {
         return walletDAO.findByUserId(userId).orElseGet(() -> {
@@ -38,7 +38,7 @@ public class WalletService {
                 em.getTransaction().begin();
                 User user = em.find(User.class, userId);
                 if (user == null) {
-                    throw ApiException.notFound("Không tìm thấy người dùng với ID: " + userId);
+                    throw ApiException.notFound("Không tìm thấy ngÃ†Â°Ã¡Â»Âi dùng vÃ¡Â»â€ºi ID: " + userId);
                 }
                 Wallet wallet = new Wallet(user);
                 wallet.setBalance(0L);
@@ -50,7 +50,7 @@ public class WalletService {
                 if (em.getTransaction().isActive()) {
                     em.getTransaction().rollback();
                 }
-                throw ApiException.internal("Lỗi khởi tạo ví người dùng: " + e.getMessage());
+                throw ApiException.internal("Lỗi khÃ¡Â»Å¸i tÃ¡ÂºÂ¡o ví ngÃ†Â°Ã¡Â»Âi dùng: " + e.getMessage());
             } finally {
                 em.close();
             }
@@ -58,7 +58,7 @@ public class WalletService {
     }
 
     /**
-     * 1. GET /wallet: Lấy thông tin ví và số dư của người dùng hiện tại
+     * 1. GET /wallet: LÃ¡ÂºÂ¥y thÃƒÂ´ng tin ví vÃƒÂ  số dư cÃ¡Â»Â§a ngÃ†Â°Ã¡Â»Âi dùng hiÃ¡Â»â€¡n tÃ¡ÂºÂ¡i
      */
     public WalletResponse getMyWallet(long userId) {
         Wallet wallet = getOrCreateWallet(userId);
@@ -70,16 +70,16 @@ public class WalletService {
     }
 
     /**
-     * 2. POST /wallet/top-up: Nạp tiền vào ví (tự động nạp thành công ngay lập tức và ghi nhận giao dịch)
+     * 2. POST /wallet/top-up: NÃ¡ÂºÂ¡p tiÃ¡Â»Ân vÃƒÂ o ví (tự Ã„â€˜Ã¡Â»â„¢ng nạp thành công ngay lÃ¡ÂºÂ­p tÃ¡Â»Â©c vÃƒÂ  ghi nhận giao dịch)
      */
     public TopUpResponse topUp(long userId, TopUpRequest req) {
 
-        // Validate số tiền nạp theo Swagger: tối thiểu 10,000 VND, tối đa 50,000,000 VND
+        // Validate số tiÃ¡Â»Ân nạp theo Swagger: tối thiểu 10,000 VND, tối đa 50,000,000 VND
         if (req == null || req.getAmount() == null) {
-            throw WalletException.invalidAmount("Số tiền nạp không được để trống");
+            throw WalletException.invalidAmount("Số tiÃ¡Â»Ân nạp khÃƒÂ´ng được để trống");
         }
         if (req.getAmount() < 10000L || req.getAmount() > 50000000L) {
-            throw WalletException.invalidAmount("Số tiền nạp tối thiểu là 10,000 VND và tối đa là 50,000,000 VND");
+            throw WalletException.invalidAmount("Số tiÃ¡Â»Ân nạp tối thiểu lÃƒÂ  10,000 VND vÃƒÂ  tối đa lÃƒÂ  50,000,000 VND");
         }
 
         EntityManager em = JPAUtil.getEntityManager();
@@ -93,7 +93,7 @@ public class WalletService {
             if (wallet == null) {
                 User user = em.find(User.class, userId);
                 if (user == null) {
-                    throw WalletException.resourceNotFound("Không tìm thấy người dùng #" + userId);
+                    throw WalletException.resourceNotFound("Không tìm thấy ngÃ†Â°Ã¡Â»Âi dùng #" + userId);
                 }
                 wallet = new Wallet(user);
                 wallet.setBalance(0L);
@@ -120,7 +120,7 @@ public class WalletService {
             tx.setType(TransactionType.ADD_MONEY);
             tx.setStatus("SUCCESSFUL");
             tx.setAmount(req.getAmount());
-            tx.setDescription("Nạp tiền vào ví thành công");
+            tx.setDescription("NÃ¡ÂºÂ¡p tiÃ¡Â»Ân vÃƒÂ o ví thành công");
             em.persist(tx);
 
             em.getTransaction().commit();
@@ -141,21 +141,21 @@ public class WalletService {
                 em.getTransaction().rollback();
             }
             if (e instanceof ApiException) throw (ApiException) e;
-            throw ApiException.internal("Lỗi nạp tiền vào ví: " + e.getMessage());
+            throw ApiException.internal("Lỗi nạp tiÃ¡Â»Ân vÃƒÂ o ví: " + e.getMessage());
         } finally {
             em.close();
         }
     }
 
     /**
-     * 3. GET /wallet/top-up/{id}: Theo dõi kết quả nạp tiền từ bảng cinema.wallet_topups
+     * 3. GET /wallet/top-up/{id}: Theo dõi kết quả nạp tiÃ¡Â»Ân từ bảng cinema.wallet_topups
      */
     public TopUpResponse getTopUpStatus(long userId, long topupId) {
         WalletTransaction tx = txDAO.findById(topupId)
-                .orElseThrow(() -> WalletException.resourceNotFound("Không tìm thấy giao dịch nạp tiền #" + topupId));
+                .orElseThrow(() -> WalletException.resourceNotFound("Không tìm thấy giao dịch nạp tiÃ¡Â»Ân #" + topupId));
 
         if (tx.getWallet().getUser().getId() != userId || tx.getType() != TransactionType.ADD_MONEY) {
-            throw WalletException.resourceNotFound("Không tìm thấy giao dịch nạp tiền #" + topupId);
+            throw WalletException.resourceNotFound("Không tìm thấy giao dịch nạp tiÃ¡Â»Ân #" + topupId);
         }
 
         Instant created = tx.getCreatedAt() != null ? tx.getCreatedAt() : Instant.now();
@@ -176,7 +176,7 @@ public class WalletService {
     }
 
     /**
-     * 4. GET /wallet/transaction: Lịch sử bút toán ví (từ bảng cinema.wallet_transactions)
+     * 4. GET /wallet/transaction: LÃ¡Â»â€¹ch sÃ¡Â»Â­ bÃƒÂºt toÃƒÂ¡n ví (từ bảng cinema.wallet_transactions)
      */
     public HistoryResult getTransactionHistory(long userId, String typeStr, String fromStr, String toStr, int page, int size) {
         Wallet wallet = getOrCreateWallet(userId);
@@ -193,7 +193,7 @@ public class WalletService {
             try {
                 from = LocalDate.parse(fromStr.trim()).atStartOfDay(ZoneOffset.UTC).toInstant();
             } catch (DateTimeParseException e) {
-                throw WalletException.invalidFilter("Định dạng ngày bắt đầu không hợp lệ (YYYY-MM-DD)", "from");
+                throw WalletException.invalidFilter("Ã„ÂÃ¡Â»â€¹nh dạng ngày bắt Ã„â€˜Ã¡ÂºÂ§u khÃƒÂ´ng hợp lệ (YYYY-MM-DD)", "from");
             }
         }
 
@@ -202,7 +202,7 @@ public class WalletService {
             try {
                 to = LocalDate.parse(toStr.trim()).plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
             } catch (DateTimeParseException e) {
-                throw WalletException.invalidFilter("Định dạng ngày kết thúc không hợp lệ (YYYY-MM-DD)", "to");
+                throw WalletException.invalidFilter("Ã„ÂÃ¡Â»â€¹nh dạng ngày kết thÃƒÂºc khÃƒÂ´ng hợp lệ (YYYY-MM-DD)", "to");
             }
         }
 
@@ -215,7 +215,6 @@ public class WalletService {
 
         List<WalletTransaction> list = txDAO.findHistory(wallet.getId(), typeStr, from, to, p, s);
         long total = txDAO.countHistory(wallet.getId(), typeStr, from, to);
-        int totalPages = (int) Math.ceil((double) total / s);
 
         List<TransactionItemResponse> items = new ArrayList<>();
         for (WalletTransaction t : list) {
@@ -231,7 +230,7 @@ public class WalletService {
             ));
         }
 
-        PageMeta meta = new PageMeta(p, s, total, totalPages);
+        PageMeta meta = new PageMeta(p, s, total);
         return new HistoryResult(items, meta);
     }
 

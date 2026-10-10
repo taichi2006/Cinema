@@ -29,6 +29,6 @@ public class AuthException extends ApiException {
     }
 
     public static AuthException invalidToken() {
-        return new AuthException("Refresh token đã hết hạn");
+        return new AuthException("Access token không hợp lệ hoặc đã hết hạn");
     }
 }

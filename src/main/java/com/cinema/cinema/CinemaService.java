@@ -3,16 +3,13 @@ package com.cinema.cinema;
 import com.cinema.cinema.DTO.Request.CinemaRequest;
 import com.cinema.cinema.DTO.Response.CinemaResponse;
 import com.cinema.cinema.DTO.Response.CinemaShowtimeResponse;
-import com.cinema.common.dto.CommonDTO.PageMeta;
+import com.cinema.common.dto.PageMeta;
+import com.cinema.common.dto.PageResponse;
 import com.cinema.common.exception.ApiException;
 
 import java.time.LocalDate;
-import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 public class CinemaService {
@@ -29,14 +26,11 @@ public class CinemaService {
         this.cinemaDAO = cinemaDAO;
     }
 
-    public Map<String, Object> getCinemas(CinemaRequest request) {
+    public PageResponse<CinemaResponse> getCinemas(CinemaRequest request) {
         validateRequest(request);
 
         List<Cinema> cinemas = cinemaDAO.findCinemas(request);
         long totalElements = cinemaDAO.countCinemas(request);
-        int totalPages = request.getSize() > 0
-                ? (int) Math.ceil((double) totalElements / request.getSize())
-                : 0;
 
         List<CinemaResponse> cinemaResponses = new ArrayList<>();
         for (Cinema cinema : cinemas) {
@@ -54,21 +48,16 @@ public class CinemaService {
             cinemaResponses.add(response);
         }
 
-        PageMeta meta = new PageMeta(request.getPage(), request.getSize(), totalElements, totalPages);
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("success", true);
-        result.put("data", cinemaResponses);
-        result.put("meta", meta);
-        return result;
+        PageMeta meta = new PageMeta(request.getPage(), request.getSize(), totalElements);
+        return PageResponse.of(cinemaResponses, meta);
     }
 
-    public Map<String, Object> getCinemaById(String idStr) {
-        Long cinemaId = parseAndValidateCinemaId(idStr);
+    public CinemaResponse getCinemaById(long cinemaId) {
         Cinema cinema = cinemaDAO.findById(cinemaId)
                 .filter(c -> "ACTIVE".equalsIgnoreCase(c.getStatus()))
                 .orElseThrow(() -> ApiException.notFound("Không tìm thấy rạp"));
 
-        CinemaResponse response = new CinemaResponse(
+        return new CinemaResponse(
                 String.valueOf(cinema.getCinemaId()),
                 cinema.getCinemaName(),
                 cinema.getCityCode(),
@@ -79,43 +68,12 @@ public class CinemaService {
                 cinema.getLatitude(),
                 cinema.getLongitude()
         );
-
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("success", true);
-        result.put("data", response);
-        result.put("meta", Collections.emptyMap());
-        return result;
     }
 
-    public Map<String, Object> getCinemaShowtimes(String idStr, String dateStr, String movieIdStr, int page, int size) {
-        Long cinemaId = parseAndValidateCinemaId(idStr);
-
+    public PageResponse<CinemaShowtimeResponse> getCinemaShowtimes(long cinemaId, LocalDate date, Long movieId, int page, int size) {
         cinemaDAO.findById(cinemaId)
                 .filter(c -> "ACTIVE".equalsIgnoreCase(c.getStatus()))
                 .orElseThrow(() -> ApiException.notFound("Không tìm thấy rạp"));
-
-        if (dateStr == null || dateStr.trim().isEmpty()) {
-            throw ApiException.badRequest("Tham số 'date' là bắt buộc (định dạng YYYY-MM-DD).");
-        }
-
-        LocalDate date;
-        try {
-            date = LocalDate.parse(dateStr.trim());
-        } catch (DateTimeParseException e) {
-            throw ApiException.badRequest("Tham số 'date' không hợp lệ hoặc sai định dạng YYYY-MM-DD: " + dateStr);
-        }
-
-        Long movieId = null;
-        if (movieIdStr != null && !movieIdStr.trim().isEmpty()) {
-            try {
-                movieId = Long.parseLong(movieIdStr.trim());
-                if (movieId <= 0) {
-                    throw ApiException.badRequest("Tham số 'movieId' phải là số nguyên dương.");
-                }
-            } catch (NumberFormatException e) {
-                throw ApiException.badRequest("Tham số 'movieId' không hợp lệ: " + movieIdStr);
-            }
-        }
 
         if (page < 0) {
             throw ApiException.badRequest("Số trang 'page' phải lớn hơn hoặc bằng 0.");
@@ -132,31 +90,9 @@ public class CinemaService {
 
         List<CinemaShowtimeResponse> showtimes = cinemaDAO.findShowtimes(cinemaId, date, movieId, page, size);
         long totalElements = cinemaDAO.countShowtimes(cinemaId, date, movieId);
-        int totalPages = size > 0
-                ? (int) Math.ceil((double) totalElements / size)
-                : 0;
 
-        PageMeta meta = new PageMeta(page, size, totalElements, totalPages);
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("success", true);
-        result.put("data", showtimes);
-        result.put("meta", meta);
-        return result;
-    }
-
-    private Long parseAndValidateCinemaId(String idStr) {
-        if (idStr == null || idStr.trim().isEmpty()) {
-            throw ApiException.badRequest("Mã rạp 'id' không được để trống.");
-        }
-        try {
-            long id = Long.parseLong(idStr.trim());
-            if (id <= 0) {
-                throw ApiException.badRequest("Mã rạp 'id' phải là số nguyên dương.");
-            }
-            return id;
-        } catch (NumberFormatException e) {
-            throw ApiException.badRequest("Mã rạp 'id' không hợp lệ: " + idStr);
-        }
+        PageMeta meta = new PageMeta(page, size, totalElements);
+        return PageResponse.of(showtimes, meta);
     }
 
     private void validateRequest(CinemaRequest request) {

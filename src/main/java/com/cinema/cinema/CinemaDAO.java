@@ -36,7 +36,7 @@ public class CinemaDAO {
             Map<String, Object> params = new HashMap<>();
 
             if (filter.getCity() != null && !filter.getCity().trim().isEmpty()) {
-                jpql.append("AND (LOWER(c.cityCode) = :city OR LOWER(c.cityName) = :city) ");
+                jpql.append("AND LOWER(c.cityCode) = :city ");
                 params.put("city", filter.getCity().trim().toLowerCase());
             }
 
@@ -73,7 +73,7 @@ public class CinemaDAO {
             Map<String, Object> params = new HashMap<>();
 
             if (filter.getCity() != null && !filter.getCity().trim().isEmpty()) {
-                jpql.append("AND (LOWER(c.cityCode) = :city OR LOWER(c.cityName) = :city) ");
+                jpql.append("AND LOWER(c.cityCode) = :city ");
                 params.put("city", filter.getCity().trim().toLowerCase());
             }
 
@@ -98,40 +98,35 @@ public class CinemaDAO {
         try {
             StringBuilder sql = new StringBuilder(
                     "SELECT " +
-                    "s.showtime_id, " +
+                    "s.show_time_id, " +
                     "s.movie_id, " +
                     "m.title, " +
                     "c.cinema_id, " +
                     "c.cinema_name, " +
                     "r.room_id, " +
                     "r.room_name, " +
-                    "s.starts_at, " +
-                    "s.ends_at, " +
-                    "s.format, " +
-                    "s.language, " +
-                    "COALESCE((SELECT MIN(ss.price) FROM cinema.showtime_seats ss WHERE ss.showtime_id = s.showtime_id AND ss.is_blocked = false), s.base_price) AS min_ticket_price, " +
+                    "(s.show_date + s.start_time) AS starts_at, " +
+                    "(s.show_date + s.end_time) AS ends_at, " +
+                    "m.format, " +
+                    "m.language, " +
+                    "s.base_price AS min_ticket_price, " +
                     "'VND' AS currency, " +
-                    "CASE " +
-                    "    WHEN (SELECT COUNT(*) FROM cinema.showtime_seats ss WHERE ss.showtime_id = s.showtime_id) > 0 THEN " +
-                    "        (SELECT COUNT(ss.seat_id) FROM cinema.showtime_seats ss WHERE ss.showtime_id = s.showtime_id AND ss.is_blocked = false AND NOT EXISTS (SELECT 1 FROM cinema.booking_seats bs WHERE bs.showtime_id = s.showtime_id AND bs.seat_id = ss.seat_id AND bs.status IN ('HELD', 'BOOKED'))) " +
-                    "    ELSE " +
-                    "        GREATEST(0, r.capacity - COALESCE((SELECT COUNT(bs.seat_id) FROM cinema.booking_seats bs WHERE bs.showtime_id = s.showtime_id AND bs.status IN ('HELD', 'BOOKED')), 0)) " +
-                    "END AS available_seat_count " +
-                    "FROM cinema.showtimes s " +
+                    "(SELECT COUNT(ss.seat_id) FROM cinema.seats ss WHERE ss.room_id = r.room_id AND ss.status = 'ACTIVE') AS available_seat_count " +
+                    "FROM cinema.show_times s " +
                     "JOIN cinema.rooms r ON s.room_id = r.room_id " +
                     "JOIN cinema.cinemas c ON r.cinema_id = c.cinema_id " +
                     "JOIN cinema.movies m ON s.movie_id = m.movie_id " +
                     "WHERE c.cinema_id = :cinemaId " +
                     "AND c.status = 'ACTIVE' " +
-                    "AND s.status = 'OPEN' " +
-                    "AND CAST(s.starts_at AS date) = CAST(:showDate AS date) "
+                    "AND s.status IN ('SCHEDULED', 'ONGOING') " +
+                    "AND s.show_date = CAST(:showDate AS date) "
             );
 
             if (movieId != null) {
                 sql.append("AND s.movie_id = :movieId ");
             }
 
-            sql.append("ORDER BY s.starts_at ASC, s.showtime_id ASC");
+            sql.append("ORDER BY s.start_time ASC, s.show_time_id ASC");
 
             var query = entityManager.createNativeQuery(sql.toString());
             query.setParameter("cinemaId", cinemaId);
@@ -178,13 +173,13 @@ public class CinemaDAO {
         try {
             StringBuilder sql = new StringBuilder(
                     "SELECT COUNT(*) " +
-                    "FROM cinema.showtimes s " +
+                    "FROM cinema.show_times s " +
                     "JOIN cinema.rooms r ON s.room_id = r.room_id " +
                     "JOIN cinema.cinemas c ON r.cinema_id = c.cinema_id " +
                     "WHERE c.cinema_id = :cinemaId " +
                     "AND c.status = 'ACTIVE' " +
-                    "AND s.status = 'OPEN' " +
-                    "AND CAST(s.starts_at AS date) = CAST(:showDate AS date) "
+                    "AND s.status IN ('SCHEDULED', 'ONGOING') " +
+                    "AND s.show_date = CAST(:showDate AS date) "
             );
 
             if (movieId != null) {
@@ -229,7 +224,7 @@ public class CinemaDAO {
     public List<CityItem> findDistinctCities() {
         EntityManager entityManager = JPAUtil.getEntityManager();
         try {
-            String sql = "SELECT DISTINCT c.city_code, c.city_name FROM cinema.cinemas c WHERE c.status = 'ACTIVE' ORDER BY c.city_name ASC";
+            String sql = "SELECT DISTINCT c.city, c.city FROM cinema.cinemas c WHERE c.status = 'ACTIVE' ORDER BY c.city ASC";
             var query = entityManager.createNativeQuery(sql);
             List<?> results = query.getResultList();
             List<CityItem> cities = new ArrayList<>();

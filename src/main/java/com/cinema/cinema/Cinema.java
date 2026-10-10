@@ -22,22 +22,22 @@ public class Cinema {
     @Column(name = "address", nullable = false, length = 300)
     private String address;
 
-    @Column(name = "city_code", nullable = false, length = 30)
+    @Column(name = "city", nullable = false, length = 100)
     private String cityCode;
 
-    @Column(name = "city_name", nullable = false, length = 100)
+    @jakarta.persistence.Transient
     private String cityName;
 
     @Column(name = "phone", length = 30)
     private String phone;
 
-    @Column(name = "image_url", columnDefinition = "text")
+    @jakarta.persistence.Transient
     private String imageUrl;
 
-    @Column(name = "latitude")
+    @jakarta.persistence.Transient
     private Double latitude;
 
-    @Column(name = "longitude")
+    @jakarta.persistence.Transient
     private Double longitude;
 
     @Column(name = "status", nullable = false, length = 20)
@@ -103,7 +103,7 @@ public class Cinema {
     }
 
     public String getCityName() {
-        return cityName;
+        return cityName != null ? cityName : cityCode;
     }
 
     public void setCityName(String cityName) {

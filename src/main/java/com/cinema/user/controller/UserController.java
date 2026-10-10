@@ -1,42 +1,34 @@
-package com.cinema.user.controller;
+import java.io.IOException;
+import java.time.DateTimeException;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.Set;
 
+import com.cinema.auth.AuthService;
+import com.cinema.auth.dto.request.ChangePasswordRequest;
+import com.cinema.common.dto.ApiResponse;
+import com.cinema.common.exception.ApiException;
+import com.cinema.common.web.BaseServlet;
+import com.cinema.user.criteria.UserBookingCriteria;
+import com.cinema.user.criteria.UserVoucherCriteria;
 import com.cinema.user.dto.request.UpdateUserRequest;
-import com.cinema.user.dto.request.UserBookingRequest;
-import com.cinema.user.dto.request.UserVoucherRequest;
 import com.cinema.user.service.UserBookingService;
 import com.cinema.user.service.UserService;
 import com.cinema.user.service.UserVoucherService;
 
-import com.cinema.auth.AuthService;
-import com.cinema.auth.JwtUtil;
-import com.cinema.auth.dto.request.ChangePasswordRequest;
-import com.cinema.auth.AuthException;
-import com.cinema.common.dto.CommonDTO.ApiResponse;
-import com.cinema.common.exception.ApiException;
-import com.cinema.common.exception.ErrorHandler;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import io.jsonwebtoken.Claims;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
-import jakarta.servlet.http.*;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
-import java.io.IOException;
-
-@WebServlet(urlPatterns = {"/user", "/user/*"})
-public class UserController extends HttpServlet {
+@WebServlet(urlPatterns = { "/user", "/user/*" })
+public class UserController extends BaseServlet {
 
     private final UserService service = new UserService();
     private final UserBookingService bookingService = new UserBookingService();
     private final UserVoucherService voucherService = new UserVoucherService();
     private final AuthService authService = new AuthService();
-    private final ObjectMapper json = new ObjectMapper()
-            .registerModule(new JavaTimeModule())
-            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
     @Override
     protected void service(HttpServletRequest req, HttpServletResponse resp)
@@ -48,129 +40,117 @@ public class UserController extends HttpServlet {
         super.service(req, resp);
     }
 
-    // GET /user, /user/bookings, /user/vouchers
-
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
-        try {
-            long userId = authenticatedUserId(req);
-            String action = pathInfo(req);
-            switch (action) {
-                case "", "/" -> write(resp, ApiResponse.ok(service.getProfile(userId)));
-                case "/bookings", "/booking" -> write(resp, ApiResponse.ok(
-                        bookingService.getBookingHistory(
-                                userId,
-                                new UserBookingRequest(
-                                        req.getParameter("status"),
-                                        req.getParameter("from"),
-                                        req.getParameter("to"),
-                                        req.getParameter("page"),
-                                        req.getParameter("size"),
-                                        req.getParameter("sort")
-                                )
-                        )
-                ));
-                case "/vouchers", "/voucher" -> write(resp, ApiResponse.ok(
-                        voucherService.getUserVouchers(
-                                userId,
-                                new UserVoucherRequest(
-                                        req.getParameter("status"),
-                                        req.getParameter("page"),
-                                        req.getParameter("size")
-                                )
-                        )
-                ));
-                default -> throw ApiException.notFound("Endpoint không tồn tại");
+        long userId = getAuthenticatedUserId(req);
+        String[] segments = getPathSegments(req);
+        if (segments.length == 0) {
+            writeSuccess(resp, service.getProfile(userId));
+        } else if (segments.length == 1) {
+            String segment = segments[0];
+            if ("bookings".equals(segment) || "booking".equals(segment)) {
+                handleGetBookings(req, resp, userId);
+            } else if ("vouchers".equals(segment) || "voucher".equals(segment)) {
+                handleGetVouchers(req, resp, userId);
+            } else {
+                throw ApiException.notFound("Endpoint không tồn tại");
             }
-        } catch (Exception ex) {
-            ErrorHandler.handle(resp, ex);
+        } else {
+            throw ApiException.notFound("Endpoint không tồn tại");
         }
     }
 
-    // PATCH /user
+    private void handleGetBookings(HttpServletRequest req, HttpServletResponse resp, long userId) throws IOException {
+        String status = req.getParameter("status");
+        if (status != null && !status.isBlank()) {
+            status = status.trim().toUpperCase();
+            if (!Set.of("PENDING", "SUCCESS", "FAILED", "CANCELLED").contains(status)) {
+                throw ApiException.badRequest("Trạng thái booking không hợp lệ");
+            }
+        } else {
+            status = null;
+        }
+
+        LocalDate from = parseDateParam(req, "from");
+        LocalDate to = parseDateParam(req, "to");
+        if (from != null && to != null && from.isAfter(to)) {
+            throw ApiException.badRequest("from không được lớn hơn to");
+        }
+
+        int page = getIntParam(req, "page", 0);
+        int size = getIntParam(req, "size", 20);
+        if (page < 0) throw ApiException.badRequest("page phải lớn hơn hoặc bằng 0");
+        if (size < 1 || size > 100) throw ApiException.badRequest("size phải từ 1 đến 100");
+
+        String sort = req.getParameter("sort");
+        UserBookingCriteria.SortDirection direction = UserBookingCriteria.SortDirection.DESC;
+        if (sort != null) {
+            if (sort.equalsIgnoreCase("createdAt,asc") || sort.equalsIgnoreCase("asc")) {
+                direction = UserBookingCriteria.SortDirection.ASC;
+            }
+        }
+
+        ZoneId zone = ZoneId.of("Asia/Ho_Chi_Minh");
+        Instant fromInstant = from == null ? null : from.atStartOfDay(zone).toInstant();
+        Instant toInstant = to == null ? null : to.plusDays(1).atStartOfDay(zone).toInstant();
+
+        var criteria = new UserBookingCriteria(status, fromInstant, toInstant, page, size, direction);
+        writeSuccess(resp, bookingService.getBookingHistory(userId, criteria));
+    }
+
+    private void handleGetVouchers(HttpServletRequest req, HttpServletResponse resp, long userId) throws IOException {
+        String status = req.getParameter("status");
+        if (status != null && !status.isBlank()) {
+            status = status.trim().toUpperCase();
+            if ("AVAILABLE".equals(status)) status = "UNUSED";
+            if (!Set.of("UNUSED", "USED", "EXPIRED").contains(status)) {
+                throw ApiException.badRequest("Trạng thái voucher không hợp lệ");
+            }
+        } else {
+            status = null;
+        }
+
+        int page = getIntParam(req, "page", 0);
+        int size = getIntParam(req, "size", 20);
+        if (page < 0) throw ApiException.badRequest("page phải lớn hơn hoặc bằng 0");
+        if (size < 1 || size > 100) throw ApiException.badRequest("size phải từ 1 đến 100");
+
+        var criteria = new UserVoucherCriteria(status, page, size);
+        writeSuccess(resp, voucherService.getUserVouchers(userId, criteria));
+    }
+
+    private LocalDate parseDateParam(HttpServletRequest req, String param) {
+        String val = req.getParameter(param);
+        if (val == null || val.isBlank()) return null;
+        try {
+            return LocalDate.parse(val.trim());
+        } catch (DateTimeException e) {
+            throw ApiException.badRequest(param + " phải có định dạng yyyy-MM-dd");
+        }
+    }
 
     @Override
     protected void doPatch(HttpServletRequest req, HttpServletResponse resp) throws IOException {
-        try {
-            long userId = authenticatedUserId(req);
-            String action = pathInfo(req);
-            switch (action) {
-                case "", "/" -> {
-                    var body = readJson(req, UpdateUserRequest.class);
-                    write(resp, ApiResponse.ok(service.updateProfile(userId, body)));
-                }
-                default -> throw ApiException.notFound("Endpoint không tồn tại");
-            }
-        } catch (Exception ex) {
-            ErrorHandler.handle(resp, ex);
+        long userId = getAuthenticatedUserId(req);
+        String[] segments = getPathSegments(req);
+        if (segments.length == 0) {
+            var body = parseBody(req, UpdateUserRequest.class);
+            writeSuccess(resp, service.updateProfile(userId, body));
+        } else {
+            throw ApiException.notFound("Endpoint không tồn tại");
         }
     }
-
-    // POST /user/change-password
 
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
-        try {
-            long userId = authenticatedUserId(req);
-            String action = pathInfo(req);
-            if (!"/change-password".equals(action)) {
-                throw ApiException.notFound("Endpoint không tồn tại");
-            }
-
-            var body = readJson(req, ChangePasswordRequest.class);
-            authService.changePassword(userId, body);
-            write(resp, ApiResponse.ok(null));
-        } catch (Exception exception) {
-            ErrorHandler.handle(resp, exception);
-        }
-    }
-
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
-    private String pathInfo(HttpServletRequest req) {
-        String p = req.getPathInfo();
-        if (p == null || p.isBlank()) {
-            return "/";
-        }
-        if (p.endsWith("/") && p.length() > 1) {
-            return p.substring(0, p.length() - 1);
-        }
-        return p;
-    }
-
-    private long authenticatedUserId(HttpServletRequest request) {
-        Object attribute = request.getAttribute("userId");
-        if (attribute instanceof Number userId) {
-            return userId.longValue();
+        long userId = getAuthenticatedUserId(req);
+        String[] segments = getPathSegments(req);
+        if (segments.length != 1 || !"change-password".equals(segments[0])) {
+            throw ApiException.notFound("Endpoint không tồn tại");
         }
 
-        String token = null;
-        String authHeader = request.getHeader("Authorization");
-        if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            token = authHeader.substring(7);
-        }
-        if (token == null || token.isBlank()) {
-            token = JwtUtil.readCookie(request, JwtUtil.COOKIE_ACCESS);
-        }
-        if (token != null && !token.isBlank()) {
-            try {
-                Claims claims = JwtUtil.parseAccessToken(token);
-                return Long.parseLong(claims.getSubject());
-            } catch (Exception ignored) {}
-        }
-        throw AuthException.unauthorized();
-    }
-
-    private <T> T readJson(HttpServletRequest request, Class<T> type) throws IOException {
-        try {
-            return json.readValue(request.getInputStream(), type);
-        } catch (JsonProcessingException exception) {
-            throw ApiException.badRequest("JSON không hợp lệ");
-        }
-    }
-
-    private void write(HttpServletResponse resp, Object body) throws IOException {
-        resp.setContentType("application/json;charset=UTF-8");
-        json.writeValue(resp.getWriter(), body);
+        var body = parseBody(req, ChangePasswordRequest.class);
+        authService.changePassword(userId, body);
+        writeSuccess(resp, null);
     }
 }

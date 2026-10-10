@@ -31,22 +31,19 @@ public class HomeService {
 
     public Map<String, Object> getHomeData() {
         // 1. Phim đang chiếu (gọi từ MovieService)
-        Map<String, Object> nowShowingResult = movieService.getMovies(
+        List<?> nowShowing = movieService.getMovies(
                 new MovieRequest(null, null, "NOW_SHOWING", 0, DEFAULT_LIMIT, "releaseDate,desc")
-        );
-        Object nowShowing = nowShowingResult.getOrDefault("data", Collections.emptyList());
+        ).getItems();
 
         // 2. Phim sắp chiếu (gọi từ MovieService)
-        Map<String, Object> comingSoonResult = movieService.getMovies(
+        List<?> comingSoon = movieService.getMovies(
                 new MovieRequest(null, null, "COMING_SOON", 0, DEFAULT_LIMIT, "releaseDate,asc")
-        );
-        Object comingSoon = comingSoonResult.getOrDefault("data", Collections.emptyList());
+        ).getItems();
 
         // 3. Rạp nổi bật (gọi từ CinemaService)
-        Map<String, Object> cinemaResult = cinemaService.getCinemas(
+        List<?> featuredCinemas = cinemaService.getCinemas(
                 new CinemaRequest(null, null, 0, DEFAULT_LIMIT, "name,asc")
-        );
-        Object featuredCinemas = cinemaResult.getOrDefault("data", Collections.emptyList());
+        ).getItems();
 
         // 4. Thể loại phim (gọi từ MovieService)
         List<Genre> rawGenres = movieService.getGenres();
@@ -54,7 +51,7 @@ public class HomeService {
         if (rawGenres != null) {
             for (Genre g : rawGenres) {
                 Map<String, String> item = new LinkedHashMap<>();
-                item.put("code", g.getGenreCode());
+                item.put("code", String.valueOf(g.getGenreId()));
                 item.put("name", g.getGenreName());
                 genres.add(item);
             }
@@ -79,10 +76,6 @@ public class HomeService {
         data.put("genres", genres);
         data.put("cities", cities);
 
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("success", true);
-        result.put("data", data);
-        result.put("meta", Collections.emptyMap());
-        return result;
+        return data;
     }
 }

@@ -23,13 +23,13 @@ public class ShowtimeService {
         this.showtimeDAO = showtimeDAO;
     }
 
-    public Map<String, Object> getSeatMap(String idStr, Long currentUserId) {
+    public SeatMapResponse getSeatMap(String idStr, Long currentUserId) {
         Long showtimeId = parseAndValidateShowtimeId(idStr);
 
         ShowtimeDAO.ShowtimeInfo showtimeInfo = showtimeDAO.findShowtimeInfo(showtimeId)
                 .orElseThrow(() -> ApiException.notFound("Không tìm thấy suất chiếu"));
 
-        if (!"OPEN".equalsIgnoreCase(showtimeInfo.status())) {
+        if (!"SCHEDULED".equalsIgnoreCase(showtimeInfo.status()) && !"ONGOING".equalsIgnoreCase(showtimeInfo.status())) {
             throw new ApiException(422, "Suất chiếu đã bắt đầu hoặc đã đóng bán");
         }
 
@@ -43,22 +43,7 @@ public class ShowtimeService {
                 currentUserId
         );
 
-        ShowtimeDetailResponse showtimeDetail = new ShowtimeDetailResponse(
-                String.valueOf(showtimeInfo.showtimeId()),
-                showtimeInfo.movieId() != null ? String.valueOf(showtimeInfo.movieId()) : null,
-                showtimeInfo.movieTitle(),
-                showtimeInfo.cinemaId() != null ? String.valueOf(showtimeInfo.cinemaId()) : null,
-                showtimeInfo.cinemaName(),
-                showtimeInfo.roomId() != null ? String.valueOf(showtimeInfo.roomId()) : null,
-                showtimeInfo.roomName(),
-                showtimeInfo.startsAt(),
-                showtimeInfo.endsAt(),
-                showtimeInfo.format(),
-                showtimeInfo.language(),
-                showtimeInfo.minTicketPrice(),
-                showtimeInfo.currency(),
-                showtimeInfo.availableSeatCount()
-        );
+        ShowtimeDetailResponse showtimeDetail = toDetailResponse(showtimeInfo);
 
         String serverTime = Instant.now().toString();
         String screenPosition = showtimeInfo.screenPosition() != null ? showtimeInfo.screenPosition() : "TOP";
@@ -70,11 +55,7 @@ public class ShowtimeService {
                 seats
         );
 
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("success", true);
-        result.put("data", seatMap);
-        result.put("meta", Collections.emptyMap());
-        return result;
+        return seatMap;
     }
 
     private Long parseAndValidateShowtimeId(String idStr) {
@@ -90,5 +71,35 @@ public class ShowtimeService {
         } catch (NumberFormatException e) {
             throw ApiException.badRequest("Mã suất chiếu 'id' không hợp lệ: " + idStr);
         }
+    }
+
+    public ShowtimeDetailResponse getShowtimeDetail(String idStr) {
+        Long showtimeId = parseAndValidateShowtimeId(idStr);
+
+        ShowtimeDAO.ShowtimeInfo showtimeInfo = showtimeDAO.findShowtimeInfo(showtimeId)
+                .orElseThrow(() -> ApiException.notFound("Không tìm thấy suất chiếu"));
+
+        ShowtimeDetailResponse showtimeDetail = toDetailResponse(showtimeInfo);
+
+        return showtimeDetail;
+    }
+
+    private ShowtimeDetailResponse toDetailResponse(ShowtimeDAO.ShowtimeInfo showtimeInfo) {
+        return new ShowtimeDetailResponse(
+                String.valueOf(showtimeInfo.showtimeId()),
+                String.valueOf(showtimeInfo.movieId()),
+                showtimeInfo.movieTitle(),
+                String.valueOf(showtimeInfo.cinemaId()),
+                showtimeInfo.cinemaName(),
+                String.valueOf(showtimeInfo.roomId()),
+                showtimeInfo.roomName(),
+                showtimeInfo.startsAt(),
+                showtimeInfo.endsAt(),
+                showtimeInfo.format(),
+                showtimeInfo.language(),
+                showtimeInfo.minTicketPrice(),
+                showtimeInfo.currency(),
+                showtimeInfo.availableSeatCount()
+        );
     }
 }

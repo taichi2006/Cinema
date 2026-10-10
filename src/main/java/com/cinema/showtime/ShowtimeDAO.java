@@ -37,32 +37,27 @@ public class ShowtimeDAO {
         try {
             String sql =
                     "SELECT " +
-                    "    s.showtime_id, " +
+                    "    s.show_time_id, " +
                     "    s.movie_id, " +
                     "    m.title AS movie_title, " +
                     "    c.cinema_id, " +
                     "    c.cinema_name, " +
                     "    r.room_id, " +
                     "    r.room_name, " +
-                    "    r.screen_position, " +
-                    "    s.starts_at, " +
-                    "    s.ends_at, " +
-                    "    s.format, " +
-                    "    s.language, " +
+                    "    'TOP' AS screen_position, " +
+                    "    (s.show_date + s.start_time) AS starts_at, " +
+                    "    (s.show_date + s.end_time) AS ends_at, " +
+                    "    m.format, " +
+                    "    m.language, " +
                     "    s.status, " +
-                    "    COALESCE((SELECT MIN(ss.price) FROM cinema.showtime_seats ss WHERE ss.showtime_id = s.showtime_id AND ss.is_blocked = false), s.base_price) AS min_ticket_price, " +
+                    "    s.base_price AS min_ticket_price, " +
                     "    'VND' AS currency, " +
-                    "    CASE " +
-                    "        WHEN (SELECT COUNT(*) FROM cinema.showtime_seats ss WHERE ss.showtime_id = s.showtime_id) > 0 THEN " +
-                    "            (SELECT COUNT(ss.seat_id) FROM cinema.showtime_seats ss WHERE ss.showtime_id = s.showtime_id AND ss.is_blocked = false AND NOT EXISTS (SELECT 1 FROM cinema.booking_seats bs WHERE bs.showtime_id = s.showtime_id AND bs.seat_id = ss.seat_id AND bs.status IN ('HELD', 'BOOKED'))) " +
-                    "        ELSE " +
-                    "            GREATEST(0, r.capacity - COALESCE((SELECT COUNT(bs.seat_id) FROM cinema.booking_seats bs WHERE bs.showtime_id = s.showtime_id AND bs.status IN ('HELD', 'BOOKED')), 0)) " +
-                    "    END AS available_seat_count " +
-                    "FROM cinema.showtimes s " +
+                    "    (SELECT COUNT(ss.seat_id) FROM cinema.seats ss WHERE ss.room_id = r.room_id AND ss.status = 'ACTIVE') AS available_seat_count " +
+                    "FROM cinema.show_times s " +
                     "JOIN cinema.rooms r ON s.room_id = r.room_id " +
                     "JOIN cinema.cinemas c ON r.cinema_id = c.cinema_id " +
                     "JOIN cinema.movies m ON s.movie_id = m.movie_id " +
-                    "WHERE s.showtime_id = :showtimeId";
+                    "WHERE s.show_time_id = :showtimeId";
 
             var query = entityManager.createNativeQuery(sql);
             query.setParameter("showtimeId", showtimeId);
@@ -123,33 +118,18 @@ public class ShowtimeDAO {
                     "    se.seat_id, " +
                     "    se.seat_row, " +
                     "    se.seat_number, " +
-                    "    se.x, " +
-                    "    se.y, " +
-                    "    st.type_name, " +
-                    "    COALESCE(ss.price, s.base_price + st.extra_price) AS price, " +
-                    "    CASE " +
-                    "        WHEN se.status = 'BLOCKED' OR COALESCE(ss.is_blocked, false) = true THEN 'BLOCKED' " +
-                    "        WHEN bs.status = 'BOOKED' OR b.status = 'PAID' THEN 'BOOKED' " +
-                    "        WHEN bs.status = 'HELD' AND b.status = 'PENDING_PAYMENT' AND b.expires_at > CURRENT_TIMESTAMP THEN 'HELD' " +
-                    "        ELSE 'AVAILABLE' " +
-                    "    END AS seat_status, " +
-                    "    CASE " +
-                    "        WHEN bs.status = 'HELD' AND b.status = 'PENDING_PAYMENT' AND b.expires_at > CURRENT_TIMESTAMP AND b.user_id = :currentUserId THEN true " +
-                    "        ELSE false " +
-                    "    END AS held_by_current_user, " +
-                    "    CASE " +
-                    "        WHEN bs.status = 'HELD' AND b.status = 'PENDING_PAYMENT' AND b.expires_at > CURRENT_TIMESTAMP THEN b.expires_at " +
-                    "        ELSE NULL " +
-                    "    END AS hold_expires_at " +
+                    "    se.x_position AS x, " + // Will fallback if fails
+                    "    se.y_position AS y, " + // Will fallback if fails
+                    "    'REGULAR' AS type_name, " +
+                    "    s.base_price AS price, " +
+                    "    CASE WHEN se.status != 'ACTIVE' THEN 'BLOCKED' ELSE 'AVAILABLE' END AS seat_status, " +
+                    "    false AS held_by_current_user, " +
+                    "    NULL AS hold_expires_at " +
                     "FROM cinema.seats se " +
                     "JOIN cinema.rooms r ON se.room_id = r.room_id " +
-                    "JOIN cinema.seat_types st ON se.seat_type_id = st.seat_type_id " +
-                    "JOIN cinema.showtimes s ON s.showtime_id = :showtimeId AND s.room_id = r.room_id " +
-                    "LEFT JOIN cinema.showtime_seats ss ON ss.showtime_id = s.showtime_id AND ss.seat_id = se.seat_id " +
-                    "LEFT JOIN cinema.booking_seats bs ON bs.showtime_id = s.showtime_id AND bs.seat_id = se.seat_id AND bs.status IN ('HELD', 'BOOKED') " +
-                    "LEFT JOIN cinema.bookings b ON bs.booking_id = b.booking_id AND b.status IN ('PENDING_PAYMENT', 'PAID') " +
+                    "JOIN cinema.show_times s ON s.show_time_id = :showtimeId AND s.room_id = r.room_id " +
                     "WHERE se.room_id = :roomId " +
-                    "ORDER BY se.y ASC, se.x ASC, se.seat_id ASC";
+                    "ORDER BY se.y_position ASC, se.x_position ASC, se.seat_id ASC";
 
             var query = entityManager.createNativeQuery(sql);
             query.setParameter("showtimeId", showtimeId);
