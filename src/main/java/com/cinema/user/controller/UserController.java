@@ -1,3 +1,5 @@
+package com.cinema.user.controller;
+
 import java.io.IOException;
 import java.time.DateTimeException;
 import java.time.Instant;

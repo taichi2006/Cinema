@@ -1,11 +1,11 @@
 package com.cinema.product;
 
-import com.cinema.common.dto.CommonDTO.PageMeta;
+import com.cinema.common.dto.PageMeta;
+import com.cinema.common.dto.PageResponse;
+import com.cinema.common.exception.ApiException;
 
 import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 public class ProductService {
@@ -21,7 +21,7 @@ public class ProductService {
     }
 
     // Lấy danh sách sản phẩm F&B kèm phân trang và lọc category, status.
-    public Map<String, Object> getProducts(String category, String statusStr, int page, int size) {
+    public PageResponse<ProductResponse> getProducts(String category, String statusStr, int page, int size) {
         if (page < 0) page = 0;
         if (size <= 0) size = 20;
         if (size > 100) size = 100; // giới hạn an toàn
@@ -31,15 +31,14 @@ public class ProductService {
             try {
                 status = ProductStatus.valueOf(statusStr.trim().toUpperCase());
             } catch (IllegalArgumentException ex) {
-                throw ProductException.badRequest("Trạng thái sản phẩm không hợp lệ: " + statusStr);
+                throw ApiException.badRequest("Trạng thái sản phẩm không hợp lệ: " + statusStr);
             }
         }
 
         long totalElements = productDAO.countTotal(category, status);
-        int totalPages = totalElements == 0 ? 0 : (int) Math.ceil((double) totalElements / size);
 
         List<ProductResponse> items;
-        if (totalElements == 0 || page >= totalPages) {
+        if (totalElements == 0 || page * size >= totalElements) {
             items = Collections.emptyList();
         } else {
             items = productDAO.findWithPaging(category, status, page, size)
@@ -48,11 +47,8 @@ public class ProductService {
                     .collect(Collectors.toList());
         }
 
-        PageMeta meta = new PageMeta(page, size, totalElements, totalPages);
+        PageMeta meta = new PageMeta(page, size, totalElements);
 
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("items", items);
-        result.put("meta", meta);
-        return result;
+        return new PageResponse<>(items, meta);
     }
 }
