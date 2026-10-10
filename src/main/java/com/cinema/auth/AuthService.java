@@ -2,6 +2,7 @@ package com.cinema.auth;
 
 import com.cinema.common.exception.ApiException;
 import com.cinema.user.entity.User;
+import com.cinema.wallet.service.WalletService;
 import org.mindrot.jbcrypt.BCrypt;
 
 import com.cinema.auth.dto.request.ChangePasswordRequest;
@@ -58,6 +59,9 @@ public class AuthService {
                 : null;
 
         User user = authDAO.createUser(email, passwordHash, fullName, phone, dob);
+
+        // Tự động khởi tạo ví rỗng cho user mới
+        new WalletService().getOrCreateWallet(user.getId());
 
         return new AuthUserResponse(user.getId(), user.getFullName(), user.getEmail(), user.getStatus());
     }

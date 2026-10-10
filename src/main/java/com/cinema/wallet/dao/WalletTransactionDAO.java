@@ -1,16 +1,14 @@
-package com.cinema.wallet;
+package com.cinema.wallet.dao;
 
 import com.cinema.common.util.JPAUtil;
+import com.cinema.wallet.entity.WalletTransaction;
+import com.cinema.wallet.enums.TransactionType;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.TypedQuery;
-
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
-/**
- * Data Access Object cho thực thể WalletTransaction (bảng cinema.wallet_transactions).
- */
 public class WalletTransactionDAO {
 
     public Optional<WalletTransaction> findById(long id) {
@@ -68,8 +66,15 @@ public class WalletTransactionDAO {
                     "SELECT tx FROM WalletTransaction tx WHERE tx.wallet.id = :walletId "
             );
 
+            TransactionType txType = null;
             if (type != null && !type.isBlank()) {
-                jpql.append("AND tx.type = :type ");
+                try {
+                    txType = TransactionType.valueOf(type.trim().toUpperCase());
+                    jpql.append("AND tx.type = :type ");
+                } catch (IllegalArgumentException ignored) {
+                    // Nếu type không đúng enum, để query rỗng hoặc handle
+                    jpql.append("AND 1 = 0 ");
+                }
             }
             if (from != null) {
                 jpql.append("AND tx.createdAt >= :from ");
@@ -83,8 +88,8 @@ public class WalletTransactionDAO {
             TypedQuery<WalletTransaction> query = em.createQuery(jpql.toString(), WalletTransaction.class)
                     .setParameter("walletId", walletId);
 
-            if (type != null && !type.isBlank()) {
-                query.setParameter("type", TransactionType.valueOf(type.toUpperCase()));
+            if (txType != null) {
+                query.setParameter("type", txType);
             }
             if (from != null) {
                 query.setParameter("from", from);
@@ -112,8 +117,14 @@ public class WalletTransactionDAO {
                     "SELECT count(tx) FROM WalletTransaction tx WHERE tx.wallet.id = :walletId "
             );
 
+            TransactionType txType = null;
             if (type != null && !type.isBlank()) {
-                jpql.append("AND tx.type = :type ");
+                try {
+                    txType = TransactionType.valueOf(type.trim().toUpperCase());
+                    jpql.append("AND tx.type = :type ");
+                } catch (IllegalArgumentException ignored) {
+                    return 0L;
+                }
             }
             if (from != null) {
                 jpql.append("AND tx.createdAt >= :from ");
@@ -125,8 +136,8 @@ public class WalletTransactionDAO {
             TypedQuery<Long> query = em.createQuery(jpql.toString(), Long.class)
                     .setParameter("walletId", walletId);
 
-            if (type != null && !type.isBlank()) {
-                query.setParameter("type", TransactionType.valueOf(type.toUpperCase()));
+            if (txType != null) {
+                query.setParameter("type", txType);
             }
             if (from != null) {
                 query.setParameter("from", from);

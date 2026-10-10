@@ -16,7 +16,11 @@
         </provider>
         <class>com.cinema.movie.Movie</class>
         <class>com.cinema.user.entity.User</class>
-        <class>com.cinema.wallet.Wallet</class>
+        <!-- Module Wallet: Ví người dùng, nạp tiền và lịch sử bút toán giao dịch -->
+        <class>com.cinema.wallet.entity.Wallet</class>
+        <class>com.cinema.wallet.entity.WalletTransaction</class>
+        <!-- Module Product: Danh mục sản phẩm F&B -->
+        <class>com.cinema.product.Product</class>
 
         <properties>
 

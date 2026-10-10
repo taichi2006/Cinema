@@ -1,15 +1,14 @@
-package com.cinema.wallet;
+package com.cinema.wallet.dao;
 
 import com.cinema.common.util.JPAUtil;
 import com.cinema.user.entity.User;
+import com.cinema.wallet.entity.Wallet;
+import com.cinema.wallet.enums.WalletStatus;
 import jakarta.persistence.EntityManager;
-
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
-/**
- * Data Access Object cho thực thể Wallet.
- */
 public class WalletDAO {
 
     public Optional<Wallet> findByUserId(long userId) {
@@ -58,14 +57,13 @@ public class WalletDAO {
     }
 
     /**
-     * Khởi tạo ví mặc định cho người dùng trong transaction sẵn có (dùng khi đăng ký tài khoản).
+     * Khởi tạo ví rỗng cho người dùng mới đăng kí tài khoản
      */
     public Wallet createDefaultWallet(User user, EntityManager em) {
         Wallet wallet = new Wallet(user);
-        wallet.setBalance(0L);
+        wallet.setBalance(BigDecimal.ZERO);
         wallet.setStatus(WalletStatus.ACTIVE);
         em.persist(wallet);
         return wallet;
     }
 }
-

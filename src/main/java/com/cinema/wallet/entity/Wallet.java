@@ -1,14 +1,10 @@
-package com.cinema.wallet;
+package com.cinema.wallet.entity;
 
 import com.cinema.user.entity.User;
+import com.cinema.wallet.enums.WalletStatus;
 import jakarta.persistence.*;
+import java.math.BigDecimal;
 
-import java.time.Instant;
-
-/**
- * Thực thể Ví người dùng
- * Quản lý số dư và trạng thái ví của từng tài khoản người dùng.
- */
 @Entity
 @Table(name = "wallets", schema = "cinema")
 public class Wallet {
@@ -22,19 +18,18 @@ public class Wallet {
     @JoinColumn(name = "user_id", unique = true, nullable = false)
     private User user;
 
-    @Column(nullable = false)
-    private Long balance = 0L;
+    @Column(name = "balance", nullable = false, precision = 15, scale = 2)
+    private BigDecimal balance = BigDecimal.ZERO;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @Column(name = "status", nullable = false, length = 20)
     private WalletStatus status = WalletStatus.ACTIVE;
-
 
     public Wallet() {}
 
     public Wallet(User user) {
         this.user = user;
-        this.balance = 0L;
+        this.balance = BigDecimal.ZERO;
         this.status = WalletStatus.ACTIVE;
     }
 
@@ -54,12 +49,12 @@ public class Wallet {
         this.user = user;
     }
 
-    public Long getBalance() {
+    public BigDecimal getBalance() {
         return balance;
     }
 
-    public void setBalance(Long balance) {
-        this.balance = balance;
+    public void setBalance(BigDecimal balance) {
+        this.balance = balance != null ? balance : BigDecimal.ZERO;
     }
 
     public WalletStatus getStatus() {
@@ -69,6 +64,4 @@ public class Wallet {
     public void setStatus(WalletStatus status) {
         this.status = status;
     }
-
 }
-

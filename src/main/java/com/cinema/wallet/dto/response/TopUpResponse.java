@@ -1,51 +1,57 @@
 package com.cinema.wallet.dto.response;
 
-/**
- * Response schema cho kết quả tạo/theo dõi yêu cầu nạp tiền (POST /wallet/top-up, GET /wallet/top-up/{id}).
- */
+import java.math.BigDecimal;
+
+// Response schema cho kết quả tạo yêu cầu nạp tiền (POST /wallet/top-up)
 public class TopUpResponse {
 
-    private String id;
-    private Long amount;
+    private Long paymentId;
+    private Long bookingId;
+    private BigDecimal amount;
     private String method;
     private String status;
-    private String checkoutUrl;
-    private String expiresAt;
-    private String createdAt;
-    private String completedAt;
-    private String failureCode;
+    private String paymentType = "TOPUP";
+    private String paymentDate;
+    private String expiredAt;
+    private String gatewayTransactionId;
+    private Long walletTransactionId;
+    private String failureReason;
 
     public TopUpResponse() {}
 
-    public TopUpResponse(String id, Long amount, String method, String status,
-                         String checkoutUrl, String expiresAt, String createdAt, String completedAt, String failureCode) {
-        this.id = id;
+    public TopUpResponse(Long paymentId, BigDecimal amount, String method, String status,
+                         Long walletTransactionId, String paymentDate) {
+        this.paymentId = paymentId;
         this.amount = amount;
         this.method = method;
         this.status = status;
-        this.checkoutUrl = checkoutUrl;
-        this.expiresAt = expiresAt;
-        this.createdAt = createdAt;
-        this.completedAt = completedAt;
-        this.failureCode = failureCode;
+        this.walletTransactionId = walletTransactionId;
+        this.paymentDate = paymentDate;
     }
 
-    public String getId() {
-        return id;
+    public Long getPaymentId() {
+        return paymentId;
     }
 
-    public void setId(String id) {
-        this.id = id;
+    public void setPaymentId(Long paymentId) {
+        this.paymentId = paymentId;
     }
 
-    public Long getAmount() {
+    public Long getBookingId() {
+        return bookingId;
+    }
+
+    public void setBookingId(Long bookingId) {
+        this.bookingId = bookingId;
+    }
+
+    public BigDecimal getAmount() {
         return amount;
     }
 
-    public void setAmount(Long amount) {
+    public void setAmount(BigDecimal amount) {
         this.amount = amount;
     }
-
 
     public String getMethod() {
         return method;
@@ -63,43 +69,56 @@ public class TopUpResponse {
         this.status = status;
     }
 
-    public String getCheckoutUrl() {
-        return checkoutUrl;
+    public String getPaymentType() {
+        return paymentType;
     }
 
-    public void setCheckoutUrl(String checkoutUrl) {
-        this.checkoutUrl = checkoutUrl;
+    public void setPaymentType(String paymentType) {
+        this.paymentType = paymentType;
     }
 
-    public String getExpiresAt() {
-        return expiresAt;
+    public String getPaymentDate() {
+        return paymentDate;
     }
 
-    public void setExpiresAt(String expiresAt) {
-        this.expiresAt = expiresAt;
+    public void setPaymentDate(String paymentDate) {
+        this.paymentDate = paymentDate;
     }
 
-    public String getCreatedAt() {
-        return createdAt;
+    public String getExpiredAt() {
+        return expiredAt;
     }
 
-    public void setCreatedAt(String createdAt) {
-        this.createdAt = createdAt;
+    public void setExpiredAt(String expiredAt) {
+        this.expiredAt = expiredAt;
     }
 
-    public String getCompletedAt() {
-        return completedAt;
+    public String getGatewayTransactionId() {
+        return gatewayTransactionId;
     }
 
-    public void setCompletedAt(String completedAt) {
-        this.completedAt = completedAt;
+    public void setGatewayTransactionId(String gatewayTransactionId) {
+        this.gatewayTransactionId = gatewayTransactionId;
     }
 
-    public String getFailureCode() {
-        return failureCode;
+    public Long getWalletTransactionId() {
+        return walletTransactionId;
     }
 
-    public void setFailureCode(String failureCode) {
-        this.failureCode = failureCode;
+    public void setWalletTransactionId(Long walletTransactionId) {
+        this.walletTransactionId = walletTransactionId;
+    }
+
+    public String getFailureReason() {
+        return failureReason;
+    }
+
+    public void setFailureReason(String failureReason) {
+        this.failureReason = failureReason;
+    }
+
+    // Helper alias
+    public String getId() {
+        return paymentId != null ? String.valueOf(paymentId) : (walletTransactionId != null ? String.valueOf(walletTransactionId) : null);
     }
 }
