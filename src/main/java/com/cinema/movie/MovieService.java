@@ -266,4 +266,8 @@ public class MovieService {
             throw ApiException.badRequest("Vị trí phân trang vượt quá giới hạn cho phép.");
         }
     }
+
+    public List<Genre> getGenres() {
+        return movieDAO.findAllGenres();
+    }
 }
