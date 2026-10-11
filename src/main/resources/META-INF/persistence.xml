@@ -33,6 +33,8 @@
         <class>com.cinema.booking.entity.Booking</class>
         <class>com.cinema.booking.entity.BookingItem</class>
         <class>com.cinema.booking.entity.Refund</class>
+        <!-- Module Payment -->
+        <class>com.cinema.payment.entity.Payment</class>
 
         <properties>
 
@@ -42,15 +44,15 @@
 
             <property
                     name="jakarta.persistence.jdbc.url"
-                    value="jdbc:postgresql://ep-solitary-sky-b34q0u44-pooler.c-4.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&amp;channelBinding=require"/>
+                    value=""/>
 
             <property
                     name="jakarta.persistence.jdbc.user"
-                    value="neondb_owner"/>
+                    value=""/>
 
             <property
                     name="jakarta.persistence.jdbc.password"
-                    value="npg_Lf1dXoHc8tyM"/>
+                    value=""/>
 
             <property
                     name="hibernate.dialect"

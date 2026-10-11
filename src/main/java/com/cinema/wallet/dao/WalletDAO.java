@@ -5,11 +5,22 @@ import com.cinema.user.entity.User;
 import com.cinema.wallet.entity.Wallet;
 import com.cinema.wallet.enums.WalletStatus;
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
 public class WalletDAO {
+
+    public Optional<Wallet> findByUserIdForUpdate(long userId, EntityManager em) {
+        return em.createQuery(
+                        "SELECT w FROM Wallet w JOIN FETCH w.user WHERE w.user.id = :userId",
+                        Wallet.class)
+                .setParameter("userId", userId)
+                .setLockMode(LockModeType.PESSIMISTIC_WRITE)
+                .getResultStream()
+                .findFirst();
+    }
 
     public Optional<Wallet> findByUserId(long userId) {
         EntityManager em = JPAUtil.getEntityManager();

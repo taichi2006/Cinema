@@ -3,6 +3,8 @@ package com.cinema.booking;
 import com.cinema.booking.dto.*;
 import com.cinema.common.exception.ApiException;
 import com.cinema.common.web.BaseServlet;
+import com.cinema.payment.dto.CreatePaymentRequest;
+import com.cinema.payment.PaymentService;
 import com.cinema.ticket.TicketService;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServletRequest;
@@ -15,15 +17,22 @@ public class BookingController extends BaseServlet {
 
     private final BookingService service;
     private final TicketService ticketService;
+    private final PaymentService paymentService;
 
     public BookingController() {
         this.service = new BookingService();
         this.ticketService = new TicketService();
+        this.paymentService = new PaymentService();
     }
 
     public BookingController(BookingService service, TicketService ticketService) {
+        this(service, ticketService, new PaymentService());
+    }
+
+    public BookingController(BookingService service, TicketService ticketService, PaymentService paymentService) {
         this.service = service;
         this.ticketService = ticketService;
+        this.paymentService = paymentService;
     }
 
     @Override
@@ -42,6 +51,15 @@ public class BookingController extends BaseServlet {
 
         if (segments.length == 2) {
             long bookingId = parsePathId(segments[0], "Mã đơn hàng");
+
+            // Giai đoạn 2: POST /bookings/{bookingId}/payment
+            if ("payment".equalsIgnoreCase(segments[1])) {
+                CreatePaymentRequest body = parseBody(req, CreatePaymentRequest.class);
+                var payment = paymentService.createPayment(userId, bookingId, body, req.getRemoteAddr());
+                resp.setStatus(HttpServletResponse.SC_CREATED);
+                writeSuccess(resp, payment);
+                return;
+            }
 
             // 5. POST /bookings/{bookingId}/cancel: Hủy booking
             if ("cancel".equalsIgnoreCase(segments[1])) {
@@ -87,6 +105,12 @@ public class BookingController extends BaseServlet {
 
         if (segments.length == 2) {
             long bookingId = parsePathId(segments[0], "Mã đơn hàng");
+
+            // Giai đoạn 1: GET /bookings/{bookingId}/payment
+            if ("payment".equalsIgnoreCase(segments[1])) {
+                writeSuccess(resp, paymentService.getPaymentsByBooking(userId, bookingId));
+                return;
+            }
 
             // 7. GET /bookings/{bookingId}/refund: Xem tiến trình refund
             if ("refund".equalsIgnoreCase(segments[1])) {
