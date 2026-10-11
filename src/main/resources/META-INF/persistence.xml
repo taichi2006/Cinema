@@ -15,6 +15,9 @@
             org.hibernate.jpa.HibernatePersistenceProvider
         </provider>
         <class>com.cinema.movie.Movie</class>
+        <class>com.cinema.movie.Review</class>
+        <class>com.cinema.cinema.Cinema</class>
+        <class>com.cinema.cinema.Room</class>
         <class>com.cinema.user.entity.User</class>
         <!-- Module Wallet: Ví người dùng, nạp tiền và lịch sử bút toán giao dịch -->
         <class>com.cinema.wallet.entity.Wallet</class>
@@ -35,23 +38,7 @@
         <class>com.cinema.booking.entity.Refund</class>
 
         <properties>
-
-            <property
-                    name="jakarta.persistence.jdbc.driver"
-                    value="org.postgresql.Driver"/>
-
-            <property
-                    name="jakarta.persistence.jdbc.url"
-                    value="jdbc:postgresql://ep-solitary-sky-b34q0u44-pooler.c-4.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&amp;channelBinding=require"/>
-
-            <property
-                    name="jakarta.persistence.jdbc.user"
-                    value="neondb_owner"/>
-
-            <property
-                    name="jakarta.persistence.jdbc.password"
-                    value="npg_Lf1dXoHc8tyM"/>
-
+            <!-- Cấu hình kết nối CSDL (URL, user, password) được nạp động qua DB.java (.env) -->
             <property
                     name="hibernate.dialect"
                     value="org.hibernate.dialect.PostgreSQLDialect"/>

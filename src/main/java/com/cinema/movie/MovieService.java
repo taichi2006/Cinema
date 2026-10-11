@@ -1,209 +1,92 @@
 package com.cinema.movie;
 
-import com.cinema.common.dto.ApiResponse;
 import com.cinema.common.dto.PageMeta;
 import com.cinema.common.dto.PageResponse;
 import com.cinema.common.exception.ApiException;
-import com.cinema.movie.DTO.Request.MovieRequest;
-import com.cinema.movie.DTO.Response.MovieResponse;
-import com.cinema.movie.DTO.Response.ReviewResponse;
-import com.cinema.movie.DTO.Response.ShowtimeResponse;
+import com.cinema.movie.dto.request.CreateReviewRequest;
+import com.cinema.movie.dto.request.MovieRequest;
+import com.cinema.movie.dto.response.MovieResponse;
+import com.cinema.movie.dto.response.ReviewResponse;
+import com.cinema.movie.dto.response.ShowtimeResponse;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Set;
 
 public class MovieService {
 
-    private static final Set<String> ALLOWED_STATUSES = Set.of("NOW_SHOWING", "COMING_SOON", "ENDED");
-    private static final Set<String> ALLOWED_SORTS = Set.of(
-            "releaseDate,asc", "releaseDate,desc",
-            "title,asc", "title,desc"
-    );
-    private static final Set<String> ALLOWED_REVIEW_SORTS = Set.of(
-            "createdAt,asc", "createdAt,desc",
-            "rating,asc", "rating,desc"
-    );
+    private final MovieDAO movieDAO = new MovieDAO();
+    private final ReviewDAO reviewDAO = new ReviewDAO();
 
-    private final MovieDAO movieDAO;
-
-    public MovieService() {
-        this.movieDAO = new MovieDAO();
-    }
-
-    public MovieService(MovieDAO movieDAO) {
-        this.movieDAO = movieDAO;
-    }
-
-    public ApiResponse<MovieResponse> getMovieById(long movieId) {
+    // 1. Chi tiết phim
+    public MovieResponse getMovieById(long movieId) {
         Movie movie = movieDAO.findById(movieId)
                 .orElseThrow(() -> ApiException.notFound("Không tìm thấy phim"));
-
-        Set<String> genreNames = new LinkedHashSet<>();
-        if (movie.getGenres() != null) {
-            for (Genre genre : movie.getGenres()) {
-                if (genre.getGenreName() != null) {
-                    genreNames.add(genre.getGenreName());
-                }
-            }
-        }
-
-        MovieResponse response = new MovieResponse(
-                String.valueOf(movie.getMovieId()),
-                movie.getTitle(),
-                movie.getDescription(),
-                movie.getDurationMinutes(),
-                movie.getReleaseDate(),
-                movie.getPosterUrl(),
-                movie.getTrailerUrl(),
-                movie.getLanguage(),
-                movie.getDefaultFormat(),
-                movie.getAgeRating(),
-                movie.getAgeLimit(),
-                movie.getStatus(),
-                new ArrayList<>(genreNames),
-                0.0,
-                0
-        );
-
-        return ApiResponse.ok(response);
+        return toDetailResponse(movie);
     }
 
-    public PageResponse<ShowtimeResponse> getMovieShowtimes(
-            long movieId,
-            LocalDate date,
-            Long cinemaId,
-            int page,
-            int size
-    ) {
-        movieDAO.findById(movieId)
-                .orElseThrow(() -> ApiException.notFound("Không tìm thấy phim"));
+    // 2. Danh sách phim (tìm kiếm, lọc, phân trang)
+    public PageResponse<MovieResponse> getMovies(MovieRequest req) {
+        List<MovieResponse> items = movieDAO.findMovies(req).stream()
+                .map(this::toSummaryResponse)
+                .toList();
+        long total = movieDAO.countMovies(req);
+        return PageResponse.of(items, new PageMeta(req.getPage(), req.getSize(), total));
+    }
 
-        if (page < 0) {
-            throw ApiException.badRequest("Số trang 'page' phải lớn hơn hoặc bằng 0.");
-        }
-        if (size < 1 || size > 50) {
-            throw ApiException.badRequest("Kích thước trang 'size' phải nằm trong khoảng từ 1 đến 50.");
-        }
-
+    // 3. Suất chiếu của phim
+    public PageResponse<ShowtimeResponse> getMovieShowtimes(long movieId, LocalDate date, Long cinemaId, int page, int size) {
+        movieDAO.findById(movieId).orElseThrow(() -> ApiException.notFound("Không tìm thấy phim"));
         List<ShowtimeResponse> showtimes = movieDAO.findShowtimes(movieId, date, cinemaId, page, size);
-        long totalElements = movieDAO.countShowtimes(movieId, date, cinemaId);
-
-        PageMeta meta = new PageMeta(page, size, totalElements);
-        return PageResponse.of(showtimes, meta);
+        long total = movieDAO.countShowtimes(movieId, date, cinemaId);
+        return PageResponse.of(showtimes, new PageMeta(page, size, total));
     }
 
+    // 4. Đánh giá của phim
     public PageResponse<ReviewResponse> getMovieReviews(long movieId, String sort, int page, int size) {
-        movieDAO.findById(movieId)
-                .orElseThrow(() -> ApiException.notFound("Không tìm thấy phim"));
-
-        if (sort != null && !sort.trim().isEmpty()) {
-            if (!ALLOWED_REVIEW_SORTS.contains(sort.trim())) {
-                throw ApiException.badRequest(
-                        "Tham số 'sort' không hợp lệ: " + sort +
-                                ". Các giá trị hợp lệ: [createdAt,asc, createdAt,desc, rating,asc, rating,desc]"
-                );
-            }
-        } else {
-            sort = "createdAt,desc";
-        }
-
-        if (page < 0) {
-            throw ApiException.badRequest("Số trang 'page' phải lớn hơn hoặc bằng 0.");
-        }
-        if (size < 1 || size > 50) {
-            throw ApiException.badRequest("Kích thước trang 'size' phải nằm trong khoảng từ 1 đến 50.");
-        }
-
-        List<ReviewResponse> reviews = movieDAO.findReviews(movieId, sort.trim(), page, size);
-        long totalElements = movieDAO.countReviews(movieId);
-
-        PageMeta meta = new PageMeta(page, size, totalElements);
-        return PageResponse.of(reviews, meta);
+        movieDAO.findById(movieId).orElseThrow(() -> ApiException.notFound("Không tìm thấy phim"));
+        String sortVal = (sort != null && !sort.isBlank()) ? sort.trim() : "createdAt,desc";
+        List<ReviewResponse> reviews = reviewDAO.findReviews(movieId, sortVal, page, size);
+        long total = reviewDAO.countReviews(movieId);
+        return PageResponse.of(reviews, new PageMeta(page, size, total));
     }
 
-    public PageResponse<MovieResponse> getMovies(MovieRequest request) {
-        validateRequest(request);
-
-        List<Movie> movies = movieDAO.findMovies(request);
-        long totalElements = movieDAO.countMovies(request);
-
-        List<MovieResponse> movieResponses = new ArrayList<>();
-        for (Movie movie : movies) {
-            Set<String> genreNames = new LinkedHashSet<>();
-            if (movie.getGenres() != null) {
-                for (Genre genre : movie.getGenres()) {
-                    if (genre.getGenreName() != null) {
-                        genreNames.add(genre.getGenreName());
-                    }
-                }
-            }
-
-            String id = String.valueOf(movie.getMovieId());
-            Double averageRating = 0.0;
-            Integer reviewCount = 0;
-
-            MovieResponse response = new MovieResponse(
-                    id,
-                    movie.getTitle(),
-                    movie.getPosterUrl(),
-                    movie.getDurationMinutes(),
-                    movie.getReleaseDate(),
-                    new ArrayList<>(genreNames),
-                    movie.getStatus(),
-                    movie.getAgeRating(),
-                    averageRating,
-                    reviewCount
-            );
-            movieResponses.add(response);
+    // 5. Gửi đánh giá
+    public ReviewResponse createReview(Long userId, long movieId, CreateReviewRequest req) {
+        if (userId == null) throw ApiException.unauthorized("Vui lòng đăng nhập để đánh giá phim.");
+        if (req == null || req.getRating() == null || req.getRating() < 1 || req.getRating() > 5) {
+            throw ApiException.badRequest("Điểm đánh giá 'rating' phải là số nguyên từ 1 đến 5 sao.");
         }
-
-        PageMeta meta = new PageMeta(request.getPage(), request.getSize(), totalElements);
-        return PageResponse.of(movieResponses, meta);
+        movieDAO.findById(movieId).orElseThrow(() -> ApiException.notFound("Không tìm thấy phim"));
+        if (!reviewDAO.hasPurchasedTicketForMovie(userId, movieId)) {
+            throw ApiException.forbidden("Bạn chỉ có thể đánh giá phim sau khi đã mua vé.");
+        }
+        if (reviewDAO.hasUserReviewed(userId, movieId)) {
+            throw ApiException.conflict("Bạn đã gửi đánh giá cho bộ phim này rồi.");
+        }
+        return reviewDAO.createReview(userId, movieId, req.getRating(), req.getComment());
     }
 
-    private void validateRequest(MovieRequest request) {
-        if (request.getQ() != null && request.getQ().trim().length() > 100) {
-            throw ApiException.badRequest("Từ khóa tìm kiếm 'q' không được vượt quá 100 ký tự.");
-        }
-
-        if (request.getStatus() != null && !request.getStatus().trim().isEmpty()) {
-            if (!ALLOWED_STATUSES.contains(request.getStatus().trim())) {
-                throw ApiException.badRequest(
-                        "Trạng thái 'status' không hợp lệ: " + request.getStatus() +
-                                ". Các giá trị hợp lệ: [NOW_SHOWING, COMING_SOON, ENDED]"
-                );
-            }
-        }
-
-        if (request.getSort() != null && !request.getSort().trim().isEmpty()) {
-            if (!ALLOWED_SORTS.contains(request.getSort().trim())) {
-                throw ApiException.badRequest(
-                        "Tham số 'sort' không hợp lệ: " + request.getSort() +
-                                ". Các giá trị hợp lệ: [releaseDate,asc, releaseDate,desc, title,asc, title,desc]"
-                );
-            }
-        } else {
-            request.setSort("releaseDate,desc");
-        }
-
-        if (request.getPage() < 0) {
-            throw ApiException.badRequest("Số trang 'page' phải lớn hơn hoặc bằng 0.");
-        }
-
-        if (request.getSize() < 1 || request.getSize() > 50) {
-            throw ApiException.badRequest("Kích thước trang 'size' phải nằm trong khoảng từ 1 đến 50.");
-        }
-
-        long offset = (long) request.getPage() * request.getSize();
-        if (offset > Integer.MAX_VALUE || offset < 0) {
-            throw ApiException.badRequest("Vị trí phân trang vượt quá giới hạn cho phép.");
-        }
-    }
-
+    // 6. Thể loại phim
     public List<Genre> getGenres() {
         return movieDAO.findAllGenres();
+    }
+
+    private MovieResponse toDetailResponse(Movie m) {
+        List<String> genres = m.getGenres() != null ? m.getGenres().stream().map(Genre::getGenreName).toList() : List.of();
+        return new MovieResponse(
+                String.valueOf(m.getMovieId()), m.getTitle(), m.getDescription(),
+                m.getDurationMinutes(), m.getReleaseDate(), m.getPosterUrl(), m.getTrailerUrl(),
+                m.getLanguage(), m.getDefaultFormat(), m.getAgeRating(), m.getAgeLimit(),
+                m.getStatus(), genres, 0.0, 0
+        );
+    }
+
+    private MovieResponse toSummaryResponse(Movie m) {
+        List<String> genres = m.getGenres() != null ? m.getGenres().stream().map(Genre::getGenreName).toList() : List.of();
+        return new MovieResponse(
+                String.valueOf(m.getMovieId()), m.getTitle(), m.getPosterUrl(),
+                m.getDurationMinutes(), m.getReleaseDate(), genres, m.getStatus(),
+                m.getAgeRating(), 0.0, 0
+        );
     }
 }

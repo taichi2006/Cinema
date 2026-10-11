@@ -1,4 +1,4 @@
-package com.cinema.cinema.DTO.Request;
+package com.cinema.cinema.dto.request;
 
 public class CinemaRequest {
 

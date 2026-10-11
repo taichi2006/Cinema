@@ -1,91 +1,60 @@
 package com.cinema.cinema;
 
-import com.cinema.cinema.DTO.Request.CinemaRequest;
-import com.cinema.cinema.DTO.Response.CinemaResponse;
-import com.cinema.cinema.DTO.Response.CinemaShowtimeResponse;
-import com.cinema.common.dto.PageResponse;
+import com.cinema.cinema.dto.request.CinemaRequest;
 import com.cinema.common.exception.ApiException;
-import jakarta.servlet.annotation.WebServlet;
 import com.cinema.common.web.BaseServlet;
+import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
-import jakarta.servlet.ServletException;
 import java.io.IOException;
 import java.time.LocalDate;
-import java.time.format.DateTimeParseException;
 
-@WebServlet(urlPatterns = {"/cinema", "/cinema/*"})
+@WebServlet(urlPatterns = {"/cinemas", "/cinemas/*"})
 public class CinemaController extends BaseServlet {
 
-    private final CinemaService cinemaService = new CinemaService();
+    private final CinemaService service = new CinemaService();
+
     @Override
-    protected void doGet(
-            HttpServletRequest request,
-            HttpServletResponse response) throws IOException {
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        String[] segments = getPathSegments(req);
 
-        String[] segments = getPathSegments(request);
-
+        // GET /cinemas (Danh sách rạp)
         if (segments.length == 0) {
-            handleGetCinemas(request, response);
+            String city = req.getParameter("city");
+            String q = req.getParameter("q");
+            String sort = req.getParameter("sort");
+            int page = getIntParam(req, "page", 0);
+            int size = getIntParam(req, "size", 20);
+
+            writeSuccess(resp, service.getCinemas(new CinemaRequest(city, q, page, size, sort)));
             return;
         }
 
+        // GET /cinemas/{id} (Chi tiết rạp)
         if (segments.length == 1) {
-            // GET /cinema/{id}
             long id = parsePathId(segments[0], "Mã rạp");
-            handleGetCinemaDetail(request, response, id);
-        } else if (segments.length == 2) {
+            writeSuccess(resp, service.getCinemaById(id));
+            return;
+        }
+
+        // GET /cinemas/{id}/showtimes (Suất chiếu theo rạp)
+        if (segments.length == 2 && "showtimes".equalsIgnoreCase(segments[1])) {
             long id = parsePathId(segments[0], "Mã rạp");
-            String subResource = segments[1].toLowerCase();
-            switch (subResource) {
-                case "showtime", "showtimes" -> handleGetCinemaShowtimes(request, response, id);
-                default -> throw ApiException.notFound("Endpoint không tồn tại: " + subResource);
+            LocalDate date = parseDateParam(req, "date");
+            if (date == null) {
+                throw ApiException.badRequest("Tham số 'date' là bắt buộc (định dạng YYYY-MM-DD).");
             }
-        } else {
-            throw ApiException.notFound("Đường dẫn không hợp lệ.");
-        }
-    }
 
-    private void handleGetCinemas(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        String city = request.getParameter("city");
-        String q = request.getParameter("q");
-        String sort = request.getParameter("sort");
-        int page = getIntParam(request, "page", 0);
-        int size = getIntParam(request, "size", 20);
+            String movieIdStr = req.getParameter("movieId");
+            Long movieId = (movieIdStr != null && !movieIdStr.isBlank()) ? parsePathId(movieIdStr, "Tham số 'movieId'") : null;
+            int page = getIntParam(req, "page", 0);
+            int size = getIntParam(req, "size", 20);
 
-        CinemaRequest cinemaRequest = new CinemaRequest(city, q, page, size, sort);
-        PageResponse<CinemaResponse> result = cinemaService.getCinemas(cinemaRequest);
-        writeSuccess(response, result);
-    }
-
-    private void handleGetCinemaDetail(HttpServletRequest request, HttpServletResponse response, long id) throws IOException {
-        CinemaResponse result = cinemaService.getCinemaById(id);
-        writeSuccess(response, result);
-    }
-
-    private void handleGetCinemaShowtimes(HttpServletRequest request, HttpServletResponse response, long id) throws IOException {
-        String dateStr = request.getParameter("date");
-        if (dateStr == null || dateStr.trim().isEmpty()) {
-            throw ApiException.badRequest("Tham số 'date' là bắt buộc (định dạng YYYY-MM-DD).");
-        }
-        LocalDate date;
-        try {
-            date = LocalDate.parse(dateStr.trim());
-        } catch (DateTimeParseException e) {
-            throw ApiException.badRequest("Tham số 'date' không hợp lệ hoặc sai định dạng YYYY-MM-DD: " + dateStr);
+            writeSuccess(resp, service.getCinemaShowtimes(id, date, movieId, page, size));
+            return;
         }
 
-        String movieIdStr = request.getParameter("movieId");
-        Long movieId = null;
-        if (movieIdStr != null && !movieIdStr.trim().isEmpty()) {
-            movieId = parsePathId(movieIdStr, "Tham số 'movieId'");
-        }
-
-        int page = getIntParam(request, "page", 0);
-        int size = getIntParam(request, "size", 20);
-
-        PageResponse<CinemaShowtimeResponse> result = cinemaService.getCinemaShowtimes(id, date, movieId, page, size);
-        writeSuccess(response, result);
+        throw ApiException.notFound("Endpoint không tồn tại: " + req.getRequestURI());
     }
 }

@@ -1,17 +1,12 @@
 package com.cinema.auth;
 
-import io.github.cdimascio.dotenv.Dotenv;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import jakarta.servlet.http.*;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.SecureRandom;
-import java.util.Base64;
 import java.util.Date;
-import java.util.HexFormat;
 
 public class JwtUtil {
 
@@ -23,13 +18,26 @@ public class JwtUtil {
     public static final String COOKIE_REFRESH = "refresh_token";
 
     private static final SecretKey KEY;
-    private static final SecureRandom RNG = new SecureRandom();
 
     static {
-        Dotenv dotenv = Dotenv.configure().directory("f:/ltw/cinema").ignoreIfMissing().load();
+        io.github.cdimascio.dotenv.Dotenv dotenv = io.github.cdimascio.dotenv.Dotenv.configure()
+                .ignoreIfMissing()
+                .load();
         String secret = dotenv.get("JWT_SECRET");
-        if (secret == null) {
-            secret = "fallback-secret-key-for-development-must-be-at-least-256-bits-long-2024!";
+        if (secret == null || secret.isBlank()) {
+            secret = System.getenv("JWT_SECRET");
+        }
+        if (secret == null || secret.isBlank()) {
+            try (java.io.InputStream is = JwtUtil.class.getResourceAsStream("/.env")) {
+                if (is != null) {
+                    java.util.Properties props = new java.util.Properties();
+                    props.load(is);
+                    secret = props.getProperty("JWT_SECRET");
+                }
+            } catch (Exception ignored) {}
+        }
+        if (secret == null || secret.isBlank()) {
+            throw new IllegalStateException("Thiếu cấu hình JWT_SECRET trong file .env hoặc biến môi trường!");
         }
         KEY = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
@@ -81,17 +89,6 @@ public class JwtUtil {
         }
         return claims;
     }
-
-    public static String hashToken(String token) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(token.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hash);
-        } catch (Exception e) {
-            throw new RuntimeException("Lỗi hash token", e);
-        }
-    }
-
 
     // ── Cookie helpers (dùng chung) ───────────────────────────────────────────
 

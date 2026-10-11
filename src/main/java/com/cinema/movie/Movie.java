@@ -10,6 +10,7 @@ import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.Transient;
+import org.hibernate.annotations.BatchSize;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -64,6 +65,7 @@ public class Movie {
     @Column(name = "created_at", nullable = false, insertable = false, updatable = false)
     private OffsetDateTime createdAt;
 
+    @BatchSize(size = 20)
     @ManyToMany
     @JoinTable(
             name = "movie_genres",
@@ -137,6 +139,10 @@ public class Movie {
     }
 
     public String getDefaultFormat() {
+        return defaultFormat;
+    }
+
+    public String getFormat() {
         return defaultFormat;
     }
 

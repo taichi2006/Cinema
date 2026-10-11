@@ -2,26 +2,13 @@ package com.cinema.ticket;
 
 import com.cinema.common.exception.ApiException;
 import java.util.List;
-import java.util.stream.Collectors;
 
 public class TicketService {
 
-    private final TicketDAO ticketDAO;
+    private final TicketDAO ticketDAO = new TicketDAO();
 
-    public TicketService() {
-        this.ticketDAO = new TicketDAO();
-    }
-
-    public TicketService(TicketDAO ticketDAO) {
-        this.ticketDAO = ticketDAO;
-    }
-
-    // 1. GET /bookings/{bookingId}/tickets
+    // 1. Danh sách vé theo bookingId
     public List<TicketResponse> getTicketsByBooking(long currentUserId, Long bookingId) {
-        if (bookingId == null || bookingId <= 0) {
-            throw ApiException.notFound("Booking không tồn tại");
-        }
-
         Long ownerId = ticketDAO.findUserIdByBookingId(bookingId)
                 .orElseThrow(() -> ApiException.notFound("Booking không tồn tại"));
 
@@ -29,18 +16,13 @@ public class TicketService {
             throw ApiException.forbidden("Bạn không có quyền xem vé của đơn đặt này");
         }
 
-        List<Ticket> tickets = ticketDAO.findByBookingId(bookingId);
-        return tickets.stream()
+        return ticketDAO.findByBookingId(bookingId).stream()
                 .map(TicketResponse::new)
-                .collect(Collectors.toList());
+                .toList();
     }
 
-    // 2. GET /tickets/{ticketId}
+    // 2. Chi tiết vé
     public TicketResponse getTicketDetail(long currentUserId, Long ticketId) {
-        if (ticketId == null || ticketId <= 0) {
-            throw ApiException.notFound("Vé không tồn tại");
-        }
-
         Ticket ticket = ticketDAO.findById(ticketId)
                 .orElseThrow(() -> ApiException.notFound("Vé không tồn tại"));
 
