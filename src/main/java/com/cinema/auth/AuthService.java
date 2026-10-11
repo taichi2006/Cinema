@@ -22,10 +22,10 @@ public class AuthService {
 
     // 1. Đăng ký tài khoản
     public AuthUserResponse register(RegisterRequest req) {
-        if (req == null || req.email() == null || req.password() == null) {
+        if (req == null || req.email() == null || req.email().isBlank() || req.password() == null || req.password().isBlank()) {
             throw ApiException.badRequest("Email và mật khẩu không được để trống");
         }
-        if (req.password().length() < 8) {
+        if (req.password().trim().length() < 8) {
             throw ApiException.badRequest("Mật khẩu phải có ít nhất 8 ký tự");
         }
 
@@ -55,14 +55,14 @@ public class AuthService {
 
     // 2. Đăng nhập
     public LoginResponse login(LoginRequest req) {
-        if (req == null || req.email() == null || req.password() == null) {
-            throw ApiException.badRequest("Thiếu email hoặc mật khẩu");
+        if (req == null || req.email() == null || req.email().isBlank() || req.password() == null || req.password().isBlank()) {
+            throw ApiException.badRequest("Email và mật khẩu không được để trống");
         }
 
         String email = req.email().trim().toLowerCase();
         User user = authDAO.findUserByEmail(email).orElseThrow(AuthException::invalidCredentials);
 
-        if (!BCrypt.checkpw(req.password(), user.getPasswordHash())) {
+        if (user.getPasswordHash() == null || !BCrypt.checkpw(req.password(), user.getPasswordHash())) {
             throw AuthException.invalidCredentials();
         }
         if (!"ACTIVE".equalsIgnoreCase(user.getStatus())) {
@@ -122,14 +122,15 @@ public class AuthService {
 
     // 5. Đổi mật khẩu
     public void changePassword(long userId, ChangePasswordRequest req) {
-        if (req == null || req.currentPassword() == null || req.newPassword() == null) {
-            throw ApiException.badRequest("Thiếu mật khẩu hiện tại hoặc mật khẩu mới");
+        if (req == null || req.currentPassword() == null || req.currentPassword().isBlank()
+                || req.newPassword() == null || req.newPassword().isBlank()) {
+            throw ApiException.badRequest("Mật khẩu hiện tại và mật khẩu mới không được để trống");
+        }
+        if (req.newPassword().trim().length() < 8) {
+            throw ApiException.badRequest("Mật khẩu mới phải có ít nhất 8 ký tự");
         }
         if (req.confirmPassword() != null && !req.confirmPassword().equals(req.newPassword())) {
             throw ApiException.badRequest("Mật khẩu xác nhận không khớp");
-        }
-        if (req.newPassword().length() < 8) {
-            throw ApiException.badRequest("Mật khẩu mới phải có ít nhất 8 ký tự");
         }
 
         User user = authDAO.findUserById(userId)
@@ -138,7 +139,7 @@ public class AuthService {
         if (!"ACTIVE".equalsIgnoreCase(user.getStatus())) {
             throw AuthException.accountLocked();
         }
-        if (!BCrypt.checkpw(req.currentPassword(), user.getPasswordHash())) {
+        if (user.getPasswordHash() == null || !BCrypt.checkpw(req.currentPassword(), user.getPasswordHash())) {
             throw new ApiException(422, "Mật khẩu hiện tại không đúng");
         }
 

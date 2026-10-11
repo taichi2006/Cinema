@@ -13,6 +13,10 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.ServletException;
 import java.io.IOException;
 
+import com.cinema.common.config.ObjectMapperConfig;
+import com.cinema.common.dto.ErrorResponse;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 @WebFilter(urlPatterns = {
         "/user", "/user/*",
         "/bookings", "/bookings/*",
@@ -21,6 +25,8 @@ import java.io.IOException;
         "/auth/logout"
 }, dispatcherTypes = {DispatcherType.REQUEST, DispatcherType.FORWARD})
 public class AuthFilter implements Filter {
+
+    private final ObjectMapper mapper = ObjectMapperConfig.getInstance();
 
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
@@ -37,8 +43,10 @@ public class AuthFilter implements Filter {
             if (token == null) {
                 token = JwtUtil.readCookie(req, JwtUtil.COOKIE_ACCESS);
             }
-            if (token == null)
-                throw AuthException.unauthorized();
+            if (token == null || token.isBlank()) {
+                sendError(resp, 401, "Chưa đăng nhập");
+                return;
+            }
 
             Claims claims = JwtUtil.parseAccessToken(token);
             long userId = Long.parseLong(claims.getSubject());
@@ -49,9 +57,19 @@ public class AuthFilter implements Filter {
             chain.doFilter(request, response);
 
         } catch (JwtException | IllegalArgumentException e) {
-            throw new ServletException(AuthException.invalidToken());
+            sendError(resp, 401, "Access token không hợp lệ hoặc đã hết hạn");
+        } catch (ApiException apiEx) {
+            sendError(resp, apiEx.getStatus(), apiEx.getMessage());
         } catch (Exception ex) {
-            throw new ServletException(ex);
+            sendError(resp, 500, "Lỗi xác thực người dùng: " + ex.getMessage());
+        }
+    }
+
+    private void sendError(HttpServletResponse resp, int status, String message) throws IOException {
+        if (!resp.isCommitted()) {
+            resp.setStatus(status);
+            resp.setContentType("application/json;charset=UTF-8");
+            mapper.writeValue(resp.getWriter(), new ErrorResponse(status, message));
         }
     }
 }

@@ -25,7 +25,7 @@ public class BookingService {
     // 3. Cập nhật bắp nước (F&B)
     public UpdateBookingItemsResponse updateBookingItems(Long bookingId, Long userId, UpdateBookingItemsRequest req) {
         validateBookingId(bookingId);
-        if (req == null) throw ApiException.badRequest("Dữ liệu yêu cầu không hợp lệ");
+        if (req == null || req.getItems() == null) throw ApiException.badRequest("Dữ liệu bắp nước (F&B) không hợp lệ");
         return bookingDAO.updateBookingItems(bookingId, userId, req.getItems());
     }
 
@@ -41,14 +41,14 @@ public class BookingService {
     // 5. Hủy đơn đặt vé
     public CancelBookingResponse cancelBooking(Long bookingId, Long userId, CancelBookingRequest req) {
         validateBookingId(bookingId);
-        String reason = (req != null && req.getReason() != null) ? req.getReason() : "Khách hàng hủy đơn";
+        String reason = (req != null && req.getReason() != null && !req.getReason().isBlank()) ? req.getReason().trim() : "Khách hàng hủy đơn";
         return bookingDAO.cancelBooking(bookingId, userId, reason);
     }
 
     // 6. Yêu cầu hoàn tiền
     public CreateRefundResponse createRefund(Long bookingId, Long userId, CreateRefundRequest req) {
         validateBookingId(bookingId);
-        String reason = (req != null && req.getReason() != null) ? req.getReason() : "Yêu cầu hoàn tiền vé";
+        String reason = (req != null && req.getReason() != null && !req.getReason().isBlank()) ? req.getReason().trim() : "Yêu cầu hoàn tiền vé";
         return refundDAO.createRefund(bookingId, userId, reason);
     }
 

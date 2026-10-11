@@ -4,6 +4,7 @@ import com.cinema.auth.AuthException;
 import com.cinema.auth.JwtUtil;
 import com.cinema.common.config.ObjectMapperConfig;
 import com.cinema.common.dto.ApiResponse;
+import com.cinema.common.dto.ErrorResponse;
 import com.cinema.common.exception.ApiException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -27,7 +28,53 @@ public abstract class BaseServlet extends HttpServlet {
         req.setCharacterEncoding("UTF-8");
         resp.setCharacterEncoding("UTF-8");
         resp.setContentType("application/json;charset=UTF-8");
-        super.service(req, resp);
+        try {
+            super.service(req, resp);
+        } catch (Throwable e) {
+            handleException(resp, e);
+        }
+    }
+
+    protected void handleException(HttpServletResponse resp, Throwable ex) throws IOException {
+        Throwable cause = ex;
+        while (cause instanceof ServletException && cause.getCause() != null) {
+            cause = cause.getCause();
+        }
+
+        int status;
+        String message;
+
+        if (cause instanceof ApiException apiEx) {
+            status = apiEx.getStatus();
+            message = apiEx.getMessage();
+        } else if (cause instanceof IllegalArgumentException) {
+            status = HttpServletResponse.SC_BAD_REQUEST;
+            message = (cause.getMessage() != null && !cause.getMessage().isBlank())
+                    ? cause.getMessage()
+                    : "Dữ liệu yêu cầu không hợp lệ";
+        } else if (cause instanceof NullPointerException) {
+            status = HttpServletResponse.SC_BAD_REQUEST;
+            message = "Thiếu trường dữ liệu bắt buộc trong yêu cầu";
+        } else if (cause instanceof NumberFormatException) {
+            status = HttpServletResponse.SC_BAD_REQUEST;
+            message = "Định dạng số không hợp lệ";
+        } else if (cause instanceof DateTimeParseException) {
+            status = HttpServletResponse.SC_BAD_REQUEST;
+            message = "Định dạng ngày giờ không hợp lệ";
+        } else if (cause instanceof JsonProcessingException) {
+            status = HttpServletResponse.SC_BAD_REQUEST;
+            message = "Dữ liệu JSON không hợp lệ";
+        } else {
+            cause.printStackTrace();
+            status = HttpServletResponse.SC_INTERNAL_SERVER_ERROR;
+            message = "Lỗi xử lý yêu cầu: " + (cause.getMessage() != null ? cause.getMessage() : "Đã xảy ra lỗi");
+        }
+
+        if (!resp.isCommitted()) {
+            resp.setStatus(status);
+            resp.setContentType("application/json;charset=UTF-8");
+            mapper.writeValue(resp.getWriter(), new ErrorResponse(status, message));
+        }
     }
 
     // 1. Phản hồi JSON
@@ -42,7 +89,11 @@ public abstract class BaseServlet extends HttpServlet {
     // 2. Đọc Request Body & Param
     protected <T> T parseBody(HttpServletRequest req, Class<T> clazz) throws IOException {
         try {
-            return mapper.readValue(req.getInputStream(), clazz);
+            T body = mapper.readValue(req.getInputStream(), clazz);
+            if (body == null) {
+                throw ApiException.badRequest("Dữ liệu yêu cầu không được để trống");
+            }
+            return body;
         } catch (JsonProcessingException e) {
             throw ApiException.badRequest("Dữ liệu JSON không hợp lệ: " + e.getOriginalMessage());
         }
