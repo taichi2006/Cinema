@@ -4,7 +4,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 public class CreateBookingResponse {
-    private Integer bookingId;
+    private Long bookingId;
     private Integer showTimeId;
     private List<Integer> seatIds;
     private BigDecimal totalAmount;
@@ -13,7 +13,7 @@ public class CreateBookingResponse {
 
     public CreateBookingResponse() {}
 
-    public CreateBookingResponse(Integer bookingId, Integer showTimeId, List<Integer> seatIds, BigDecimal totalAmount, String holdExpiresAt, String status) {
+    public CreateBookingResponse(Long bookingId, Integer showTimeId, List<Integer> seatIds, BigDecimal totalAmount, String holdExpiresAt, String status) {
         this.bookingId = bookingId;
         this.showTimeId = showTimeId;
         this.seatIds = seatIds;
@@ -22,8 +22,8 @@ public class CreateBookingResponse {
         this.status = status;
     }
 
-    public Integer getBookingId() { return bookingId; }
-    public void setBookingId(Integer bookingId) { this.bookingId = bookingId; }
+    public Long getBookingId() { return bookingId; }
+    public void setBookingId(Long bookingId) { this.bookingId = bookingId; }
 
     public Integer getShowTimeId() { return showTimeId; }
     public void setShowTimeId(Integer showTimeId) { this.showTimeId = showTimeId; }

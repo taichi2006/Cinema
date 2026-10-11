@@ -117,24 +117,29 @@ public class ShowtimeDAO {
                     "SELECT " +
                     "    se.seat_id, " +
                     "    se.seat_row, " +
-                    "    se.seat_number, " +
-                    "    se.x_position AS x, " + // Will fallback if fails
-                    "    se.y_position AS y, " + // Will fallback if fails
+                    "    se.seat_col AS number, " +
+                    "    se.seat_col AS x, " +
+                    "    (ascii(upper(substring(se.seat_row, 1, 1))) - 64) AS y, " +
                     "    'REGULAR' AS type_name, " +
-                    "    s.base_price AS price, " +
-                    "    CASE WHEN se.status != 'ACTIVE' THEN 'BLOCKED' ELSE 'AVAILABLE' END AS seat_status, " +
+                    "    COALESCE(sts.price, s.base_price) AS price, " +
+                    "    CASE " +
+                    "        WHEN se.status != 'ACTIVE' THEN 'BLOCKED' " +
+                    "        WHEN sts.status = 'BOOKED' THEN 'BOOKED' " +
+                    "        WHEN sts.status = 'SELECTED' AND (sts.hold_expiration_at IS NULL OR sts.hold_expiration_at > CURRENT_TIMESTAMP) THEN 'HELD' " +
+                    "        ELSE 'AVAILABLE' " +
+                    "    END AS seat_status, " +
                     "    false AS held_by_current_user, " +
-                    "    NULL AS hold_expires_at " +
+                    "    sts.hold_expiration_at AS hold_expires_at " +
                     "FROM cinema.seats se " +
                     "JOIN cinema.rooms r ON se.room_id = r.room_id " +
                     "JOIN cinema.show_times s ON s.show_time_id = :showtimeId AND s.room_id = r.room_id " +
+                    "LEFT JOIN cinema.show_time_seats sts ON sts.show_time_id = s.show_time_id AND sts.seat_id = se.seat_id " +
                     "WHERE se.room_id = :roomId " +
-                    "ORDER BY se.y_position ASC, se.x_position ASC, se.seat_id ASC";
+                    "ORDER BY se.seat_row ASC, se.seat_col ASC, se.seat_id ASC";
 
             var query = entityManager.createNativeQuery(sql);
             query.setParameter("showtimeId", showtimeId);
             query.setParameter("roomId", roomId);
-            query.setParameter("currentUserId", currentUserId != null ? currentUserId : -1L);
 
             List<?> results = query.getResultList();
             List<SeatResponse> seats = new ArrayList<>();

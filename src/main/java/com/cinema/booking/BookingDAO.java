@@ -25,7 +25,7 @@ public class BookingDAO {
     private static final DateTimeFormatter ISO_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'");
 
     // 1. POST /bookings: Tạo booking & giữ ghế
-    public CreateBookingResponse createBooking(Integer userId, Integer showTimeId, List<Integer> seatIds,
+    public CreateBookingResponse createBooking(Long userId, Integer showTimeId, List<Integer> seatIds,
                                                List<CreateBookingRequest.ProductItem> productItems) {
         if (showTimeId == null) {
             throw ApiException.badRequest("showTimeId không được để trống");
@@ -165,7 +165,7 @@ public class BookingDAO {
     }
 
     // 2. GET /bookings/{bookingId}: Chi tiết booking
-    public BookingDetailResponse getBookingDetail(Integer bookingId, Integer userId) {
+    public BookingDetailResponse getBookingDetail(Long bookingId, Long userId) {
         EntityManager em = JPAUtil.getEntityManager();
         try {
             Booking booking = em.find(Booking.class, bookingId);
@@ -267,7 +267,7 @@ public class BookingDAO {
     }
 
     // 3. PUT /bookings/{bookingId}/items: Cập nhật F&B
-    public UpdateBookingItemsResponse updateBookingItems(Integer bookingId, Integer userId, List<UpdateBookingItemsRequest.Item> items) {
+    public UpdateBookingItemsResponse updateBookingItems(Long bookingId, Long userId, List<UpdateBookingItemsRequest.Item> items) {
         EntityManager em = JPAUtil.getEntityManager();
         try {
             em.getTransaction().begin();
@@ -344,7 +344,7 @@ public class BookingDAO {
     }
 
     // 4. PUT /bookings/{bookingId}/voucher: Áp dụng voucher
-    public ApplyVoucherResponse applyVoucher(Integer bookingId, Integer userId, String code) {
+    public ApplyVoucherResponse applyVoucher(Long bookingId, Long userId, String code) {
         if (code == null || code.trim().isEmpty()) {
             throw ApiException.badRequest("Mã voucher không được để trống");
         }
@@ -382,7 +382,7 @@ public class BookingDAO {
             }
 
             Object[] vRow = (Object[]) vList.get(0);
-            Integer voucherId = ((Number) vRow[0]).intValue();
+            Long voucherId = ((Number) vRow[0]).longValue();
             String vCode = (String) vRow[1];
             String discountType = (String) vRow[2];
             BigDecimal discountValue = new BigDecimal(vRow[3].toString());
@@ -464,7 +464,7 @@ public class BookingDAO {
     }
 
     // 5. POST /bookings/{bookingId}/cancel: Hủy booking
-    public CancelBookingResponse cancelBooking(Integer bookingId, Integer userId, String reason) {
+    public CancelBookingResponse cancelBooking(Long bookingId, Long userId, String reason) {
         EntityManager em = JPAUtil.getEntityManager();
         try {
             em.getTransaction().begin();
@@ -514,7 +514,7 @@ public class BookingDAO {
     }
 
     // 6. POST /bookings/{bookingId}/refund: Yêu cầu hoàn tiền
-    public CreateRefundResponse createRefund(Integer bookingId, Integer userId, String reason) {
+    public CreateRefundResponse createRefund(Long bookingId, Long userId, String reason) {
         EntityManager em = JPAUtil.getEntityManager();
         try {
             em.getTransaction().begin();
@@ -547,7 +547,7 @@ public class BookingDAO {
             }
 
             Object[] payRow = (Object[]) payList.get(0);
-            Integer paymentId = ((Number) payRow[0]).intValue();
+            Long paymentId = ((Number) payRow[0]).longValue();
             BigDecimal refundAmount = new BigDecimal(payRow[1].toString());
 
             // Check if existing refund already requested
@@ -614,7 +614,7 @@ public class BookingDAO {
     }
 
     // 7. GET /bookings/{bookingId}/refund: Xem tiến trình refund
-    public RefundDetailResponse getRefundDetail(Integer bookingId, Integer userId) {
+    public RefundDetailResponse getRefundDetail(Long bookingId, Long userId) {
         EntityManager em = JPAUtil.getEntityManager();
         try {
             Booking booking = em.find(Booking.class, bookingId);
@@ -641,7 +641,7 @@ public class BookingDAO {
             }
 
             Object[] row = (Object[]) refList.get(0);
-            Integer refId = ((Number) row[0]).intValue();
+            Long refId = ((Number) row[0]).longValue();
             BigDecimal amount = new BigDecimal(row[1].toString());
             String status = (String) row[2];
             Timestamp refDate = (Timestamp) row[3];

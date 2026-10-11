@@ -23,6 +23,16 @@
         <class>com.cinema.product.Product</class>
         <!-- Module Ticket: Vé xem phim điện tử -->
         <class>com.cinema.ticket.Ticket</class>
+        <!-- Module Showtime & Seat -->
+        <class>com.cinema.showtime.Showtime</class>
+        <class>com.cinema.showtime.Seat</class>
+        <class>com.cinema.showtime.ShowtimeSeat</class>
+        <!-- Module Voucher -->
+        <class>com.cinema.voucher.Voucher</class>
+        <!-- Module Booking -->
+        <class>com.cinema.booking.entity.Booking</class>
+        <class>com.cinema.booking.entity.BookingItem</class>
+        <class>com.cinema.booking.entity.Refund</class>
 
         <properties>
 

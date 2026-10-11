@@ -10,7 +10,7 @@ public class BookingItem {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "booking_item_id")
-    private Integer bookingItemId;
+    private Long bookingItemId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "booking_id", nullable = false)
@@ -38,8 +38,8 @@ public class BookingItem {
         this.subtotal = subtotal;
     }
 
-    public Integer getBookingItemId() { return bookingItemId; }
-    public void setBookingItemId(Integer bookingItemId) { this.bookingItemId = bookingItemId; }
+    public Long getBookingItemId() { return bookingItemId; }
+    public void setBookingItemId(Long bookingItemId) { this.bookingItemId = bookingItemId; }
 
     public Booking getBooking() { return booking; }
     public void setBooking(Booking booking) { this.booking = booking; }

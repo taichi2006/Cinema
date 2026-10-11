@@ -13,10 +13,10 @@ public class Booking {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "booking_id")
-    private Integer bookingId;
+    private Long bookingId;
 
     @Column(name = "user_id", nullable = false)
-    private Integer userId;
+    private Long userId;
 
     @Column(name = "status", nullable = false, length = 50)
     private String status = "PENDING"; // PENDING, CONFIRMED, CANCELLED, EXPIRED, REFUNDED
@@ -25,7 +25,7 @@ public class Booking {
     private BigDecimal totalAmount = BigDecimal.ZERO;
 
     @Column(name = "voucher_id")
-    private Integer voucherId;
+    private Long voucherId;
 
     @Column(name = "voucher_code", length = 50)
     private String voucherCode;
@@ -53,11 +53,11 @@ public class Booking {
 
     public Booking() {}
 
-    public Integer getBookingId() { return bookingId; }
-    public void setBookingId(Integer bookingId) { this.bookingId = bookingId; }
+    public Long getBookingId() { return bookingId; }
+    public void setBookingId(Long bookingId) { this.bookingId = bookingId; }
 
-    public Integer getUserId() { return userId; }
-    public void setUserId(Integer userId) { this.userId = userId; }
+    public Long getUserId() { return userId; }
+    public void setUserId(Long userId) { this.userId = userId; }
 
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
@@ -65,8 +65,8 @@ public class Booking {
     public BigDecimal getTotalAmount() { return totalAmount; }
     public void setTotalAmount(BigDecimal totalAmount) { this.totalAmount = totalAmount; }
 
-    public Integer getVoucherId() { return voucherId; }
-    public void setVoucherId(Integer voucherId) { this.voucherId = voucherId; }
+    public Long getVoucherId() { return voucherId; }
+    public void setVoucherId(Long voucherId) { this.voucherId = voucherId; }
 
     public String getVoucherCode() { return voucherCode; }
     public void setVoucherCode(String voucherCode) { this.voucherCode = voucherCode; }

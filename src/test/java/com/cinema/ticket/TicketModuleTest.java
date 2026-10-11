@@ -1,6 +1,7 @@
 package com.cinema.ticket;
 
-import com.cinema.common.dto.CommonDTO.ApiResponse;
+import com.cinema.common.dto.ApiResponse;
+import com.cinema.common.exception.ApiException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -103,7 +104,7 @@ public class TicketModuleTest {
         };
 
         TicketService service = new TicketService(fakeDAO);
-        TicketException ex = assertThrows(TicketException.class, () ->
+        ApiException ex = assertThrows(ApiException.class, () ->
                 service.getTicketsByBooking(currentUserId, bookingId));
 
         assertEquals(403, ex.getStatus());
@@ -121,7 +122,7 @@ public class TicketModuleTest {
         };
 
         TicketService service = new TicketService(fakeDAO);
-        TicketException ex = assertThrows(TicketException.class, () ->
+        ApiException ex = assertThrows(ApiException.class, () ->
                 service.getTicketsByBooking(10L, 9999L));
 
         assertEquals(404, ex.getStatus());
@@ -166,7 +167,7 @@ public class TicketModuleTest {
         };
 
         TicketService service = new TicketService(fakeDAO);
-        TicketException ex = assertThrows(TicketException.class, () ->
+        ApiException ex = assertThrows(ApiException.class, () ->
                 service.getTicketDetail(10L, 9999L));
 
         assertEquals(404, ex.getStatus());

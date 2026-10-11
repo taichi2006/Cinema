@@ -1,5 +1,6 @@
 package com.cinema.ticket;
 
+import com.cinema.common.exception.ApiException;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -18,14 +19,14 @@ public class TicketService {
     // 1. GET /bookings/{bookingId}/tickets
     public List<TicketResponse> getTicketsByBooking(long currentUserId, Long bookingId) {
         if (bookingId == null || bookingId <= 0) {
-            throw TicketException.notFound("Booking không tồn tại");
+            throw ApiException.notFound("Booking không tồn tại");
         }
 
         Long ownerId = ticketDAO.findUserIdByBookingId(bookingId)
-                .orElseThrow(() -> TicketException.notFound("Booking không tồn tại"));
+                .orElseThrow(() -> ApiException.notFound("Booking không tồn tại"));
 
         if (!ownerId.equals(currentUserId)) {
-            throw TicketException.forbidden("Bạn không có quyền xem vé của đơn đặt này");
+            throw ApiException.forbidden("Bạn không có quyền xem vé của đơn đặt này");
         }
 
         List<Ticket> tickets = ticketDAO.findByBookingId(bookingId);
@@ -37,17 +38,17 @@ public class TicketService {
     // 2. GET /tickets/{ticketId}
     public TicketResponse getTicketDetail(long currentUserId, Long ticketId) {
         if (ticketId == null || ticketId <= 0) {
-            throw TicketException.notFound("Vé không tồn tại");
+            throw ApiException.notFound("Vé không tồn tại");
         }
 
         Ticket ticket = ticketDAO.findById(ticketId)
-                .orElseThrow(() -> TicketException.notFound("Vé không tồn tại"));
+                .orElseThrow(() -> ApiException.notFound("Vé không tồn tại"));
 
         Long ownerId = ticketDAO.findUserIdByBookingId(ticket.getBookingId())
-                .orElseThrow(() -> TicketException.notFound("Booking không tồn tại"));
+                .orElseThrow(() -> ApiException.notFound("Booking không tồn tại"));
 
         if (!ownerId.equals(currentUserId)) {
-            throw TicketException.forbidden("Bạn không có quyền xem thông tin vé này");
+            throw ApiException.forbidden("Bạn không có quyền xem thông tin vé này");
         }
 
         return new TicketResponse(ticket);

@@ -11,10 +11,10 @@ public class Refund {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "refund_id")
-    private Integer refundId;
+    private Long refundId;
 
     @Column(name = "payment_id", nullable = false)
-    private Integer paymentId;
+    private Long paymentId;
 
     @Column(name = "amount", nullable = false)
     private BigDecimal amount = BigDecimal.ZERO;
@@ -28,23 +28,23 @@ public class Refund {
     @Column(name = "gateway_refund_id", length = 100)
     private String gatewayRefundId;
 
-    @Column(name = "refund_date", insertable = false, updatable = false)
+    @Column(name = "refund_date")
     private LocalDateTime refundDate;
 
     public Refund() {}
 
-    public Refund(Integer paymentId, BigDecimal amount, String reason, String status) {
+    public Refund(Long paymentId, BigDecimal amount, String reason, String status) {
         this.paymentId = paymentId;
         this.amount = amount;
         this.reason = reason;
         this.status = status;
     }
 
-    public Integer getRefundId() { return refundId; }
-    public void setRefundId(Integer refundId) { this.refundId = refundId; }
+    public Long getRefundId() { return refundId; }
+    public void setRefundId(Long refundId) { this.refundId = refundId; }
 
-    public Integer getPaymentId() { return paymentId; }
-    public void setPaymentId(Integer paymentId) { this.paymentId = paymentId; }
+    public Long getPaymentId() { return paymentId; }
+    public void setPaymentId(Long paymentId) { this.paymentId = paymentId; }
 
     public BigDecimal getAmount() { return amount; }
     public void setAmount(BigDecimal amount) { this.amount = amount; }

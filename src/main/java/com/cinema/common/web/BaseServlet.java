@@ -5,6 +5,8 @@ import com.cinema.common.dto.ApiResponse;
 import com.cinema.common.dto.PageMeta;
 import com.cinema.common.dto.PageResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.cinema.auth.JwtUtil;
+import io.jsonwebtoken.Claims;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
@@ -43,7 +45,11 @@ public abstract class BaseServlet extends HttpServlet {
 
     // ========== ĐỌC REQUEST ==========
     protected <T> T parseBody(HttpServletRequest req, Class<T> clazz) throws IOException {
-        return mapper.readValue(req.getInputStream(), clazz);
+        try {
+            return mapper.readValue(req.getInputStream(), clazz);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw com.cinema.common.exception.ApiException.badRequest("Dữ liệu JSON không hợp lệ: " + e.getOriginalMessage());
+        }
     }
 
     protected int getIntParam(HttpServletRequest req, String name, int defaultValue) {
@@ -69,15 +75,41 @@ public abstract class BaseServlet extends HttpServlet {
         if (attribute instanceof Number userId) {
             return userId.longValue();
         }
+        Long resolved = extractUserIdFromRequest(request);
+        if (resolved != null) {
+            return resolved;
+        }
         throw com.cinema.auth.AuthException.unauthorized();
     }
 
     protected Long getOptionalUserId(HttpServletRequest request) {
-        try {
-            return getAuthenticatedUserId(request);
-        } catch (com.cinema.auth.AuthException e) {
-            return null;
+        Object attribute = request.getAttribute("userId");
+        if (attribute instanceof Number userId) {
+            return userId.longValue();
         }
+        return extractUserIdFromRequest(request);
+    }
+
+    private Long extractUserIdFromRequest(HttpServletRequest request) {
+        try {
+            String authHeader = request.getHeader("Authorization");
+            String token = null;
+            if (authHeader != null && authHeader.startsWith("Bearer ")) {
+                token = authHeader.substring(7);
+            }
+            if (token == null) {
+                token = JwtUtil.readCookie(request, JwtUtil.COOKIE_ACCESS);
+            }
+            if (token != null && !token.isBlank()) {
+                Claims claims = JwtUtil.parseAccessToken(token);
+                long userId = Long.parseLong(claims.getSubject());
+                request.setAttribute("userId", userId);
+                return userId;
+            }
+        } catch (Exception ignored) {
+            // Token không hợp lệ, hết hạn hoặc không tồn tại
+        }
+        return null;
     }
 
     // ========== PATH PARSING ==========

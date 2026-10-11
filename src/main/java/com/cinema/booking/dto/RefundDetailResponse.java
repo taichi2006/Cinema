@@ -3,15 +3,15 @@ package com.cinema.booking.dto;
 import java.math.BigDecimal;
 
 public class RefundDetailResponse {
-    private Integer refundId;
-    private Integer bookingId;
+    private Long refundId;
+    private Long bookingId;
     private BigDecimal refundAmount;
     private String status;
     private String refundedAt;
 
     public RefundDetailResponse() {}
 
-    public RefundDetailResponse(Integer refundId, Integer bookingId, BigDecimal refundAmount, String status, String refundedAt) {
+    public RefundDetailResponse(Long refundId, Long bookingId, BigDecimal refundAmount, String status, String refundedAt) {
         this.refundId = refundId;
         this.bookingId = bookingId;
         this.refundAmount = refundAmount;
@@ -19,11 +19,11 @@ public class RefundDetailResponse {
         this.refundedAt = refundedAt;
     }
 
-    public Integer getRefundId() { return refundId; }
-    public void setRefundId(Integer refundId) { this.refundId = refundId; }
+    public Long getRefundId() { return refundId; }
+    public void setRefundId(Long refundId) { this.refundId = refundId; }
 
-    public Integer getBookingId() { return bookingId; }
-    public void setBookingId(Integer bookingId) { this.bookingId = bookingId; }
+    public Long getBookingId() { return bookingId; }
+    public void setBookingId(Long bookingId) { this.bookingId = bookingId; }
 
     public BigDecimal getRefundAmount() { return refundAmount; }
     public void setRefundAmount(BigDecimal refundAmount) { this.refundAmount = refundAmount; }

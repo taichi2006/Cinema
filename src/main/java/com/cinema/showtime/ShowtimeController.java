@@ -41,7 +41,7 @@ public class ShowtimeController extends BaseServlet {
     }
 
     private void handleGetSeatMap(HttpServletRequest request, HttpServletResponse response, String id) throws IOException {
-        long userId = getAuthenticatedUserId(request);
+        Long userId = getOptionalUserId(request);
         SeatMapResponse result = showtimeService.getSeatMap(id, userId);
         writeSuccess(response, result);
     }
