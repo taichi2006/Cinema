@@ -1,23 +1,28 @@
 package com.cinema.home;
 
-import jakarta.servlet.annotation.WebServlet;
-import jakarta.servlet.http.HttpServlet;
+import com.cinema.common.exception.ApiException;
 import com.cinema.common.web.BaseServlet;
+import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
-import jakarta.servlet.ServletException;
 import java.io.IOException;
-import java.util.Map;
 
 @WebServlet(urlPatterns = {"/home", "/home/*"})
 public class HomeController extends BaseServlet {
 
-    private final HomeService homeService = new HomeService();
-    @Override
-    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws IOException {
-            Map<String, Object> result = homeService.getHomeData();
-            writeSuccess(response, result);
+    private final HomeService service = new HomeService();
 
+    @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        String[] segments = getPathSegments(req);
+
+        // GET /home (Dữ liệu trang chủ)
+        if (segments.length == 0) {
+            writeSuccess(resp, service.getHomeData());
+            return;
+        }
+
+        throw ApiException.notFound("Endpoint không tồn tại: " + req.getRequestURI());
     }
 }

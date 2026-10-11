@@ -2,10 +2,11 @@ package com.cinema.auth;
 
 import com.cinema.common.util.JPAUtil;
 import com.cinema.user.entity.User;
+import com.cinema.wallet.entity.Wallet;
+import com.cinema.wallet.enums.WalletStatus;
 import jakarta.persistence.EntityManager;
-import jakarta.persistence.EntityTransaction;
-import jakarta.persistence.LockModeType;
 
+import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -15,17 +16,14 @@ import java.util.Optional;
 public class AuthDAO {
 
     public boolean existsByEmail(String email) {
-        EntityManager entityManager = JPAUtil.getEntityManager();
+        EntityManager em = JPAUtil.getEntityManager();
         try {
-            Long count = entityManager.createQuery(
-                            "SELECT count(user) FROM User user WHERE user.email = :email",
-                            Long.class
-                    )
+            Long count = em.createQuery("SELECT count(u) FROM User u WHERE u.email = :email", Long.class)
                     .setParameter("email", email)
                     .getSingleResult();
-            return count > 0;
+            return count != null && count > 0;
         } finally {
-            entityManager.close();
+            em.close();
         }
     }
 
@@ -33,17 +31,10 @@ public class AuthDAO {
         return createUser(email, passwordHash, fullName, null, null);
     }
 
-    public User createUser(
-            String email,
-            String passwordHash,
-            String fullName,
-            String phone,
-            LocalDate dob
-    ) {
-        EntityManager entityManager = JPAUtil.getEntityManager();
-        EntityTransaction transaction = entityManager.getTransaction();
+    public User createUser(String email, String passwordHash, String fullName, String phone, LocalDate dob) {
+        EntityManager em = JPAUtil.getEntityManager();
         try {
-            transaction.begin();
+            em.getTransaction().begin();
 
             User user = new User();
             user.setEmail(email);
@@ -52,207 +43,148 @@ public class AuthDAO {
             user.setPhone(phone);
             user.setDob(dob);
             user.setStatus("ACTIVE");
-            entityManager.persist(user);
+            em.persist(user);
 
-            // Khởi tạo ví rỗng cho user trong bảng cinema.wallets
-            entityManager.createNativeQuery(
-                            """
-                            INSERT INTO cinema.wallets (user_id, balance, status)
-                            VALUES (:userId, 0.00, 'ACTIVE')
-                            """
-                    )
-                    .setParameter("userId", user.getId())
-                    .executeUpdate();
+            Wallet wallet = new Wallet(user);
+            wallet.setBalance(BigDecimal.ZERO);
+            wallet.setStatus(WalletStatus.ACTIVE);
+            em.persist(wallet);
 
-            transaction.commit();
+            em.getTransaction().commit();
             return user;
-        } catch (RuntimeException exception) {
-            rollback(transaction);
-            throw exception;
+        } catch (RuntimeException e) {
+            if (em.getTransaction().isActive()) {
+                em.getTransaction().rollback();
+            }
+            throw e;
         } finally {
-            entityManager.close();
+            em.close();
         }
     }
 
     public Optional<User> findUserByEmail(String email) {
-        EntityManager entityManager = JPAUtil.getEntityManager();
+        EntityManager em = JPAUtil.getEntityManager();
         try {
-            return entityManager.createQuery(
-                            """
-                            SELECT user
-                            FROM User user
-                            WHERE user.email = :email
-                            """,
-                            User.class
-                    )
+            return em.createQuery("SELECT u FROM User u WHERE u.email = :email", User.class)
                     .setParameter("email", email)
                     .getResultStream()
                     .findFirst();
         } finally {
-            entityManager.close();
+            em.close();
         }
     }
 
     public Optional<User> findUserById(long userId) {
-        EntityManager entityManager = JPAUtil.getEntityManager();
+        EntityManager em = JPAUtil.getEntityManager();
         try {
-            return entityManager.createQuery(
-                            """
-                            SELECT user
-                            FROM User user
-                            WHERE user.id = :userId
-                            """,
-                            User.class
-                    )
-                    .setParameter("userId", userId)
-                    .getResultStream()
-                    .findFirst();
+            return Optional.ofNullable(em.find(User.class, userId));
         } finally {
-            entityManager.close();
+            em.close();
         }
     }
 
-    public void saveRefreshToken(
-            long userId,
-            String tokenHash,
-            Instant expiresAt,
-            String userAgent,
-            String ipAddress
-    ) {
-        EntityManager entityManager = JPAUtil.getEntityManager();
-        EntityTransaction transaction = entityManager.getTransaction();
+    public void saveRefreshToken(long userId, String token, Instant expiresAt) {
+        EntityManager em = JPAUtil.getEntityManager();
         try {
-            transaction.begin();
-            entityManager.createNativeQuery(
-                            """
-                            INSERT INTO cinema.refresh_tokens (user_id, token_hash, expires_at, user_agent, ip_address, revoked)
-                            VALUES (:userId, :tokenHash, :expiresAt, :userAgent, :ipAddress, false)
-                            """
-                    )
-                    .setParameter("userId", userId)
-                    .setParameter("tokenHash", tokenHash)
-                    .setParameter("expiresAt", Timestamp.from(expiresAt))
-                    .setParameter("userAgent", userAgent)
-                    .setParameter("ipAddress", ipAddress)
-                    .executeUpdate();
-            transaction.commit();
-        } catch (RuntimeException exception) {
-            rollback(transaction);
-            throw exception;
+            em.getTransaction().begin();
+            em.createNativeQuery(
+                    "INSERT INTO cinema.refresh_tokens (user_id, token_hash, expires_at, revoked) " +
+                    "VALUES (:userId, :token, :expiresAt, false)"
+            )
+            .setParameter("userId", userId)
+            .setParameter("token", token)
+            .setParameter("expiresAt", Timestamp.from(expiresAt))
+            .executeUpdate();
+            em.getTransaction().commit();
+        } catch (RuntimeException e) {
+            if (em.getTransaction().isActive()) em.getTransaction().rollback();
+            throw e;
         } finally {
-            entityManager.close();
+            em.close();
         }
     }
 
-    public boolean isRefreshTokenValid(String tokenHash, long userId) {
-        EntityManager entityManager = JPAUtil.getEntityManager();
+    public boolean isRefreshTokenValid(String token, long userId) {
+        EntityManager em = JPAUtil.getEntityManager();
         try {
-            Number count = (Number) entityManager.createNativeQuery(
-                            """
-                            SELECT count(*)
-                            FROM cinema.refresh_tokens
-                            WHERE token_hash = :tokenHash
-                              AND user_id = :userId
-                              AND revoked = false
-                              AND expires_at > CURRENT_TIMESTAMP
-                            """
-                    )
-                    .setParameter("tokenHash", tokenHash)
-                    .setParameter("userId", userId)
-                    .getSingleResult();
+            Number count = (Number) em.createNativeQuery(
+                    "SELECT count(*) FROM cinema.refresh_tokens " +
+                    "WHERE token_hash = :token AND user_id = :userId AND revoked = false AND expires_at > CURRENT_TIMESTAMP"
+            )
+            .setParameter("token", token)
+            .setParameter("userId", userId)
+            .getSingleResult();
             return count != null && count.longValue() > 0;
         } finally {
-            entityManager.close();
+            em.close();
         }
     }
 
-    public boolean revokeRefreshToken(String tokenHash) {
-        EntityManager entityManager = JPAUtil.getEntityManager();
-        EntityTransaction transaction = entityManager.getTransaction();
+    public boolean revokeRefreshToken(String token) {
+        EntityManager em = JPAUtil.getEntityManager();
         try {
-            transaction.begin();
-            int updated = entityManager.createNativeQuery(
-                            """
-                            UPDATE cinema.refresh_tokens
-                            SET revoked = true, revoked_at = CURRENT_TIMESTAMP
-                            WHERE token_hash = :tokenHash AND revoked = false
-                            """
-                    )
-                    .setParameter("tokenHash", tokenHash)
-                    .executeUpdate();
-            transaction.commit();
+            em.getTransaction().begin();
+            int updated = em.createNativeQuery(
+                    "UPDATE cinema.refresh_tokens SET revoked = true, revoked_at = CURRENT_TIMESTAMP " +
+                    "WHERE token_hash = :token AND revoked = false"
+            )
+            .setParameter("token", token)
+            .executeUpdate();
+            em.getTransaction().commit();
             return updated > 0;
-        } catch (RuntimeException exception) {
-            rollback(transaction);
-            throw exception;
+        } catch (RuntimeException e) {
+            if (em.getTransaction().isActive()) em.getTransaction().rollback();
+            throw e;
         } finally {
-            entityManager.close();
+            em.close();
         }
     }
 
     public void revokeAllUserTokens(long userId) {
-        EntityManager entityManager = JPAUtil.getEntityManager();
-        EntityTransaction transaction = entityManager.getTransaction();
+        EntityManager em = JPAUtil.getEntityManager();
         try {
-            transaction.begin();
-            entityManager.createNativeQuery(
-                            """
-                            UPDATE cinema.refresh_tokens
-                            SET revoked = true, revoked_at = CURRENT_TIMESTAMP
-                            WHERE user_id = :userId AND revoked = false
-                            """
-                    )
-                    .setParameter("userId", userId)
-                    .executeUpdate();
-            transaction.commit();
-        } catch (RuntimeException exception) {
-            rollback(transaction);
-            throw exception;
+            em.getTransaction().begin();
+            em.createNativeQuery(
+                    "UPDATE cinema.refresh_tokens SET revoked = true, revoked_at = CURRENT_TIMESTAMP " +
+                    "WHERE user_id = :userId AND revoked = false"
+            )
+            .setParameter("userId", userId)
+            .executeUpdate();
+            em.getTransaction().commit();
+        } catch (RuntimeException e) {
+            if (em.getTransaction().isActive()) em.getTransaction().rollback();
+            throw e;
         } finally {
-            entityManager.close();
+            em.close();
         }
     }
 
-    public boolean updatePasswordAndRevokeTokens(
-            long userId,
-            String expectedPasswordHash,
-            String newPasswordHash
-    ) {
-        EntityManager entityManager = JPAUtil.getEntityManager();
-        EntityTransaction transaction = entityManager.getTransaction();
+    public boolean updatePasswordAndRevokeTokens(long userId, String expectedPasswordHash, String newPasswordHash) {
+        EntityManager em = JPAUtil.getEntityManager();
         try {
-            transaction.begin();
-            User user = entityManager.find(User.class, userId, LockModeType.PESSIMISTIC_WRITE);
+            em.getTransaction().begin();
+            User user = em.find(User.class, userId);
             if (user == null || !Objects.equals(user.getPasswordHash(), expectedPasswordHash)) {
-                transaction.rollback();
+                em.getTransaction().rollback();
                 return false;
             }
 
             user.setPasswordHash(newPasswordHash);
 
-            entityManager.createNativeQuery(
-                            """
-                            UPDATE cinema.refresh_tokens
-                            SET revoked = true, revoked_at = CURRENT_TIMESTAMP
-                            WHERE user_id = :userId AND revoked = false
-                            """
-                    )
-                    .setParameter("userId", userId)
-                    .executeUpdate();
+            em.createNativeQuery(
+                    "UPDATE cinema.refresh_tokens SET revoked = true, revoked_at = CURRENT_TIMESTAMP " +
+                    "WHERE user_id = :userId AND revoked = false"
+            )
+            .setParameter("userId", userId)
+            .executeUpdate();
 
-            transaction.commit();
+            em.getTransaction().commit();
             return true;
-        } catch (RuntimeException exception) {
-            rollback(transaction);
-            throw exception;
+        } catch (RuntimeException e) {
+            if (em.getTransaction().isActive()) em.getTransaction().rollback();
+            throw e;
         } finally {
-            entityManager.close();
-        }
-    }
-
-    private void rollback(EntityTransaction transaction) {
-        if (transaction.isActive()) {
-            transaction.rollback();
+            em.close();
         }
     }
 }

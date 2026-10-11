@@ -1,11 +1,12 @@
 package com.cinema.common.web;
 
+import com.cinema.auth.AuthException;
+import com.cinema.auth.JwtUtil;
 import com.cinema.common.config.ObjectMapperConfig;
 import com.cinema.common.dto.ApiResponse;
-import com.cinema.common.dto.PageMeta;
-import com.cinema.common.dto.PageResponse;
+import com.cinema.common.exception.ApiException;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.cinema.auth.JwtUtil;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
@@ -13,9 +14,12 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 import java.io.IOException;
-import java.util.List;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
+import java.util.Arrays;
 
 public abstract class BaseServlet extends HttpServlet {
+
     protected final ObjectMapper mapper = ObjectMapperConfig.getInstance();
 
     @Override
@@ -26,7 +30,7 @@ public abstract class BaseServlet extends HttpServlet {
         super.service(req, resp);
     }
 
-    // ========== GHI RESPONSE ==========
+    // 1. Phản hồi JSON
     protected void sendJson(HttpServletResponse resp, Object data) throws IOException {
         mapper.writeValue(resp.getWriter(), data);
     }
@@ -35,20 +39,21 @@ public abstract class BaseServlet extends HttpServlet {
         sendJson(resp, ApiResponse.ok(data));
     }
 
-    protected void writeMessage(HttpServletResponse resp, String message) throws IOException {
-        sendJson(resp, ApiResponse.success(message));
-    }
-
-    protected <T> void writePage(HttpServletResponse resp, List<T> data, PageMeta meta) throws IOException {
-        sendJson(resp, ApiResponse.ok(PageResponse.of(data, meta)));
-    }
-
-    // ========== ĐỌC REQUEST ==========
+    // 2. Đọc Request Body & Param
     protected <T> T parseBody(HttpServletRequest req, Class<T> clazz) throws IOException {
         try {
             return mapper.readValue(req.getInputStream(), clazz);
-        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
-            throw com.cinema.common.exception.ApiException.badRequest("Dữ liệu JSON không hợp lệ: " + e.getOriginalMessage());
+        } catch (JsonProcessingException e) {
+            throw ApiException.badRequest("Dữ liệu JSON không hợp lệ: " + e.getOriginalMessage());
+        }
+    }
+
+    protected <T> T parseOptionalBody(HttpServletRequest req, Class<T> clazz) {
+        try {
+            if (req.getContentLengthLong() <= 0) return null;
+            return mapper.readValue(req.getInputStream(), clazz);
+        } catch (Exception e) {
+            return null;
         }
     }
 
@@ -62,79 +67,60 @@ public abstract class BaseServlet extends HttpServlet {
         }
     }
 
-    protected PageMeta getPagination(HttpServletRequest req, long totalElements) {
-        int page = getIntParam(req, "page", 1);
-        int size = getIntParam(req, "size", 10);
-        if (size <= 0) size = 10;
-        return new PageMeta(page, size, totalElements);
-    }
-
-    // ========== XÁC THỰC ==========
-    protected long getAuthenticatedUserId(HttpServletRequest request) {
-        Object attribute = request.getAttribute("userId");
-        if (attribute instanceof Number userId) {
-            return userId.longValue();
-        }
-        Long resolved = extractUserIdFromRequest(request);
-        if (resolved != null) {
-            return resolved;
-        }
-        throw com.cinema.auth.AuthException.unauthorized();
-    }
-
-    protected Long getOptionalUserId(HttpServletRequest request) {
-        Object attribute = request.getAttribute("userId");
-        if (attribute instanceof Number userId) {
-            return userId.longValue();
-        }
-        return extractUserIdFromRequest(request);
-    }
-
-    private Long extractUserIdFromRequest(HttpServletRequest request) {
+    protected LocalDate parseDateParam(HttpServletRequest req, String name) {
+        String value = req.getParameter(name);
+        if (value == null || value.isBlank()) return null;
         try {
-            String authHeader = request.getHeader("Authorization");
-            String token = null;
-            if (authHeader != null && authHeader.startsWith("Bearer ")) {
-                token = authHeader.substring(7);
-            }
+            return LocalDate.parse(value.trim());
+        } catch (DateTimeParseException e) {
+            throw ApiException.badRequest("Tham số '" + name + "' phải có định dạng YYYY-MM-DD: " + value);
+        }
+    }
+
+    // 3. Phân tích đường dẫn (Routing & Path Variables)
+    protected String[] getPathSegments(HttpServletRequest req) {
+        String pathInfo = req.getPathInfo();
+        if (pathInfo == null || pathInfo.isBlank()) return new String[0];
+        return Arrays.stream(pathInfo.split("/")).filter(s -> !s.isBlank()).toArray(String[]::new);
+    }
+
+    protected long parsePathId(String idStr, String name) {
+        if (idStr == null || idStr.isBlank()) {
+            throw ApiException.badRequest(name + " không được để trống.");
+        }
+        try {
+            long id = Long.parseLong(idStr.trim());
+            if (id <= 0) throw ApiException.badRequest(name + " phải là số nguyên dương.");
+            return id;
+        } catch (NumberFormatException e) {
+            throw ApiException.badRequest(name + " không hợp lệ: " + idStr);
+        }
+    }
+
+    // 4. Xác thực người dùng (JWT)
+    protected long getAuthenticatedUserId(HttpServletRequest req) {
+        Long id = getOptionalUserId(req);
+        if (id != null) return id;
+        throw AuthException.unauthorized();
+    }
+
+    protected Long getOptionalUserId(HttpServletRequest req) {
+        Object attr = req.getAttribute("userId");
+        if (attr instanceof Number n) return n.longValue();
+
+        try {
+            String header = req.getHeader("Authorization");
+            String token = (header != null && header.startsWith("Bearer ")) ? header.substring(7) : null;
             if (token == null) {
-                token = JwtUtil.readCookie(request, JwtUtil.COOKIE_ACCESS);
+                token = JwtUtil.readCookie(req, JwtUtil.COOKIE_ACCESS);
             }
             if (token != null && !token.isBlank()) {
                 Claims claims = JwtUtil.parseAccessToken(token);
                 long userId = Long.parseLong(claims.getSubject());
-                request.setAttribute("userId", userId);
+                req.setAttribute("userId", userId);
                 return userId;
             }
-        } catch (Exception ignored) {
-            // Token không hợp lệ, hết hạn hoặc không tồn tại
-        }
+        } catch (Exception ignored) {}
         return null;
-    }
-
-    // ========== PATH PARSING ==========
-    protected String[] getPathSegments(HttpServletRequest req) {
-        String pathInfo = req.getPathInfo();
-        if (pathInfo == null || pathInfo.equals("/") || pathInfo.trim().isEmpty()) {
-            return new String[0];
-        }
-        return java.util.Arrays.stream(pathInfo.split("/"))
-                .filter(s -> !s.isBlank())
-                .toArray(String[]::new);
-    }
-
-    protected long parsePathId(String idStr, String name) {
-        if (idStr == null || idStr.trim().isEmpty()) {
-            throw com.cinema.common.exception.ApiException.badRequest(name + " không được để trống.");
-        }
-        try {
-            long id = Long.parseLong(idStr.trim());
-            if (id <= 0) {
-                throw com.cinema.common.exception.ApiException.badRequest(name + " phải là số nguyên dương.");
-            }
-            return id;
-        } catch (NumberFormatException e) {
-            throw com.cinema.common.exception.ApiException.badRequest(name + " không hợp lệ: " + idStr);
-        }
     }
 }

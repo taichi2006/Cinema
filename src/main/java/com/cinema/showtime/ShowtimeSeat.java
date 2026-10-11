@@ -11,7 +11,7 @@ public class ShowtimeSeat {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id")
-    private Integer id;
+    private Long id;
 
     @Column(name = "show_time_id", nullable = false)
     private Integer showTimeId;
@@ -20,7 +20,7 @@ public class ShowtimeSeat {
     private Integer seatId;
 
     @Column(name = "booking_id")
-    private Integer bookingId;
+    private Long bookingId;
 
     @Column(name = "price", nullable = false)
     private BigDecimal price = BigDecimal.ZERO;
@@ -37,8 +37,8 @@ public class ShowtimeSeat {
 
     public ShowtimeSeat() {}
 
-    public Integer getId() { return id; }
-    public void setId(Integer id) { this.id = id; }
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
 
     public Integer getShowTimeId() { return showTimeId; }
     public void setShowTimeId(Integer showTimeId) { this.showTimeId = showTimeId; }
@@ -46,8 +46,8 @@ public class ShowtimeSeat {
     public Integer getSeatId() { return seatId; }
     public void setSeatId(Integer seatId) { this.seatId = seatId; }
 
-    public Integer getBookingId() { return bookingId; }
-    public void setBookingId(Integer bookingId) { this.bookingId = bookingId; }
+    public Long getBookingId() { return bookingId; }
+    public void setBookingId(Long bookingId) { this.bookingId = bookingId; }
 
     public BigDecimal getPrice() { return price; }
     public void setPrice(BigDecimal price) { this.price = price; }

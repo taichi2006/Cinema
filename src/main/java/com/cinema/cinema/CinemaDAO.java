@@ -1,13 +1,17 @@
 package com.cinema.cinema;
 
-import com.cinema.cinema.DTO.Request.CinemaRequest;
-import com.cinema.cinema.DTO.Response.CinemaShowtimeResponse;
+import com.cinema.cinema.dto.request.CinemaRequest;
+import com.cinema.cinema.dto.response.CinemaShowtimeResponse;
 import com.cinema.common.util.JPAUtil;
+import com.cinema.movie.Movie;
+import com.cinema.showtime.Showtime;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.TypedQuery;
 
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -17,20 +21,17 @@ import java.util.Optional;
 public class CinemaDAO {
 
     public Optional<Cinema> findById(Long cinemaId) {
-        if (cinemaId == null) {
-            return Optional.empty();
-        }
-        EntityManager entityManager = JPAUtil.getEntityManager();
+        if (cinemaId == null) return Optional.empty();
+        EntityManager em = JPAUtil.getEntityManager();
         try {
-            Cinema cinema = entityManager.find(Cinema.class, cinemaId);
-            return Optional.ofNullable(cinema);
+            return Optional.ofNullable(em.find(Cinema.class, cinemaId));
         } finally {
-            entityManager.close();
+            em.close();
         }
     }
 
     public List<Cinema> findCinemas(CinemaRequest filter) {
-        EntityManager entityManager = JPAUtil.getEntityManager();
+        EntityManager em = JPAUtil.getEntityManager();
         try {
             StringBuilder jpql = new StringBuilder("SELECT c FROM Cinema c WHERE c.status = 'ACTIVE' ");
             Map<String, Object> params = new HashMap<>();
@@ -39,35 +40,27 @@ public class CinemaDAO {
                 jpql.append("AND LOWER(c.cityCode) = :city ");
                 params.put("city", filter.getCity().trim().toLowerCase());
             }
-
             if (filter.getQ() != null && !filter.getQ().trim().isEmpty()) {
                 jpql.append("AND (LOWER(c.cinemaName) LIKE :q OR LOWER(c.address) LIKE :q) ");
                 params.put("q", "%" + filter.getQ().trim().toLowerCase() + "%");
             }
 
-            if ("name,desc".equalsIgnoreCase(filter.getSort())) {
-                jpql.append("ORDER BY c.cinemaName DESC, c.cinemaId ASC");
-            } else {
-                jpql.append("ORDER BY c.cinemaName ASC, c.cinemaId ASC");
-            }
+            jpql.append("name,desc".equalsIgnoreCase(filter.getSort())
+                    ? "ORDER BY c.cinemaName DESC, c.cinemaId ASC"
+                    : "ORDER BY c.cinemaName ASC, c.cinemaId ASC");
 
-            TypedQuery<Cinema> query = entityManager.createQuery(jpql.toString(), Cinema.class);
-            for (Map.Entry<String, Object> entry : params.entrySet()) {
-                query.setParameter(entry.getKey(), entry.getValue());
-            }
-
-            int offset = Math.max(0, filter.getPage()) * Math.max(1, filter.getSize());
-            query.setFirstResult(offset);
+            TypedQuery<Cinema> query = em.createQuery(jpql.toString(), Cinema.class);
+            params.forEach(query::setParameter);
+            query.setFirstResult(Math.max(0, filter.getPage()) * Math.max(1, filter.getSize()));
             query.setMaxResults(filter.getSize());
-
             return query.getResultList();
         } finally {
-            entityManager.close();
+            em.close();
         }
     }
 
     public long countCinemas(CinemaRequest filter) {
-        EntityManager entityManager = JPAUtil.getEntityManager();
+        EntityManager em = JPAUtil.getEntityManager();
         try {
             StringBuilder jpql = new StringBuilder("SELECT COUNT(c) FROM Cinema c WHERE c.status = 'ACTIVE' ");
             Map<String, Object> params = new HashMap<>();
@@ -76,167 +69,100 @@ public class CinemaDAO {
                 jpql.append("AND LOWER(c.cityCode) = :city ");
                 params.put("city", filter.getCity().trim().toLowerCase());
             }
-
             if (filter.getQ() != null && !filter.getQ().trim().isEmpty()) {
                 jpql.append("AND (LOWER(c.cinemaName) LIKE :q OR LOWER(c.address) LIKE :q) ");
                 params.put("q", "%" + filter.getQ().trim().toLowerCase() + "%");
             }
 
-            TypedQuery<Long> query = entityManager.createQuery(jpql.toString(), Long.class);
-            for (Map.Entry<String, Object> entry : params.entrySet()) {
-                query.setParameter(entry.getKey(), entry.getValue());
-            }
-
+            TypedQuery<Long> query = em.createQuery(jpql.toString(), Long.class);
+            params.forEach(query::setParameter);
             return query.getSingleResult();
         } finally {
-            entityManager.close();
+            em.close();
         }
     }
 
     public List<CinemaShowtimeResponse> findShowtimes(Long cinemaId, LocalDate date, Long movieId, int page, int size) {
-        EntityManager entityManager = JPAUtil.getEntityManager();
+        EntityManager em = JPAUtil.getEntityManager();
         try {
-            StringBuilder sql = new StringBuilder(
-                    "SELECT " +
-                    "s.show_time_id, " +
-                    "s.movie_id, " +
-                    "m.title, " +
-                    "c.cinema_id, " +
-                    "c.cinema_name, " +
-                    "r.room_id, " +
-                    "r.room_name, " +
-                    "(s.show_date + s.start_time) AS starts_at, " +
-                    "(s.show_date + s.end_time) AS ends_at, " +
-                    "m.format, " +
-                    "m.language, " +
-                    "s.base_price AS min_ticket_price, " +
-                    "'VND' AS currency, " +
-                    "(SELECT COUNT(ss.seat_id) FROM cinema.seats ss WHERE ss.room_id = r.room_id AND ss.status = 'ACTIVE') AS available_seat_count " +
-                    "FROM cinema.show_times s " +
-                    "JOIN cinema.rooms r ON s.room_id = r.room_id " +
-                    "JOIN cinema.cinemas c ON r.cinema_id = c.cinema_id " +
-                    "JOIN cinema.movies m ON s.movie_id = m.movie_id " +
-                    "WHERE c.cinema_id = :cinemaId " +
-                    "AND c.status = 'ACTIVE' " +
-                    "AND s.status IN ('SCHEDULED', 'ONGOING') " +
-                    "AND s.show_date = CAST(:showDate AS date) "
+            StringBuilder jpql = new StringBuilder(
+                    "SELECT s, m, r, c, " +
+                    "(SELECT COUNT(ss) FROM Seat ss WHERE ss.roomId = r.roomId AND ss.status = 'ACTIVE') " +
+                    "FROM Showtime s, Room r, Cinema c, Movie m " +
+                    "WHERE s.roomId = r.roomId AND r.cinemaId = c.cinemaId AND s.movieId = m.movieId " +
+                    "AND c.cinemaId = :cinemaId AND c.status = 'ACTIVE' AND s.status IN ('SCHEDULED', 'ONGOING') " +
+                    "AND s.showDate = :showDate "
             );
+            if (movieId != null) jpql.append("AND s.movieId = :movieId ");
+            jpql.append("ORDER BY s.startTime ASC, s.showTimeId ASC");
 
-            if (movieId != null) {
-                sql.append("AND s.movie_id = :movieId ");
-            }
+            TypedQuery<Object[]> query = em.createQuery(jpql.toString(), Object[].class)
+                    .setParameter("cinemaId", cinemaId).setParameter("showDate", date);
+            if (movieId != null) query.setParameter("movieId", movieId.intValue());
+            query.setFirstResult(Math.max(0, page) * Math.max(1, size)).setMaxResults(size);
 
-            sql.append("ORDER BY s.start_time ASC, s.show_time_id ASC");
-
-            var query = entityManager.createNativeQuery(sql.toString());
-            query.setParameter("cinemaId", cinemaId);
-            query.setParameter("showDate", date.toString());
-            if (movieId != null) {
-                query.setParameter("movieId", movieId);
-            }
-
-            int offset = Math.max(0, page) * Math.max(1, size);
-            query.setFirstResult(offset);
-            query.setMaxResults(size);
-
-            List<?> rawResults = query.getResultList();
             List<CinemaShowtimeResponse> responses = new ArrayList<>();
-            for (Object rowObj : rawResults) {
-                Object[] row = (Object[]) rowObj;
-                String showtimeId = row[0] != null ? row[0].toString() : null;
-                String mId = row[1] != null ? row[1].toString() : null;
-                String movieTitle = row[2] != null ? row[2].toString() : null;
-                String cId = row[3] != null ? row[3].toString() : null;
-                String cName = row[4] != null ? row[4].toString() : null;
-                String rId = row[5] != null ? row[5].toString() : null;
-                String rName = row[6] != null ? row[6].toString() : null;
-                String startsAt = formatTimestamp(row[7]);
-                String endsAt = formatTimestamp(row[8]);
-                String format = row[9] != null ? row[9].toString() : null;
-                String language = row[10] != null ? row[10].toString() : null;
-                Long minTicketPrice = row[11] != null ? ((Number) row[11]).longValue() : null;
-                String currency = row[12] != null ? row[12].toString() : "VND";
-                Integer availableSeatCount = row[13] != null ? ((Number) row[13]).intValue() : null;
+            for (Object[] row : query.getResultList()) {
+                Showtime s = (Showtime) row[0];
+                Movie m = (Movie) row[1];
+                Room r = (Room) row[2];
+                Cinema c = (Cinema) row[3];
+                Long availableSeats = (Long) row[4];
 
                 responses.add(new CinemaShowtimeResponse(
-                        showtimeId, mId, movieTitle, cId, cName, rId, rName, startsAt, endsAt, format, language, minTicketPrice, currency, availableSeatCount
+                        String.valueOf(s.getShowTimeId()), String.valueOf(s.getMovieId()), m.getTitle(),
+                        String.valueOf(c.getCinemaId()), c.getCinemaName(),
+                        String.valueOf(r.getRoomId()), r.getRoomName(),
+                        formatDateTime(s.getShowDate(), s.getStartTime()),
+                        formatDateTime(s.getShowDate(), s.getEndTime()),
+                        m.getFormat(), m.getLanguage(),
+                        s.getBasePrice() != null ? s.getBasePrice().longValue() : 0L,
+                        "VND", availableSeats != null ? availableSeats.intValue() : 0
                 ));
             }
             return responses;
         } finally {
-            entityManager.close();
+            em.close();
         }
     }
 
     public long countShowtimes(Long cinemaId, LocalDate date, Long movieId) {
-        EntityManager entityManager = JPAUtil.getEntityManager();
+        EntityManager em = JPAUtil.getEntityManager();
         try {
-            StringBuilder sql = new StringBuilder(
-                    "SELECT COUNT(*) " +
-                    "FROM cinema.show_times s " +
-                    "JOIN cinema.rooms r ON s.room_id = r.room_id " +
-                    "JOIN cinema.cinemas c ON r.cinema_id = c.cinema_id " +
-                    "WHERE c.cinema_id = :cinemaId " +
-                    "AND c.status = 'ACTIVE' " +
-                    "AND s.status IN ('SCHEDULED', 'ONGOING') " +
-                    "AND s.show_date = CAST(:showDate AS date) "
+            StringBuilder jpql = new StringBuilder(
+                    "SELECT COUNT(s) FROM Showtime s, Room r, Cinema c " +
+                    "WHERE s.roomId = r.roomId AND r.cinemaId = c.cinemaId " +
+                    "AND c.cinemaId = :cinemaId AND c.status = 'ACTIVE' " +
+                    "AND s.status IN ('SCHEDULED', 'ONGOING') AND s.showDate = :showDate "
             );
+            if (movieId != null) jpql.append("AND s.movieId = :movieId ");
 
-            if (movieId != null) {
-                sql.append("AND s.movie_id = :movieId ");
-            }
-
-            var query = entityManager.createNativeQuery(sql.toString());
-            query.setParameter("cinemaId", cinemaId);
-            query.setParameter("showDate", date.toString());
-            if (movieId != null) {
-                query.setParameter("movieId", movieId);
-            }
-
-            Object result = query.getSingleResult();
-            return result != null ? ((Number) result).longValue() : 0L;
+            TypedQuery<Long> query = em.createQuery(jpql.toString(), Long.class)
+                    .setParameter("cinemaId", cinemaId).setParameter("showDate", date);
+            if (movieId != null) query.setParameter("movieId", movieId.intValue());
+            return query.getSingleResult();
         } finally {
-            entityManager.close();
+            em.close();
         }
-    }
-
-    private String formatTimestamp(Object obj) {
-        if (obj == null) {
-            return null;
-        }
-        if (obj instanceof java.time.OffsetDateTime odt) {
-            return odt.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
-        }
-        if (obj instanceof java.time.Instant inst) {
-            return inst.toString();
-        }
-        if (obj instanceof java.time.ZonedDateTime zdt) {
-            return zdt.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
-        }
-        if (obj instanceof java.sql.Timestamp ts) {
-            return ts.toInstant().toString();
-        }
-        return obj.toString();
     }
 
     public record CityItem(String cityCode, String cityName) {}
 
     public List<CityItem> findDistinctCities() {
-        EntityManager entityManager = JPAUtil.getEntityManager();
+        EntityManager em = JPAUtil.getEntityManager();
         try {
-            String sql = "SELECT DISTINCT c.city, c.city FROM cinema.cinemas c WHERE c.status = 'ACTIVE' ORDER BY c.city ASC";
-            var query = entityManager.createNativeQuery(sql);
-            List<?> results = query.getResultList();
-            List<CityItem> cities = new ArrayList<>();
-            for (Object rowObj : results) {
-                Object[] row = (Object[]) rowObj;
-                String code = row[0] != null ? row[0].toString() : null;
-                String name = row[1] != null ? row[1].toString() : null;
-                cities.add(new CityItem(code, name));
-            }
-            return cities;
+            List<String> cities = em.createQuery(
+                    "SELECT DISTINCT c.cityCode FROM Cinema c WHERE c.status = 'ACTIVE' ORDER BY c.cityCode ASC",
+                    String.class
+            ).getResultList();
+            return cities.stream().map(c -> new CityItem(c, c)).toList();
         } finally {
-            entityManager.close();
+            em.close();
         }
+    }
+
+    private String formatDateTime(LocalDate date, LocalTime time) {
+        if (date == null || time == null) return null;
+        return LocalDateTime.of(date, time).atZone(ZoneId.systemDefault()).toInstant().toString();
     }
 }

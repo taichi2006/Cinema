@@ -18,19 +18,11 @@ import java.io.IOException;
 
 @WebFilter(urlPatterns = {
         "/user", "/user/*",
-        "/booking", "/booking/*", "/bookings", "/bookings/*",
+        "/bookings", "/bookings/*",
         "/wallet", "/wallet/*",
         "/payments", "/payments/*",
         "/tickets", "/tickets/*",
-        "/api/booking", "/api/booking/*", "/api/bookings", "/api/bookings/*",
-        "/api/wallet", "/api/wallet/*",
-        "/api/payments", "/api/payments/*",
-        "/api/tickets", "/api/tickets/*",
-        "/api/v1/booking", "/api/v1/booking/*", "/api/v1/bookings", "/api/v1/bookings/*",
-        "/api/v1/wallet", "/api/v1/wallet/*",
-        "/api/v1/payments", "/api/v1/payments/*",
-        "/api/v1/tickets", "/api/v1/tickets/*",
-        "/api/v1/auth/logout", "/api/auth/logout", "/auth/logout"
+        "/auth/logout"
 }, dispatcherTypes = {DispatcherType.REQUEST, DispatcherType.FORWARD})
 public class AuthFilter implements Filter {
 
@@ -43,8 +35,8 @@ public class AuthFilter implements Filter {
         HttpServletResponse resp = (HttpServletResponse) response;
 
         // IPN là callback server-to-server của VNPAY và được xác thực bằng checksum.
-        // Request URI vẫn giữ nguyên khi ApiPrefixFilter forward nên kiểm tra suffix
-        // hoạt động cho cả /payments, /api/payments và /api/v1/payments.
+        // ApiPrefixFilter có thể forward /api hoặc /api/v1, nhưng request URI gốc
+        // vẫn kết thúc bằng đường dẫn webhook này.
         if (req.getRequestURI().endsWith("/payments/webhook")) {
             chain.doFilter(request, response);
             return;

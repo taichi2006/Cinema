@@ -12,48 +12,32 @@ import jakarta.servlet.http.HttpServletResponse;
 
 import java.io.IOException;
 
-@WebServlet(name = "BookingController", urlPatterns = { "/bookings", "/bookings/*", "/booking", "/booking/*" })
+@WebServlet(urlPatterns = {"/bookings", "/bookings/*"})
 public class BookingController extends BaseServlet {
 
-    private final BookingService service;
-    private final TicketService ticketService;
-    private final PaymentService paymentService;
-
-    public BookingController() {
-        this.service = new BookingService();
-        this.ticketService = new TicketService();
-        this.paymentService = new PaymentService();
-    }
-
-    public BookingController(BookingService service, TicketService ticketService) {
-        this(service, ticketService, new PaymentService());
-    }
-
-    public BookingController(BookingService service, TicketService ticketService, PaymentService paymentService) {
-        this.service = service;
-        this.ticketService = ticketService;
-        this.paymentService = paymentService;
-    }
+    private final BookingService service = new BookingService();
+    private final TicketService ticketService = new TicketService();
+    private final PaymentService paymentService = new PaymentService();
 
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         long userId = getAuthenticatedUserId(req);
         String[] segments = getPathSegments(req);
 
-        // 1. POST /bookings: Tạo booking & giữ ghế
+        // POST /bookings (Tạo booking)
         if (segments.length == 0) {
             CreateBookingRequest body = parseBody(req, CreateBookingRequest.class);
-            CreateBookingResponse res = service.createBooking(userId, body);
             resp.setStatus(HttpServletResponse.SC_CREATED);
-            writeSuccess(resp, res);
+            writeSuccess(resp, service.createBooking(userId, body));
             return;
         }
 
+        // POST /bookings/{id}/{action} (cancel / refund)
         if (segments.length == 2) {
             long bookingId = parsePathId(segments[0], "Mã đơn hàng");
+            String action = segments[1].toLowerCase();
 
-            // Giai đoạn 2: POST /bookings/{bookingId}/payment
-            if ("payment".equalsIgnoreCase(segments[1])) {
+            if ("payment".equals(action)) {
                 CreatePaymentRequest body = parseBody(req, CreatePaymentRequest.class);
                 var payment = paymentService.createPayment(userId, bookingId, body, req.getRemoteAddr());
                 resp.setStatus(HttpServletResponse.SC_CREATED);
@@ -61,30 +45,20 @@ public class BookingController extends BaseServlet {
                 return;
             }
 
-            // 5. POST /bookings/{bookingId}/cancel: Hủy booking
-            if ("cancel".equalsIgnoreCase(segments[1])) {
-                CancelBookingRequest body = null;
-                try {
-                    body = parseBody(req, CancelBookingRequest.class);
-                } catch (Exception ignored) {
-                }
-                CancelBookingResponse res = service.cancelBooking(bookingId, userId, body);
-                writeSuccess(resp, res);
+            if ("cancel".equals(action)) {
+                CancelBookingRequest body = parseOptionalBody(req, CancelBookingRequest.class);
+                writeSuccess(resp, service.cancelBooking(bookingId, userId, body));
                 return;
             }
 
-            // 6. POST /bookings/{bookingId}/refund: Yêu cầu hoàn tiền
-            if ("refund".equalsIgnoreCase(segments[1])) {
-                CreateRefundRequest body = null;
-                try {
-                    body = parseBody(req, CreateRefundRequest.class);
-                } catch (Exception ignored) {
-                }
-                CreateRefundResponse res = service.createRefund(bookingId, userId, body);
+            if ("refund".equals(action)) {
+                CreateRefundRequest body = parseOptionalBody(req, CreateRefundRequest.class);
                 resp.setStatus(HttpServletResponse.SC_CREATED);
-                writeSuccess(resp, res);
+                writeSuccess(resp, service.createRefund(bookingId, userId, body));
                 return;
             }
+
+            throw ApiException.notFound("Endpoint không tồn tại: " + action);
         }
 
         throw ApiException.notFound("Endpoint không tồn tại: " + req.getRequestURI());
@@ -95,36 +69,34 @@ public class BookingController extends BaseServlet {
         long userId = getAuthenticatedUserId(req);
         String[] segments = getPathSegments(req);
 
-        // 2. GET /bookings/{bookingId}: Chi tiết booking
+        // GET /bookings/{id} (Chi tiết)
         if (segments.length == 1) {
             long bookingId = parsePathId(segments[0], "Mã đơn hàng");
-            BookingDetailResponse res = service.getBookingDetail(bookingId, userId);
-            writeSuccess(resp, res);
+            writeSuccess(resp, service.getBookingDetail(bookingId, userId));
             return;
         }
 
+        // GET /bookings/{id}/{sub} (refund / tickets)
         if (segments.length == 2) {
             long bookingId = parsePathId(segments[0], "Mã đơn hàng");
+            String sub = segments[1].toLowerCase();
 
-            // Giai đoạn 1: GET /bookings/{bookingId}/payment
-            if ("payment".equalsIgnoreCase(segments[1])) {
+            if ("payment".equals(sub)) {
                 writeSuccess(resp, paymentService.getPaymentsByBooking(userId, bookingId));
                 return;
             }
 
-            // 7. GET /bookings/{bookingId}/refund: Xem tiến trình refund
-            if ("refund".equalsIgnoreCase(segments[1])) {
-                RefundDetailResponse res = service.getRefundDetail(bookingId, userId);
-                writeSuccess(resp, res);
+            if ("refund".equals(sub)) {
+                writeSuccess(resp, service.getRefundDetail(bookingId, userId));
                 return;
             }
 
-            // GET /bookings/{bookingId}/tickets: Danh sách vé của booking
-            if ("tickets".equalsIgnoreCase(segments[1])) {
-                var tickets = ticketService.getTicketsByBooking(userId, bookingId);
-                writeSuccess(resp, tickets);
+            if ("tickets".equals(sub)) {
+                writeSuccess(resp, ticketService.getTicketsByBooking(userId, bookingId));
                 return;
             }
+
+            throw ApiException.notFound("Endpoint không tồn tại: " + sub);
         }
 
         throw ApiException.notFound("Endpoint không tồn tại: " + req.getRequestURI());
@@ -135,24 +107,24 @@ public class BookingController extends BaseServlet {
         long userId = getAuthenticatedUserId(req);
         String[] segments = getPathSegments(req);
 
+        // PUT /bookings/{id}/{action} (items / voucher)
         if (segments.length == 2) {
             long bookingId = parsePathId(segments[0], "Mã đơn hàng");
+            String action = segments[1].toLowerCase();
 
-            // 3. PUT /bookings/{bookingId}/items: Cập nhật F&B
-            if ("items".equalsIgnoreCase(segments[1])) {
+            if ("items".equals(action)) {
                 UpdateBookingItemsRequest body = parseBody(req, UpdateBookingItemsRequest.class);
-                UpdateBookingItemsResponse res = service.updateBookingItems(bookingId, userId, body);
-                writeSuccess(resp, res);
+                writeSuccess(resp, service.updateBookingItems(bookingId, userId, body));
                 return;
             }
 
-            // 4. PUT /bookings/{bookingId}/voucher: Áp dụng voucher
-            if ("voucher".equalsIgnoreCase(segments[1])) {
+            if ("voucher".equals(action)) {
                 ApplyVoucherRequest body = parseBody(req, ApplyVoucherRequest.class);
-                ApplyVoucherResponse res = service.applyVoucher(bookingId, userId, body);
-                writeSuccess(resp, res);
+                writeSuccess(resp, service.applyVoucher(bookingId, userId, body));
                 return;
             }
+
+            throw ApiException.notFound("Endpoint không tồn tại: " + action);
         }
 
         throw ApiException.notFound("Endpoint không tồn tại: " + req.getRequestURI());

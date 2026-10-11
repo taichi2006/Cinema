@@ -5,83 +5,62 @@ import com.cinema.common.exception.ApiException;
 
 public class BookingService {
 
-    private final BookingDAO bookingDAO;
+    private final BookingDAO bookingDAO = new BookingDAO();
+    private final RefundDAO refundDAO = new RefundDAO();
 
-    public BookingService() {
-        this.bookingDAO = new BookingDAO();
+    // 1. Tạo đơn đặt vé & giữ ghế
+    public CreateBookingResponse createBooking(Long userId, CreateBookingRequest req) {
+        if (req == null || req.getShowTimeId() == null || req.getSeatIds() == null || req.getSeatIds().isEmpty()) {
+            throw ApiException.badRequest("Dữ liệu đặt vé không hợp lệ");
+        }
+        return bookingDAO.createBooking(userId, req.getShowTimeId(), req.getSeatIds(), req.getProductItems());
     }
 
-    public BookingService(BookingDAO bookingDAO) {
-        this.bookingDAO = bookingDAO;
-    }
-
-    // 1. POST /bookings: Tạo booking & giữ ghế
-    public CreateBookingResponse createBooking(Long userId, CreateBookingRequest request) {
-        if (request == null) {
-            throw ApiException.badRequest("Dữ liệu yêu cầu không hợp lệ");
-        }
-        if (request.getShowTimeId() == null) {
-            throw ApiException.badRequest("showTimeId không được để trống");
-        }
-        if (request.getSeatIds() == null || request.getSeatIds().isEmpty()) {
-            throw ApiException.badRequest("Danh sách ghế không được để trống");
-        }
-        return bookingDAO.createBooking(userId, request.getShowTimeId(), request.getSeatIds(), request.getProductItems());
-    }
-
-    // 2. GET /bookings/{bookingId}: Chi tiết booking
+    // 2. Chi tiết đơn đặt vé
     public BookingDetailResponse getBookingDetail(Long bookingId, Long userId) {
-        if (bookingId == null || bookingId <= 0) {
-            throw ApiException.badRequest("bookingId không hợp lệ");
-        }
+        validateBookingId(bookingId);
         return bookingDAO.getBookingDetail(bookingId, userId);
     }
 
-    // 3. PUT /bookings/{bookingId}/items: Cập nhật F&B
-    public UpdateBookingItemsResponse updateBookingItems(Long bookingId, Long userId, UpdateBookingItemsRequest request) {
-        if (bookingId == null || bookingId <= 0) {
-            throw ApiException.badRequest("bookingId không hợp lệ");
-        }
-        if (request == null) {
-            throw ApiException.badRequest("Dữ liệu yêu cầu không hợp lệ");
-        }
-        return bookingDAO.updateBookingItems(bookingId, userId, request.getItems());
+    // 3. Cập nhật bắp nước (F&B)
+    public UpdateBookingItemsResponse updateBookingItems(Long bookingId, Long userId, UpdateBookingItemsRequest req) {
+        validateBookingId(bookingId);
+        if (req == null) throw ApiException.badRequest("Dữ liệu yêu cầu không hợp lệ");
+        return bookingDAO.updateBookingItems(bookingId, userId, req.getItems());
     }
 
-    // 4. PUT /bookings/{bookingId}/voucher: Áp dụng voucher
-    public ApplyVoucherResponse applyVoucher(Long bookingId, Long userId, ApplyVoucherRequest request) {
-        if (bookingId == null || bookingId <= 0) {
-            throw ApiException.badRequest("bookingId không hợp lệ");
-        }
-        if (request == null || request.getCode() == null || request.getCode().trim().isEmpty()) {
+    // 4. Áp dụng mã giảm giá (Voucher)
+    public ApplyVoucherResponse applyVoucher(Long bookingId, Long userId, ApplyVoucherRequest req) {
+        validateBookingId(bookingId);
+        if (req == null || req.getCode() == null || req.getCode().trim().isEmpty()) {
             throw ApiException.badRequest("Mã voucher không được để trống");
         }
-        return bookingDAO.applyVoucher(bookingId, userId, request.getCode().trim());
+        return bookingDAO.applyVoucher(bookingId, userId, req.getCode().trim());
     }
 
-    // 5. POST /bookings/{bookingId}/cancel: Hủy booking
-    public CancelBookingResponse cancelBooking(Long bookingId, Long userId, CancelBookingRequest request) {
-        if (bookingId == null || bookingId <= 0) {
-            throw ApiException.badRequest("bookingId không hợp lệ");
-        }
-        String reason = (request != null && request.getReason() != null) ? request.getReason() : "Khách hàng hủy đơn";
+    // 5. Hủy đơn đặt vé
+    public CancelBookingResponse cancelBooking(Long bookingId, Long userId, CancelBookingRequest req) {
+        validateBookingId(bookingId);
+        String reason = (req != null && req.getReason() != null) ? req.getReason() : "Khách hàng hủy đơn";
         return bookingDAO.cancelBooking(bookingId, userId, reason);
     }
 
-    // 6. POST /bookings/{bookingId}/refund: Yêu cầu hoàn tiền
-    public CreateRefundResponse createRefund(Long bookingId, Long userId, CreateRefundRequest request) {
-        if (bookingId == null || bookingId <= 0) {
-            throw ApiException.badRequest("bookingId không hợp lệ");
-        }
-        String reason = (request != null && request.getReason() != null) ? request.getReason() : "Yêu cầu hoàn tiền vé";
-        return bookingDAO.createRefund(bookingId, userId, reason);
+    // 6. Yêu cầu hoàn tiền
+    public CreateRefundResponse createRefund(Long bookingId, Long userId, CreateRefundRequest req) {
+        validateBookingId(bookingId);
+        String reason = (req != null && req.getReason() != null) ? req.getReason() : "Yêu cầu hoàn tiền vé";
+        return refundDAO.createRefund(bookingId, userId, reason);
     }
 
-    // 7. GET /bookings/{bookingId}/refund: Xem tiến trình refund
+    // 7. Xem trạng thái hoàn tiền
     public RefundDetailResponse getRefundDetail(Long bookingId, Long userId) {
+        validateBookingId(bookingId);
+        return refundDAO.getRefundDetail(bookingId, userId);
+    }
+
+    private void validateBookingId(Long bookingId) {
         if (bookingId == null || bookingId <= 0) {
-            throw ApiException.badRequest("bookingId không hợp lệ");
+            throw ApiException.badRequest("Mã đơn hàng không hợp lệ");
         }
-        return bookingDAO.getRefundDetail(bookingId, userId);
     }
 }

@@ -1,97 +1,65 @@
 package com.cinema.user.dao;
 
+import com.cinema.booking.entity.Booking;
 import com.cinema.common.util.JPAUtil;
-import com.cinema.user.criteria.UserBookingCriteria;
 import jakarta.persistence.EntityManager;
-import jakarta.persistence.Query;
+import jakarta.persistence.TypedQuery;
 
-import java.util.ArrayList;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 
 public class UserBookingDAO {
 
-    public long count(long userId, UserBookingCriteria query) {
-        EntityManager entityManager = JPAUtil.getEntityManager();
+    public record BookingRow(long bookingId, String status, long totalAmount) {}
+
+    public long count(long userId, String status, Instant from, Instant to) {
+        EntityManager em = JPAUtil.getEntityManager();
         try {
-            StringBuilder sql = new StringBuilder("""
-                    SELECT count(*)
-                    FROM cinema.bookings b
-                    WHERE b.user_id = :userId
-                    """);
-            appendFilters(sql, query);
+            StringBuilder jpql = new StringBuilder("SELECT count(b) FROM Booking b WHERE b.userId = :userId");
+            if (status != null && !status.isBlank()) jpql.append(" AND b.status = :st");
+            if (from != null) jpql.append(" AND b.createdAt >= :fromDt");
+            if (to != null) jpql.append(" AND b.createdAt <= :toDt");
 
-            Query nativeQuery = entityManager.createNativeQuery(sql.toString());
-            bindFilters(nativeQuery, userId, query);
-            return ((Number) nativeQuery.getSingleResult()).longValue();
+            var q = em.createQuery(jpql.toString(), Long.class).setParameter("userId", userId);
+            if (status != null && !status.isBlank()) q.setParameter("st", status.trim());
+            if (from != null) q.setParameter("fromDt", LocalDateTime.ofInstant(from, ZoneId.of("Asia/Ho_Chi_Minh")));
+            if (to != null) q.setParameter("toDt", LocalDateTime.ofInstant(to, ZoneId.of("Asia/Ho_Chi_Minh")));
+
+            return q.getSingleResult();
         } finally {
-            entityManager.close();
+            em.close();
         }
     }
 
-    public List<BookingRow> findPage(long userId, UserBookingCriteria query) {
-        EntityManager entityManager = JPAUtil.getEntityManager();
+    public List<BookingRow> findPage(long userId, String status, Instant from, Instant to,
+                                     int page, int size, String sortDirection) {
+        EntityManager em = JPAUtil.getEntityManager();
         try {
-            StringBuilder sql = new StringBuilder("""
-                    SELECT b.booking_id,
-                           b.status,
-                           b.total_amount
-                    FROM cinema.bookings b
-                    WHERE b.user_id = :userId
-                    """);
-            appendFilters(sql, query);
+            String order = "ASC".equalsIgnoreCase(sortDirection) ? "ASC" : "DESC";
+            StringBuilder jpql = new StringBuilder("SELECT b FROM Booking b WHERE b.userId = :userId");
+            if (status != null && !status.isBlank()) jpql.append(" AND b.status = :st");
+            if (from != null) jpql.append(" AND b.createdAt >= :fromDt");
+            if (to != null) jpql.append(" AND b.createdAt <= :toDt");
+            jpql.append(" ORDER BY b.createdAt ").append(order);
 
-            sql.append(" ORDER BY b.created_at ");
-            sql.append(query.sortDirection() == UserBookingCriteria.SortDirection.ASC ? "ASC" : "DESC");
-            sql.append(" LIMIT :limit OFFSET :offset ");
+            TypedQuery<Booking> query = em.createQuery(jpql.toString(), Booking.class)
+                    .setParameter("userId", userId)
+                    .setFirstResult(page * size)
+                    .setMaxResults(size);
 
-            Query nativeQuery = entityManager.createNativeQuery(sql.toString());
-            bindFilters(nativeQuery, userId, query);
-            nativeQuery.setParameter("limit", query.size());
-            nativeQuery.setParameter("offset", query.offset());
+            if (status != null && !status.isBlank()) query.setParameter("st", status.trim());
+            if (from != null) query.setParameter("fromDt", LocalDateTime.ofInstant(from, ZoneId.of("Asia/Ho_Chi_Minh")));
+            if (to != null) query.setParameter("toDt", LocalDateTime.ofInstant(to, ZoneId.of("Asia/Ho_Chi_Minh")));
 
-            @SuppressWarnings("unchecked")
-            List<Object[]> results = nativeQuery.getResultList();
-            List<BookingRow> rows = new ArrayList<>(results.size());
-            for (Object[] row : results) {
-                long bookingId = ((Number) row[0]).longValue();
-                String status = (String) row[1];
-                long totalAmount = row[2] != null ? ((Number) row[2]).longValue() : 0L;
-                rows.add(new BookingRow(bookingId, status, totalAmount));
-            }
-            return rows;
+            return query.getResultList().stream().map(b -> new BookingRow(
+                    b.getBookingId(),
+                    b.getStatus(),
+                    b.getTotalAmount() != null ? b.getTotalAmount().longValue() : 0L
+            )).toList();
         } finally {
-            entityManager.close();
+            em.close();
         }
     }
-
-    private void appendFilters(StringBuilder sql, UserBookingCriteria query) {
-        if (query.status() != null) {
-            sql.append(" AND b.status = :status ");
-        }
-        if (query.fromInclusive() != null) {
-            sql.append(" AND b.created_at >= :fromInclusive ");
-        }
-        if (query.toExclusive() != null) {
-            sql.append(" AND b.created_at < :toExclusive ");
-        }
-    }
-
-    private void bindFilters(Query nativeQuery, long userId, UserBookingCriteria query) {
-        nativeQuery.setParameter("userId", userId);
-        if (query.status() != null) {
-            nativeQuery.setParameter("status", query.status());
-        }
-        if (query.fromInclusive() != null) {
-            nativeQuery.setParameter("fromInclusive", java.sql.Timestamp.from(query.fromInclusive()));
-        }
-        if (query.toExclusive() != null) {
-            nativeQuery.setParameter("toExclusive", java.sql.Timestamp.from(query.toExclusive()));
-        }
-    }
-
-    public record BookingRow(
-            long bookingId,
-            String status,
-            long totalAmount
-    ) {}
 }
