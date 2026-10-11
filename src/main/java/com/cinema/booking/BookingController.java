@@ -3,6 +3,8 @@ package com.cinema.booking;
 import com.cinema.booking.dto.*;
 import com.cinema.common.exception.ApiException;
 import com.cinema.common.web.BaseServlet;
+import com.cinema.payment.dto.CreatePaymentRequest;
+import com.cinema.payment.PaymentService;
 import com.cinema.ticket.TicketService;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServletRequest;
@@ -15,6 +17,7 @@ public class BookingController extends BaseServlet {
 
     private final BookingService service = new BookingService();
     private final TicketService ticketService = new TicketService();
+    private final PaymentService paymentService = new PaymentService();
 
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
@@ -33,6 +36,14 @@ public class BookingController extends BaseServlet {
         if (segments.length == 2) {
             long bookingId = parsePathId(segments[0], "Mã đơn hàng");
             String action = segments[1].toLowerCase();
+
+            if ("payment".equals(action)) {
+                CreatePaymentRequest body = parseBody(req, CreatePaymentRequest.class);
+                var payment = paymentService.createPayment(userId, bookingId, body, req.getRemoteAddr());
+                resp.setStatus(HttpServletResponse.SC_CREATED);
+                writeSuccess(resp, payment);
+                return;
+            }
 
             if ("cancel".equals(action)) {
                 CancelBookingRequest body = parseOptionalBody(req, CancelBookingRequest.class);
@@ -69,6 +80,11 @@ public class BookingController extends BaseServlet {
         if (segments.length == 2) {
             long bookingId = parsePathId(segments[0], "Mã đơn hàng");
             String sub = segments[1].toLowerCase();
+
+            if ("payment".equals(sub)) {
+                writeSuccess(resp, paymentService.getPaymentsByBooking(userId, bookingId));
+                return;
+            }
 
             if ("refund".equals(sub)) {
                 writeSuccess(resp, service.getRefundDetail(bookingId, userId));

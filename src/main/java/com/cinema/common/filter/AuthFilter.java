@@ -2,7 +2,10 @@ package com.cinema.common.filter;
 
 import com.cinema.auth.AuthException;
 import com.cinema.auth.JwtUtil;
+import com.cinema.common.config.ObjectMapperConfig;
+import com.cinema.common.dto.ErrorResponse;
 import com.cinema.common.exception.ApiException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.*;
@@ -13,14 +16,11 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.ServletException;
 import java.io.IOException;
 
-import com.cinema.common.config.ObjectMapperConfig;
-import com.cinema.common.dto.ErrorResponse;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 @WebFilter(urlPatterns = {
         "/user", "/user/*",
         "/bookings", "/bookings/*",
         "/wallet", "/wallet/*",
+        "/payments", "/payments/*",
         "/tickets", "/tickets/*",
         "/auth/logout"
 }, dispatcherTypes = {DispatcherType.REQUEST, DispatcherType.FORWARD})
@@ -33,6 +33,12 @@ public class AuthFilter implements Filter {
             throws IOException, ServletException {
         HttpServletRequest req = (HttpServletRequest) request;
         HttpServletResponse resp = (HttpServletResponse) response;
+
+        // IPN là callback server-to-server của VNPAY và được xác thực bằng checksum.
+        if (req.getRequestURI().endsWith("/payments/webhook")) {
+            chain.doFilter(request, response);
+            return;
+        }
 
         try {
             String authHeader = req.getHeader("Authorization");

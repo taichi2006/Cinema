@@ -83,7 +83,7 @@ public class RefundDAO {
             }
 
             LocalDateTime now = LocalDateTime.now();
-            Refund refund = new Refund(paymentId, refundAmount, reason != null ? reason : "Yêu cầu hoàn tiền", "PROCESSING");
+            Refund refund = new Refund(paymentId, refundAmount, reason != null ? reason : "Yêu cầu hoàn tiền", "PENDING");
             refund.setRefundDate(now);
             em.persist(refund);
             em.flush();
@@ -94,7 +94,7 @@ public class RefundDAO {
                     refund.getRefundId(),
                     bookingId,
                     refundAmount,
-                    "PROCESSING",
+                    "PENDING",
                     now.format(ISO_FORMATTER)
             );
         } catch (ApiException e) {

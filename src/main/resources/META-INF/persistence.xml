@@ -36,6 +36,8 @@
         <class>com.cinema.booking.entity.Booking</class>
         <class>com.cinema.booking.entity.BookingItem</class>
         <class>com.cinema.booking.entity.Refund</class>
+        <!-- Module Payment -->
+        <class>com.cinema.payment.entity.Payment</class>
 
         <properties>
             <!-- Cấu hình kết nối CSDL (URL, user, password) được nạp động qua DB.java (.env) -->
