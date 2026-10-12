@@ -13,7 +13,10 @@ import java.io.IOException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.time.format.DateTimeParseException;
 
-@WebFilter(urlPatterns = "/*", dispatcherTypes = {DispatcherType.REQUEST, DispatcherType.FORWARD, DispatcherType.ERROR})
+/**
+ * Filter duy nhất bắt và chuẩn hóa toàn bộ lỗi (ApiException, validation, DB constraints, 500)
+ * thành JSON ErrorResponse cho toàn bộ ứng dụng. Cấu hình tại web.xml để đảm bảo thứ tự ưu tiên cao nhất.
+ */
 public class ExceptionHandlerFilter implements Filter {
     private final ObjectMapper json = ObjectMapperConfig.getInstance();
 
