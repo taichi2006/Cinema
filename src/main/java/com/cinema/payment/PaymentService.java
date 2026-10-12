@@ -122,9 +122,8 @@ public class PaymentService {
             if (paymentDAO.existsSuccessfulByBookingId(bookingId, em)) {
                 throw ApiException.conflict("Đơn hàng đã được thanh toán");
             }
-            if (paymentDAO.existsActivePendingByBookingId(bookingId, now, em)) {
-                throw ApiException.conflict("Đơn hàng đang có giao dịch thanh toán chờ xử lý");
-            }
+            // Hủy các giao dịch chờ cũ (nếu khách quay lại bấm thanh toán hoặc đổi sang Ví)
+            paymentDAO.cancelPendingPaymentsByBookingId(bookingId, "Đổi sang thanh toán bằng ví", em);
 
             List<Long> lockedSeatIds = fulfillmentDAO.lockHeldSeatIds(bookingId, em);
             if (lockedSeatIds.isEmpty()) {
@@ -198,9 +197,8 @@ public class PaymentService {
             if (paymentDAO.existsSuccessfulByBookingId(bookingId, em)) {
                 throw ApiException.conflict("Đơn hàng đã được thanh toán");
             }
-            if (paymentDAO.existsActivePendingByBookingId(bookingId, now, em)) {
-                throw ApiException.conflict("Đơn hàng đang có giao dịch thanh toán chờ xử lý");
-            }
+            // Hủy các giao dịch chờ cũ để tạo giao dịch VNPAY mới
+            paymentDAO.cancelPendingPaymentsByBookingId(bookingId, "Tạo lại giao dịch VNPAY mới", em);
             if (fulfillmentDAO.lockHeldSeatIds(bookingId, em).isEmpty()) {
                 throw ApiException.conflict("Đơn hàng không còn ghế đang được giữ");
             }

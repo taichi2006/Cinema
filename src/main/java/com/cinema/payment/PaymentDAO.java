@@ -73,6 +73,22 @@ public class PaymentDAO {
         return count > 0;
     }
 
+    public void cancelPendingPaymentsByBookingId(long bookingId, String reason, EntityManager em) {
+        List<Payment> pendingList = em.createQuery(
+                        "SELECT p FROM Payment p WHERE p.bookingId = :bookingId AND p.status = :status", Payment.class)
+                .setParameter("bookingId", bookingId)
+                .setParameter("status", com.cinema.payment.enums.PaymentStatus.PENDING)
+                .getResultList();
+        for (Payment p : pendingList) {
+            p.setStatus(com.cinema.payment.enums.PaymentStatus.FAILED);
+            p.setFailureReason(reason != null ? reason : "Hủy giao dịch chờ để tạo thanh toán mới");
+        }
+        if (!pendingList.isEmpty()) {
+            em.flush();
+        }
+    }
+
+
     public Payment save(Payment payment, EntityManager em) {
         if (payment.getId() == null) {
             em.persist(payment);
