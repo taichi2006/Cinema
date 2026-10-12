@@ -1,6 +1,5 @@
 package com.cinema.common.filter;
 
-import com.cinema.auth.AuthException;
 import com.cinema.auth.JwtUtil;
 import com.cinema.common.config.ObjectMapperConfig;
 import com.cinema.common.dto.ErrorResponse;
