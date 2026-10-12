@@ -33,10 +33,17 @@ RUN tr -d '\r' < /usr/local/tomcat/bin/entrypoint.sh > /usr/local/tomcat/bin/ent
     && mv /usr/local/tomcat/bin/entrypoint-clean.sh /usr/local/tomcat/bin/entrypoint.sh \
     && chmod +x /usr/local/tomcat/bin/entrypoint.sh
 
-# Cấu hình tối ưu bộ nhớ cho Render Free Tier (512MB RAM)
-ENV JAVA_OPTS="-Xms128m -Xmx320m -XX:+UseG1GC -XX:+ExitOnOutOfMemoryError"
+# Cài đặt và đồng bộ múi giờ Việt Nam (GMT+7) cho hệ thống và JVM
+ENV TZ="Asia/Ho_Chi_Minh"
+RUN apt-get update && apt-get install -y --no-install-recommends tzdata \
+    && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone \
+    && rm -rf /var/lib/apt/lists/*
+
+# Cấu hình tối ưu bộ nhớ cho Render Free Tier (512MB RAM) và đồng bộ múi giờ cho JVM
+ENV JAVA_OPTS="-Duser.timezone=Asia/Ho_Chi_Minh -Xms128m -Xmx320m -XX:+UseG1GC -XX:+ExitOnOutOfMemoryError"
 ENV PORT=8080
 
 EXPOSE 8080
 
 CMD ["/usr/local/tomcat/bin/entrypoint.sh"]
+

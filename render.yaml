@@ -24,3 +24,6 @@ services:
         value: https://be-cinema.onrender.com/vn_return.jsp
       - key: VNPAY_TIME_ZONE
         value: Asia/Ho_Chi_Minh
+      - key: TZ
+        value: Asia/Ho_Chi_Minh
+

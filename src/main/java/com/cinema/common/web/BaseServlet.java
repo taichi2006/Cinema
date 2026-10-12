@@ -30,7 +30,6 @@ public abstract class BaseServlet extends HttpServlet {
         super.service(req, resp);
     }
 
-
     // 1. Phản hồi JSON
     protected void sendJson(HttpServletResponse resp, Object data) throws IOException {
         mapper.writeValue(resp.getWriter(), data);
@@ -55,7 +54,8 @@ public abstract class BaseServlet extends HttpServlet {
 
     protected <T> T parseOptionalBody(HttpServletRequest req, Class<T> clazz) {
         try {
-            if (req.getContentLengthLong() <= 0) return null;
+            if (req.getContentLengthLong() <= 0)
+                return null;
             return mapper.readValue(req.getInputStream(), clazz);
         } catch (Exception e) {
             return null;
@@ -64,7 +64,8 @@ public abstract class BaseServlet extends HttpServlet {
 
     protected int getIntParam(HttpServletRequest req, String name, int defaultValue) {
         String value = req.getParameter(name);
-        if (value == null || value.isBlank()) return defaultValue;
+        if (value == null || value.isBlank())
+            return defaultValue;
         try {
             return Integer.parseInt(value);
         } catch (NumberFormatException e) {
@@ -74,7 +75,8 @@ public abstract class BaseServlet extends HttpServlet {
 
     protected LocalDate parseDateParam(HttpServletRequest req, String name) {
         String value = req.getParameter(name);
-        if (value == null || value.isBlank()) return null;
+        if (value == null || value.isBlank())
+            return null;
         try {
             return LocalDate.parse(value.trim());
         } catch (DateTimeParseException e) {
@@ -85,7 +87,8 @@ public abstract class BaseServlet extends HttpServlet {
     // 3. Phân tích đường dẫn (Routing & Path Variables)
     protected String[] getPathSegments(HttpServletRequest req) {
         String pathInfo = req.getPathInfo();
-        if (pathInfo == null || pathInfo.isBlank()) return new String[0];
+        if (pathInfo == null || pathInfo.isBlank())
+            return new String[0];
         return Arrays.stream(pathInfo.split("/")).filter(s -> !s.isBlank()).toArray(String[]::new);
     }
 
@@ -95,7 +98,8 @@ public abstract class BaseServlet extends HttpServlet {
         }
         try {
             long id = Long.parseLong(idStr.trim());
-            if (id <= 0) throw ApiException.badRequest(name + " phải là số nguyên dương.");
+            if (id <= 0)
+                throw ApiException.badRequest(name + " phải là số nguyên dương.");
             return id;
         } catch (NumberFormatException e) {
             throw ApiException.badRequest(name + " không hợp lệ: " + idStr);
@@ -105,13 +109,15 @@ public abstract class BaseServlet extends HttpServlet {
     // 4. Xác thực người dùng (JWT)
     protected long getAuthenticatedUserId(HttpServletRequest req) {
         Long id = getOptionalUserId(req);
-        if (id != null) return id;
+        if (id != null)
+            return id;
         throw AuthException.unauthorized();
     }
 
     protected Long getOptionalUserId(HttpServletRequest req) {
         Object attr = req.getAttribute("userId");
-        if (attr instanceof Number n) return n.longValue();
+        if (attr instanceof Number n)
+            return n.longValue();
 
         try {
             String header = req.getHeader("Authorization");
@@ -125,7 +131,8 @@ public abstract class BaseServlet extends HttpServlet {
                 req.setAttribute("userId", userId);
                 return userId;
             }
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
         return null;
     }
 }

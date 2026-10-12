@@ -16,7 +16,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.time.LocalDate;
 
-@WebServlet(urlPatterns = {"/user", "/user/*"})
+@WebServlet(urlPatterns = { "/user", "/user/*" })
 public class UserController extends BaseServlet {
 
     private final UserService service = new UserService();
