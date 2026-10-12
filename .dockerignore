@@ -1,0 +1,12 @@
+target/
+.git/
+.gitignore
+.idea/
+.mvn/
+*.iml
+*.log
+.env
+.smarttomcat/
+doc/
+mvnw
+mvnw.cmd
