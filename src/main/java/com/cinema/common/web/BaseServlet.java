@@ -1,6 +1,5 @@
 package com.cinema.common.web;
 
-import com.cinema.auth.AuthException;
 import com.cinema.auth.JwtUtil;
 import com.cinema.common.config.ObjectMapperConfig;
 import com.cinema.common.dto.ApiResponse;
@@ -111,7 +110,7 @@ public abstract class BaseServlet extends HttpServlet {
         Long id = getOptionalUserId(req);
         if (id != null)
             return id;
-        throw AuthException.unauthorized();
+        throw ApiException.unauthorized("Chưa đăng nhập");
     }
 
     protected Long getOptionalUserId(HttpServletRequest req) {
@@ -128,8 +127,11 @@ public abstract class BaseServlet extends HttpServlet {
             if (token != null && !token.isBlank()) {
                 Claims claims = JwtUtil.parseAccessToken(token);
                 long userId = Long.parseLong(claims.getSubject());
-                req.setAttribute("userId", userId);
-                return userId;
+                Integer tokenVer = claims.get("token_version", Integer.class);
+                if (tokenVer != null && new com.cinema.auth.AuthDAO().isTokenVersionValid(userId, tokenVer)) {
+                    req.setAttribute("userId", userId);
+                    return userId;
+                }
             }
         } catch (Exception ignored) {
         }

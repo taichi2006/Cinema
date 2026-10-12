@@ -60,16 +60,17 @@ public class AuthService {
         }
 
         String email = req.email().trim().toLowerCase();
-        User user = authDAO.findUserByEmail(email).orElseThrow(AuthException::invalidCredentials);
+        User user = authDAO.findUserByEmail(email)
+                .orElseThrow(() -> ApiException.unauthorized("Email hoặc mật khẩu không đúng"));
 
         if (user.getPasswordHash() == null || !BCrypt.checkpw(req.password(), user.getPasswordHash())) {
-            throw AuthException.invalidCredentials();
+            throw ApiException.unauthorized("Email hoặc mật khẩu không đúng");
         }
         if (!"ACTIVE".equalsIgnoreCase(user.getStatus())) {
-            throw AuthException.accountLocked();
+            throw ApiException.forbidden("Tài khoản đã bị khóa");
         }
 
-        // Thu hồi toàn bộ refresh token cũ của user trên các thiết bị trước đó (chỉ cho phép 1 thiết bị đăng nhập)
+        // Thu hồi toàn bộ refresh token cũ của user trên các thiết bị trước đó
         authDAO.revokeAllUserTokens(user.getId());
 
         // Tăng phiên bản token JWT: Vô hiệu hóa toàn bộ Access Token của các thiết bị đăng nhập trước đó
@@ -97,18 +98,18 @@ public class AuthService {
             long userId = Long.parseLong(claims.getSubject());
             Integer tokenVer = claims.get("token_version", Integer.class);
 
-            // Kiểm tra version JWT: Nếu thiết bị khác đã đăng nhập làm tăng version -> từ chối ngay lập tức
             if (tokenVer == null || !authDAO.isTokenVersionValid(userId, tokenVer)) {
-                throw AuthException.unauthorized();
+                throw ApiException.unauthorized("Tài khoản đã được đăng nhập từ một thiết bị khác");
             }
 
             if (!authDAO.isRefreshTokenValid(req.refreshToken(), userId)) {
-                throw AuthException.refreshTokenExpired();
+                throw ApiException.unauthorized("Refresh token đã hết hạn");
             }
 
-            User user = authDAO.findUserById(userId).orElseThrow(AuthException::unauthorized);
+            User user = authDAO.findUserById(userId)
+                    .orElseThrow(() -> ApiException.unauthorized("Chưa đăng nhập"));
             if (!"ACTIVE".equalsIgnoreCase(user.getStatus())) {
-                throw AuthException.accountLocked();
+                throw ApiException.forbidden("Tài khoản đã bị khóa");
             }
 
             String newAccess = JwtUtil.generateAccessToken(user.getId(), tokenVer);
@@ -116,7 +117,7 @@ public class AuthService {
         } catch (ApiException e) {
             throw e;
         } catch (Exception e) {
-            throw AuthException.refreshTokenExpired();
+            throw ApiException.unauthorized("Refresh token không hợp lệ hoặc đã hết hạn");
         }
     }
 
@@ -155,10 +156,10 @@ public class AuthService {
                 .orElseThrow(() -> ApiException.notFound("Người dùng không tồn tại"));
 
         if (!"ACTIVE".equalsIgnoreCase(user.getStatus())) {
-            throw AuthException.accountLocked();
+            throw ApiException.forbidden("Tài khoản đã bị khóa");
         }
         if (user.getPasswordHash() == null || !BCrypt.checkpw(req.currentPassword(), user.getPasswordHash())) {
-            throw new ApiException(422, "Mật khẩu hiện tại không đúng");
+            throw ApiException.unprocessable("Mật khẩu hiện tại không đúng");
         }
 
         String newPasswordHash = BCrypt.hashpw(req.newPassword(), BCrypt.gensalt(12));

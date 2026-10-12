@@ -26,65 +26,66 @@ public class AuthController extends BaseServlet {
         // POST /auth/{action}
         if (segments.length == 1) {
             String action = segments[0].toLowerCase();
-            switch (action) {
-                case "register"        -> handleRegister(req, resp);
-                case "login"           -> handleLogin(req, resp);
-                case "logout"          -> handleLogout(req, resp);
-                case "refresh"         -> handleRefresh(req, resp);
-                case "change-password" -> handleChangePassword(req, resp);
-                default                -> throw ApiException.notFound("Endpoint không tồn tại: " + action);
+
+            // 1. POST /auth/register (Đăng ký tài khoản)
+            if ("register".equals(action)) {
+                RegisterRequest body = parseBody(req, RegisterRequest.class);
+                resp.setStatus(HttpServletResponse.SC_CREATED);
+                writeSuccess(resp, service.register(body));
+                return;
             }
-            return;
+
+            // 2. POST /auth/login (Đăng nhập)
+            if ("login".equals(action)) {
+                LoginRequest body = parseBody(req, LoginRequest.class);
+                LoginResponse result = service.login(body);
+                resp.addCookie(JwtUtil.buildCookie(JwtUtil.COOKIE_ACCESS, result.accessToken(), (int) result.expiresIn()));
+                resp.addCookie(JwtUtil.buildCookie(JwtUtil.COOKIE_REFRESH, result.refreshToken(), JwtUtil.getRefreshTtlSeconds()));
+                writeSuccess(resp, result);
+                return;
+            }
+
+            // 3. POST /auth/logout (Đăng xuất)
+            if ("logout".equals(action)) {
+                Long userId = getOptionalUserId(req);
+                String refreshToken = resolveRefreshToken(req);
+                if (userId != null) {
+                    service.logout(userId, refreshToken);
+                } else {
+                    service.logout(refreshToken);
+                }
+                resp.addCookie(JwtUtil.buildCookie(JwtUtil.COOKIE_ACCESS, "", 0));
+                resp.addCookie(JwtUtil.buildCookie(JwtUtil.COOKIE_REFRESH, "", 0));
+                writeSuccess(resp, null);
+                return;
+            }
+
+            // 4. POST /auth/refresh (Làm mới token)
+            if ("refresh".equals(action)) {
+                String refreshToken = resolveRefreshToken(req);
+                if (refreshToken == null || refreshToken.isBlank()) {
+                    throw ApiException.badRequest("Thiếu refresh token");
+                }
+                RefreshResponse result = service.refresh(new RefreshRequest(refreshToken));
+                resp.addCookie(JwtUtil.buildCookie(JwtUtil.COOKIE_ACCESS, result.accessToken(), (int) result.expiresIn()));
+                resp.addCookie(JwtUtil.buildCookie(JwtUtil.COOKIE_REFRESH, result.refreshToken(), JwtUtil.getRefreshTtlSeconds()));
+                writeSuccess(resp, result);
+                return;
+            }
+
+            // 5. POST /auth/change-password (Đổi mật khẩu)
+            if ("change-password".equals(action)) {
+                long userId = getAuthenticatedUserId(req);
+                ChangePasswordRequest body = parseBody(req, ChangePasswordRequest.class);
+                service.changePassword(userId, body);
+                writeSuccess(resp, null);
+                return;
+            }
+
+            throw ApiException.notFound("Endpoint không tồn tại: " + action);
         }
 
-        throw ApiException.notFound("Đường dẫn không hợp lệ: " + req.getRequestURI());
-    }
-
-    private void handleRegister(HttpServletRequest req, HttpServletResponse resp) throws IOException {
-        RegisterRequest body = parseBody(req, RegisterRequest.class);
-        resp.setStatus(HttpServletResponse.SC_CREATED);
-        writeSuccess(resp, service.register(body));
-    }
-
-    private void handleLogin(HttpServletRequest req, HttpServletResponse resp) throws IOException {
-        LoginRequest body = parseBody(req, LoginRequest.class);
-        LoginResponse result = service.login(body);
-        resp.addCookie(JwtUtil.buildCookie(JwtUtil.COOKIE_ACCESS, result.accessToken(), (int) result.expiresIn()));
-        resp.addCookie(JwtUtil.buildCookie(JwtUtil.COOKIE_REFRESH, result.refreshToken(), JwtUtil.getRefreshTtlSeconds()));
-        writeSuccess(resp, result);
-    }
-
-    private void handleLogout(HttpServletRequest req, HttpServletResponse resp) throws IOException {
-        Long userId = getOptionalUserId(req);
-        String refreshToken = resolveRefreshToken(req);
-
-        if (userId != null) {
-            service.logout(userId, refreshToken);
-        } else {
-            service.logout(refreshToken);
-        }
-
-        resp.addCookie(JwtUtil.buildCookie(JwtUtil.COOKIE_ACCESS, "", 0));
-        resp.addCookie(JwtUtil.buildCookie(JwtUtil.COOKIE_REFRESH, "", 0));
-        writeSuccess(resp, null);
-    }
-
-    private void handleRefresh(HttpServletRequest req, HttpServletResponse resp) throws IOException {
-        String refreshToken = resolveRefreshToken(req);
-        if (refreshToken == null || refreshToken.isBlank()) {
-            throw ApiException.badRequest("Thiếu refresh token");
-        }
-
-        RefreshResponse result = service.refresh(new RefreshRequest(refreshToken));
-        resp.addCookie(JwtUtil.buildCookie(JwtUtil.COOKIE_ACCESS, result.accessToken(), (int) result.expiresIn()));
-        resp.addCookie(JwtUtil.buildCookie(JwtUtil.COOKIE_REFRESH, result.refreshToken(), JwtUtil.getRefreshTtlSeconds()));
-        writeSuccess(resp, result);
-    }
-
-    private void handleChangePassword(HttpServletRequest req, HttpServletResponse resp) throws IOException {
-        long userId = getAuthenticatedUserId(req);
-        service.changePassword(userId, parseBody(req, ChangePasswordRequest.class));
-        writeSuccess(resp, null);
+        throw ApiException.notFound("Endpoint không tồn tại: " + req.getRequestURI());
     }
 
     private String resolveRefreshToken(HttpServletRequest req) {
