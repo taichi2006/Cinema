@@ -72,8 +72,11 @@ public class AuthService {
         // Thu hồi toàn bộ refresh token cũ của user trên các thiết bị trước đó (chỉ cho phép 1 thiết bị đăng nhập)
         authDAO.revokeAllUserTokens(user.getId());
 
-        String access = JwtUtil.generateAccessToken(user.getId());
-        String refresh = JwtUtil.generateRefreshToken(user.getId());
+        // Tăng phiên bản token JWT: Vô hiệu hóa toàn bộ Access Token của các thiết bị đăng nhập trước đó
+        int tokenVersion = authDAO.incrementAndGetTokenVersion(user.getId());
+
+        String access = JwtUtil.generateAccessToken(user.getId(), tokenVersion);
+        String refresh = JwtUtil.generateRefreshToken(user.getId(), tokenVersion);
         Instant expiresAt = Instant.now().plusSeconds(JwtUtil.getRefreshTtlSeconds());
         authDAO.saveRefreshToken(user.getId(), refresh, expiresAt);
 
@@ -92,6 +95,12 @@ public class AuthService {
         try {
             Claims claims = JwtUtil.parseRefreshToken(req.refreshToken());
             long userId = Long.parseLong(claims.getSubject());
+            Integer tokenVer = claims.get("token_version", Integer.class);
+
+            // Kiểm tra version JWT: Nếu thiết bị khác đã đăng nhập làm tăng version -> từ chối ngay lập tức
+            if (tokenVer == null || !authDAO.isTokenVersionValid(userId, tokenVer)) {
+                throw AuthException.unauthorized();
+            }
 
             if (!authDAO.isRefreshTokenValid(req.refreshToken(), userId)) {
                 throw AuthException.refreshTokenExpired();
@@ -102,7 +111,7 @@ public class AuthService {
                 throw AuthException.accountLocked();
             }
 
-            String newAccess = JwtUtil.generateAccessToken(user.getId());
+            String newAccess = JwtUtil.generateAccessToken(user.getId(), tokenVer);
             return new RefreshResponse(newAccess, req.refreshToken(), JwtUtil.getAccessTtlSeconds());
         } catch (ApiException e) {
             throw e;
@@ -114,12 +123,18 @@ public class AuthService {
     // 4. Đăng xuất
     public void logout(String refreshToken) {
         if (refreshToken != null && !refreshToken.isBlank()) {
+            try {
+                Claims claims = JwtUtil.parseRefreshToken(refreshToken);
+                long userId = Long.parseLong(claims.getSubject());
+                authDAO.invalidateTokenVersion(userId);
+            } catch (Exception ignored) {}
             authDAO.revokeRefreshToken(refreshToken);
         }
     }
 
     public void logout(long userId, String refreshToken) {
         logout(refreshToken);
+        authDAO.invalidateTokenVersion(userId);
         authDAO.revokeAllUserTokens(userId);
     }
 
@@ -150,5 +165,6 @@ public class AuthService {
         if (!authDAO.updatePasswordAndRevokeTokens(userId, user.getPasswordHash(), newPasswordHash)) {
             throw ApiException.internal("Không thể cập nhật mật khẩu");
         }
+        authDAO.invalidateTokenVersion(userId);
     }
 }

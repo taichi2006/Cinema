@@ -53,9 +53,14 @@ public class JwtUtil {
     // ── Access Token ──────────────────────────────────────────────────────────
 
     public static String generateAccessToken(long userId) {
+        return generateAccessToken(userId, 1);
+    }
+
+    public static String generateAccessToken(long userId, int tokenVersion) {
         Date now = new Date();
         return Jwts.builder()
                 .subject(String.valueOf(userId))
+                .claim("token_version", tokenVersion)
                 .issuedAt(now)
                 .expiration(new Date(now.getTime() + ACCESS_TTL_MS))
                 .signWith(KEY)
@@ -70,10 +75,15 @@ public class JwtUtil {
     // ── Refresh Token ─────────────────────────────────────────────────────────
 
     public static String generateRefreshToken(long userId) {
+        return generateRefreshToken(userId, 1);
+    }
+
+    public static String generateRefreshToken(long userId, int tokenVersion) {
         Date now = new Date();
         return Jwts.builder()
                 .subject(String.valueOf(userId))
                 .claim("type", "refresh")
+                .claim("token_version", tokenVersion)
                 .id(java.util.UUID.randomUUID().toString())
                 .issuedAt(now)
                 .expiration(new Date(now.getTime() + REFRESH_TTL_MS))

@@ -193,6 +193,7 @@ public class AuthDAO {
             .executeUpdate();
 
             em.getTransaction().commit();
+            invalidateTokenVersion(userId);
             return true;
         } catch (RuntimeException e) {
             if (em.getTransaction().isActive()) em.getTransaction().rollback();
@@ -200,5 +201,58 @@ public class AuthDAO {
         } finally {
             em.close();
         }
+    }
+
+    private static final java.util.concurrent.ConcurrentHashMap<Long, Integer> TOKEN_VERSIONS = new java.util.concurrent.ConcurrentHashMap<>();
+
+    public int incrementAndGetTokenVersion(long userId) {
+        EntityManager em = JPAUtil.getEntityManager();
+        try {
+            em.getTransaction().begin();
+            Object res = em.createNativeQuery(
+                    "UPDATE cinema.users SET token_version = COALESCE(token_version, 0) + 1 " +
+                    "WHERE user_id = :userId RETURNING token_version"
+            ).setParameter("userId", userId).getSingleResult();
+            em.getTransaction().commit();
+
+            int newVer = ((Number) res).intValue();
+            TOKEN_VERSIONS.put(userId, newVer);
+            return newVer;
+        } catch (RuntimeException e) {
+            if (em.getTransaction().isActive()) em.getTransaction().rollback();
+            throw e;
+        } finally {
+            em.close();
+        }
+    }
+
+    public boolean isTokenVersionValid(long userId, Integer tokenVersion) {
+        if (tokenVersion == null) {
+            return false;
+        }
+        Integer cached = TOKEN_VERSIONS.get(userId);
+        if (cached != null) {
+            return cached.equals(tokenVersion);
+        }
+        EntityManager em = JPAUtil.getEntityManager();
+        try {
+            Object res = em.createNativeQuery(
+                    "SELECT COALESCE(token_version, 1) FROM cinema.users WHERE user_id = :userId"
+            ).setParameter("userId", userId).getResultStream().findFirst().orElse(null);
+            if (res != null) {
+                int dbVer = ((Number) res).intValue();
+                TOKEN_VERSIONS.put(userId, dbVer);
+                return dbVer == tokenVersion;
+            }
+            return false;
+        } finally {
+            em.close();
+        }
+    }
+
+    public void invalidateTokenVersion(long userId) {
+        try {
+            incrementAndGetTokenVersion(userId);
+        } catch (Exception ignored) {}
     }
 }

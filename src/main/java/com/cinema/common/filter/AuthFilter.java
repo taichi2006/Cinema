@@ -27,6 +27,7 @@ import java.io.IOException;
 public class AuthFilter implements Filter {
 
     private final ObjectMapper mapper = ObjectMapperConfig.getInstance();
+    private final com.cinema.auth.AuthDAO authDAO = new com.cinema.auth.AuthDAO();
 
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
@@ -57,6 +58,13 @@ public class AuthFilter implements Filter {
 
             Claims claims = JwtUtil.parseAccessToken(token);
             long userId = Long.parseLong(claims.getSubject());
+            Integer tokenVer = claims.get("token_version", Integer.class);
+
+            // Đảm bảo chỉ 1 thiết bị đăng nhập tại một thời điểm (pure JWT Token Version)
+            if (tokenVer == null || !authDAO.isTokenVersionValid(userId, tokenVer)) {
+                sendError(resp, 401, "Tài khoản của bạn đã được đăng nhập từ một thiết bị khác");
+                return;
+            }
 
             // Lưu vào Request Attribute để các Controller phía sau sử dụng
             req.setAttribute("userId", userId);

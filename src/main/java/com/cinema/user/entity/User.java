@@ -68,4 +68,10 @@ public class User {
 
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
+
+    @Column(name = "token_version")
+    private Integer tokenVersion = 1;
+
+    public Integer getTokenVersion() { return tokenVersion != null ? tokenVersion : 1; }
+    public void setTokenVersion(Integer tokenVersion) { this.tokenVersion = tokenVersion; }
 }

@@ -38,7 +38,10 @@ public class RefundDAO {
             if (userId != null && !booking.getUserId().equals(userId)) {
                 throw ApiException.forbidden("Bạn không có quyền yêu cầu hoàn tiền cho đơn hàng này");
             }
-            if (!"CONFIRMED".equalsIgnoreCase(booking.getStatus())) {
+            if ("REFUNDED".equalsIgnoreCase(booking.getStatus())) {
+                throw ApiException.conflict("Đơn đặt vé này đã được hoàn tiền trước đó");
+            }
+            if (!"CONFIRMED".equalsIgnoreCase(booking.getStatus()) && !"PAID".equalsIgnoreCase(booking.getStatus())) {
                 throw ApiException.unprocessable("Chỉ có thể hoàn tiền cho đơn hàng đã thanh toán thành công");
             }
 
@@ -66,6 +69,8 @@ public class RefundDAO {
             }
 
             // 1. Kiểm tra thời gian suất chiếu: Chỉ hoàn tiền trước giờ chiếu ít nhất 24 giờ
+            java.time.ZoneId vnZone = java.time.ZoneId.of("Asia/Ho_Chi_Minh");
+            LocalDateTime now = LocalDateTime.now(vnZone);
             LocalDateTime showTimeDt = null;
             List<Showtime> showtimes = em.createQuery(
                     "SELECT st FROM ShowtimeSeat sts, Showtime st " +
@@ -87,8 +92,9 @@ public class RefundDAO {
             }
 
             if (showTimeDt != null) {
-                if (LocalDateTime.now().plusHours(24).isAfter(showTimeDt)) {
-                    throw ApiException.unprocessable("Chỉ có thể yêu cầu hoàn tiền trước giờ chiếu ít nhất 24 giờ");
+                if (now.plusHours(24).isAfter(showTimeDt)) {
+                    String timeStr = showTimeDt.format(DateTimeFormatter.ofPattern("HH:mm 'ngày' dd/MM/yyyy"));
+                    throw ApiException.unprocessable("Chỉ có thể yêu cầu hoàn tiền trước giờ chiếu ít nhất 24 giờ. Suất chiếu của bạn: " + timeStr);
                 }
             }
 
@@ -101,8 +107,6 @@ public class RefundDAO {
             if (usedTickets != null && usedTickets > 0) {
                 throw ApiException.unprocessable("Vé đã được sử dụng, không thể hoàn tiền");
             }
-
-            LocalDateTime now = LocalDateTime.now();
 
             // 3. Hoàn tiền trực tiếp vào Ví (Wallet) của người dùng
             Wallet wallet = em.createQuery(
