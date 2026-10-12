@@ -5,7 +5,10 @@ set -e
 TARGET_PORT=${PORT:-8080}
 echo "[Tomcat] Binding HTTP connector to port: $TARGET_PORT"
 
-# Cập nhật cổng lắng nghe trong server.xml của Tomcat
+# Vô hiệu hóa cổng shutdown 8005 (tránh Render scanner gửi HTTP probe vào port socket shutdown gây spam log)
+sed -i 's/<Server port="8005"/<Server port="-1"/g' /usr/local/tomcat/conf/server.xml
+
+# Cập nhật cổng lắng nghe HTTP trong server.xml của Tomcat
 sed -i "s/port=\"8080\"/port=\"$TARGET_PORT\"/g" /usr/local/tomcat/conf/server.xml
 
 # Khởi chạy Tomcat
