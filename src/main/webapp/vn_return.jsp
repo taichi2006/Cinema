@@ -1,5 +1,8 @@
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ page import="com.cinema.payment.PaymentService" %>
+<%@ page import="com.cinema.payment.PaymentDAO" %>
+<%@ page import="com.cinema.payment.entity.Payment" %>
+<%@ page import="com.cinema.payment.enums.PaymentType" %>
 <%@ page import="com.cinema.payment.gateway.VnPayIpnResponse" %>
 <%@ page import="java.text.NumberFormat" %>
 <%@ page import="java.util.Locale" %>
@@ -31,6 +34,38 @@
 
     // 00: Cập nhật thành công, 02: Giao dịch đã được xác nhận thành công trước đó
     boolean isSuccess = ipnResult != null && ("00".equals(ipnResult.rspCode()) || "02".equals(ipnResult.rspCode()));
+
+    Payment paymentObj = null;
+    if (vnp_TxnRef != null && !vnp_TxnRef.isBlank()) {
+        try {
+            long pId = Long.parseLong(vnp_TxnRef);
+            paymentObj = new PaymentDAO().findById(pId).orElse(null);
+        } catch (Exception ignored) {}
+    }
+
+    // Phân biệt giao dịch Nạp tiền ví (TOPUP) hay Thanh toán vé xem phim (BOOKING)
+    boolean isTopUp = (paymentObj != null && paymentObj.getPaymentType() == PaymentType.TOPUP)
+            || (vnp_OrderInfo != null && vnp_OrderInfo.toLowerCase().contains("nap tien"));
+
+    String frontendTargetUrl;
+    String actionBtnText;
+    String actionBtnIcon;
+
+    if (isTopUp) {
+        String envWalletUrl = System.getenv("FRONTEND_WALLET_URL");
+        frontendTargetUrl = (envWalletUrl != null && !envWalletUrl.isBlank())
+                ? envWalletUrl
+                : "https://web-final-project-tawny.vercel.app/#/wallet";
+        actionBtnText = "Xem lịch sử nạp tiền";
+        actionBtnIcon = "fa-wallet";
+    } else {
+        String envBookingUrl = System.getenv("FRONTEND_BOOKING_URL");
+        frontendTargetUrl = (envBookingUrl != null && !envBookingUrl.isBlank())
+                ? envBookingUrl
+                : "https://web-final-project-tawny.vercel.app/#/user/booking";
+        actionBtnText = "Xem vé";
+        actionBtnIcon = "fa-ticket";
+    }
 %>
 <!DOCTYPE html>
 <html lang="vi">
@@ -179,11 +214,33 @@
         <a href="javascript:window.close();" class="btn btn-outline-secondary btn-action me-2">
             <i class="fa-solid fa-xmark me-1"></i>Đóng
         </a>
-        <a href="<%= request.getContextPath() %>/" class="btn btn-primary btn-action">
-            <i class="fa-solid fa-house me-1"></i>Về trang chủ
+        <a href="<%= frontendTargetUrl %>" class="btn btn-primary btn-action" id="btn-view-action">
+            <i class="fa-solid <%= actionBtnIcon %> me-1"></i><%= actionBtnText %>
         </a>
     </div>
 </div>
+
+<% if (isSuccess) { %>
+<script>
+    // Tự động chuyển hướng về trang lịch sử tương ứng trên Frontend sau 5 giây nếu thành công
+    let countdown = 5;
+    const btn = document.getElementById('btn-view-action');
+    const targetUrl = '<%= frontendTargetUrl %>';
+    const btnText = '<%= actionBtnText %>';
+    const btnIcon = '<%= actionBtnIcon %>';
+    if (btn) {
+        const interval = setInterval(function() {
+            countdown--;
+            if (countdown > 0) {
+                btn.innerHTML = '<i class="fa-solid ' + btnIcon + ' me-1"></i>' + btnText + ' (' + countdown + 's)';
+            } else {
+                clearInterval(interval);
+                window.location.href = targetUrl;
+            }
+        }, 1000);
+    }
+</script>
+<% } %>
 
 </body>
 </html>
