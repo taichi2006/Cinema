@@ -21,6 +21,6 @@ services:
       - key: VNPAY_PAYMENT_URL
         value: https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
       - key: VNPAY_RETURN_URL
-        sync: false
+        value: https://be-cinema.onrender.com/vn_return.jsp
       - key: VNPAY_TIME_ZONE
         value: Asia/Ho_Chi_Minh
