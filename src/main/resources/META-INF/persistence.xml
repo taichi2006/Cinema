@@ -41,7 +41,7 @@
         <class>com.cinema.payment.entity.Payment</class>
 
         <properties>
-            <!-- Cấu hình kết nối CSDL (URL, user, password) được nạp động qua JPAUtil.java (.env) -->
+            <!-- Cấu hình kết nối CSDL (URL, user, password) được nạp động qua DB.java (.env) -->
             <property
                     name="hibernate.dialect"
                     value="org.hibernate.dialect.PostgreSQLDialect"/>
