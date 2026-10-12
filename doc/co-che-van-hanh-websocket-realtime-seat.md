@@ -179,3 +179,10 @@ Nếu **2 người dùng cùng click vào ghế H8 ở cùng một tích tắc (
 4. **Quan sát tại Cửa sổ 2:** Ghế `D5` lập tức chuyển sang **MÀU XÁM**, bị khóa click và hiển thị tooltip *"Đang có người khác giữ chỗ (Thời gian thực)"*.
 5. **Tại Cửa sổ 1:** Click bỏ chọn ghế `D5`.
 6. **Quan sát tại Cửa sổ 2:** Ghế `D5` lập tức **sáng trở lại màu bình thường** và cho phép Cửa sổ 2 bấm chọn!
+7. **Kịch bản Tiếp tục đặt vé (Proceed to Checkout):**
+   - Tại Cửa sổ 1: Chọn ghế `D5`, bấm **TIẾP TỤC (ĐẶT VÉ)** để sang trang thanh toán `/booking/{id}`.
+   - Tại Cửa sổ 2: Ghế `D5` lập tức chuyển sang trạng thái **ĐÃ CÓ NGƯỜI ĐẶT (ĐEN/XÁM ĐẬM)**. Cửa sổ 2 chọn bất kỳ ghế nào khác cũng không thể tác động hay mở khóa ghế `D5`.
+8. **Kịch bản Đổi ghế hoặc Hủy vé từ trang thanh toán:**
+   - Tại Cửa sổ 1 (đang ở trang thanh toán `/booking/{id}`): Bấm nút **"Đổi lại ghế"** hoặc **"Hủy đơn đặt vé & Đổi ghế khác"** $\rightarrow$ Xác nhận *"Đồng ý & Chọn lại ghế"*.
+   - Đơn vé được hủy, Cửa sổ 1 quay lại sơ đồ chọn ghế.
+   - Tại Cửa sổ 2: Ghế `D5` lập tức **giải phóng thành AVAILABLE (sáng màu trở lại)** trong thời gian thực mà **không cần tải lại trang (F5)**!

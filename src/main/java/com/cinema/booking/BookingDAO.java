@@ -118,11 +118,11 @@ public class BookingDAO {
 
             if ("PENDING".equalsIgnoreCase(booking.getStatus()) && booking.getExpiredAt() != null && booking.getExpiredAt().isBefore(LocalDateTime.now())) {
                 List<Object[]> expiredSeats = em.createQuery(
-                        "SELECT s.showTimeId, s.seatId FROM ShowtimeSeat s WHERE s.bookingId = :bId AND s.status = 'SELECTED'", Object[].class)
+                        "SELECT s.showTimeId, s.seatId FROM ShowtimeSeat s WHERE s.bookingId = :bId", Object[].class)
                         .setParameter("bId", bookingId).getResultList();
                 em.getTransaction().begin();
                 booking.setStatus("EXPIRED");
-                em.createQuery("UPDATE ShowtimeSeat s SET s.status = 'AVAILABLE', s.bookingId = null, s.holdExpirationAt = null WHERE s.bookingId = :bId AND s.status = 'SELECTED'")
+                em.createQuery("UPDATE ShowtimeSeat s SET s.status = 'AVAILABLE', s.bookingId = null, s.holdExpirationAt = null WHERE s.bookingId = :bId")
                         .setParameter("bId", bookingId).executeUpdate();
                 em.getTransaction().commit();
 
@@ -294,10 +294,10 @@ public class BookingDAO {
 
             LocalDateTime now = LocalDateTime.now();
             List<Object[]> cancelledSeats = em.createQuery(
-                    "SELECT s.showTimeId, s.seatId FROM ShowtimeSeat s WHERE s.bookingId = :bId AND s.status = 'SELECTED'", Object[].class)
+                    "SELECT s.showTimeId, s.seatId FROM ShowtimeSeat s WHERE s.bookingId = :bId", Object[].class)
                     .setParameter("bId", bookingId).getResultList();
 
-            em.createQuery("UPDATE ShowtimeSeat s SET s.status = 'AVAILABLE', s.bookingId = null, s.holdExpirationAt = null WHERE s.bookingId = :bId AND s.status = 'SELECTED'")
+            em.createQuery("UPDATE ShowtimeSeat s SET s.status = 'AVAILABLE', s.bookingId = null, s.holdExpirationAt = null WHERE s.bookingId = :bId")
                     .setParameter("bId", bookingId).executeUpdate();
 
             booking.setStatus("CANCELLED");

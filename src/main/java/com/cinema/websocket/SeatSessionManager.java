@@ -42,9 +42,10 @@ public class SeatSessionManager {
             sessionUserMap.put(session.getId(), userId);
         }
 
-        // Gửi ngay trạng thái các ghế đang bị giữ cho người mới vào phòng
+        // Gửi ngay trạng thái các ghế đang bị giữ và đã tạo đơn cho người mới vào phòng
         Map<Long, Long> heldSeats = showtimeHeldSeats.getOrDefault(showtimeId, Collections.emptyMap());
-        sendDirect(session, SeatSocketMessage.initialState(showtimeId, new HashMap<>(heldSeats)));
+        Set<Long> bSeats = showtimeBookedSeats.getOrDefault(showtimeId, Collections.emptySet());
+        sendDirect(session, SeatSocketMessage.initialState(showtimeId, new HashMap<>(heldSeats), new ArrayList<>(bSeats)));
     }
 
     // Client rời phòng hoặc mất mạng

@@ -1,6 +1,7 @@
 package com.cinema.websocket;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -16,6 +17,7 @@ public class SeatSocketMessage {
     private String message;
     private Long timestamp;
     private Map<Long, Long> holdingSeats; // seatId -> userId (dùng cho INITIAL_STATE)
+    private List<Long> bookedSeats; // Danh sách seatId đã tạo đơn hoặc đã đặt (dùng cho INITIAL_STATE)
 
     public SeatSocketMessage() {
         this.timestamp = System.currentTimeMillis();
@@ -35,11 +37,16 @@ public class SeatSocketMessage {
         return msg;
     }
 
-    public static SeatSocketMessage initialState(Long showtimeId, Map<Long, Long> holdingSeats) {
+    public static SeatSocketMessage initialState(Long showtimeId, Map<Long, Long> holdingSeats, List<Long> bookedSeats) {
         SeatSocketMessage msg = new SeatSocketMessage("INITIAL_STATE");
         msg.setShowtimeId(showtimeId);
         msg.setHoldingSeats(holdingSeats);
+        msg.setBookedSeats(bookedSeats);
         return msg;
+    }
+
+    public static SeatSocketMessage initialState(Long showtimeId, Map<Long, Long> holdingSeats) {
+        return initialState(showtimeId, holdingSeats, Collections.emptyList());
     }
 
     public static SeatSocketMessage error(String message) {
@@ -75,4 +82,7 @@ public class SeatSocketMessage {
 
     public Map<Long, Long> getHoldingSeats() { return holdingSeats; }
     public void setHoldingSeats(Map<Long, Long> holdingSeats) { this.holdingSeats = holdingSeats; }
+
+    public List<Long> getBookedSeats() { return bookedSeats; }
+    public void setBookedSeats(List<Long> bookedSeats) { this.bookedSeats = bookedSeats; }
 }
