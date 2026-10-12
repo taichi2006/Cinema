@@ -12,6 +12,7 @@ import com.cinema.payment.enums.PaymentStatus;
 import com.cinema.payment.enums.PaymentType;
 import com.cinema.payment.gateway.VnPayGateway;
 import com.cinema.payment.gateway.VnPayIpnResponse;
+import com.cinema.ticket.Email.TicketEmailService;
 import com.cinema.wallet.dao.WalletDAO;
 import com.cinema.wallet.dao.WalletTransactionDAO;
 import com.cinema.wallet.entity.Wallet;
@@ -40,6 +41,7 @@ public class PaymentService {
     private final PaymentFulfillmentDAO fulfillmentDAO;
     private final VnPayGateway vnPayGateway;
     private final PaymentIpnService ipnService;
+    private final TicketEmailService ticketEmailService;
 
     public PaymentService() {
         this(new PaymentDAO(), new WalletDAO(), new WalletTransactionDAO(),
@@ -55,18 +57,28 @@ public class PaymentService {
                           WalletTransactionDAO walletTransactionDAO, PaymentFulfillmentDAO fulfillmentDAO,
                           VnPayGateway vnPayGateway) {
         this(paymentDAO, walletDAO, walletTransactionDAO, fulfillmentDAO, vnPayGateway,
-                new PaymentIpnService(paymentDAO, fulfillmentDAO, vnPayGateway));
+                new PaymentIpnService(paymentDAO, fulfillmentDAO, vnPayGateway),
+                new TicketEmailService());
     }
 
     PaymentService(PaymentDAO paymentDAO, WalletDAO walletDAO,
                    WalletTransactionDAO walletTransactionDAO, PaymentFulfillmentDAO fulfillmentDAO,
                    VnPayGateway vnPayGateway, PaymentIpnService ipnService) {
+        this(paymentDAO, walletDAO, walletTransactionDAO, fulfillmentDAO, vnPayGateway, ipnService,
+                new TicketEmailService());
+    }
+
+    PaymentService(PaymentDAO paymentDAO, WalletDAO walletDAO,
+                   WalletTransactionDAO walletTransactionDAO, PaymentFulfillmentDAO fulfillmentDAO,
+                   VnPayGateway vnPayGateway, PaymentIpnService ipnService,
+                   TicketEmailService ticketEmailService) {
         this.paymentDAO = paymentDAO;
         this.walletDAO = walletDAO;
         this.walletTransactionDAO = walletTransactionDAO;
         this.fulfillmentDAO = fulfillmentDAO;
         this.vnPayGateway = vnPayGateway;
         this.ipnService = ipnService;
+        this.ticketEmailService = ticketEmailService != null ? ticketEmailService : new TicketEmailService();
     }
 
     public List<PaymentResponse> getPaymentsByBooking(long currentUserId, long bookingId) {
@@ -157,6 +169,9 @@ public class PaymentService {
             fulfillmentDAO.fulfillBooking(currentUserId, booking, payment, ticketSnapshots, now, em);
             em.getTransaction().commit();
             logPaymentEvent(Level.INFO, "wallet_payment_completed", payment, bookingId, null);
+
+            // Gửi email vé điện tử bất đồng bộ cho người dùng
+            ticketEmailService.sendTicketEmailByBookingAsync(bookingId, currentUserId);
 
             return new CreatePaymentResponse(
                     payment.getId(), bookingId, payment.getAmount(), payment.getMethod(),
