@@ -19,6 +19,9 @@ public class SeatSessionManager {
     // 2. Quản lý trạng thái ghế đang giữ tạm thời: showtimeId -> (seatId -> userId)
     private final Map<Long, Map<Long, Long>> showtimeHeldSeats = new ConcurrentHashMap<>();
 
+    // 2.1 Quản lý trạng thái ghế đã tạo đơn đặt vé (PENDING hoặc BOOKED): showtimeId -> Set<seatId>
+    private final Map<Long, Set<Long>> showtimeBookedSeats = new ConcurrentHashMap<>();
+
     // 3. Mapping session -> userId và session -> showtimeId để dọn dẹp khi disconnect
     private final Map<String, Long> sessionUserMap = new ConcurrentHashMap<>();
     private final Map<String, Long> sessionShowtimeMap = new ConcurrentHashMap<>();
@@ -61,14 +64,18 @@ public class SeatSessionManager {
                 }
             }
 
-            // Tự động nhả các ghế mà user này đang giữ tạm thời (chưa tạo đơn) khi họ tắt tab
+            // Tự động nhả các ghế mà user này đang giữ tạm thời khi họ tắt tab (CHƯA tạo đơn booking)
             if (userId != null) {
                 Map<Long, Long> heldSeats = showtimeHeldSeats.get(showtimeId);
+                Set<Long> bSeats = showtimeBookedSeats.get(showtimeId);
                 if (heldSeats != null) {
                     List<Long> seatsToRelease = new ArrayList<>();
                     heldSeats.forEach((seatId, heldUserId) -> {
                         if (Objects.equals(heldUserId, userId)) {
-                            seatsToRelease.add(seatId);
+                            // Chỉ nhả ghế nếu ghế này CHƯA được tạo đơn đặt vé
+                            if (bSeats == null || !bSeats.contains(seatId)) {
+                                seatsToRelease.add(seatId);
+                            }
                         }
                     });
 
@@ -84,6 +91,13 @@ public class SeatSessionManager {
     // Client click chọn giữ ghế
     public boolean holdSeat(Long showtimeId, Long seatId, Long userId, Session session) {
         if (showtimeId == null || seatId == null || userId == null) return false;
+
+        // Kiểm tra xem ghế đã được tạo đơn đặt vé trước đó chưa
+        Set<Long> bSeats = showtimeBookedSeats.get(showtimeId);
+        if (bSeats != null && bSeats.contains(seatId)) {
+            sendDirect(session, SeatSocketMessage.error("Ghế này đã có người đặt vé!"));
+            return false;
+        }
 
         Map<Long, Long> heldSeats = showtimeHeldSeats.computeIfAbsent(showtimeId, k -> new ConcurrentHashMap<>());
 
@@ -121,18 +135,39 @@ public class SeatSessionManager {
         return false;
     }
 
-    // Khi thanh toán xong đơn vé -> đánh dấu ghế đã bán
+    // Khi người dùng bấm TIẾP TỤC ĐẶT VÉ (tạo đơn PENDING) hoặc thanh toán thành công
     public void markBooked(Long showtimeId, List<Long> seatIds) {
         if (showtimeId == null || seatIds == null || seatIds.isEmpty()) return;
 
         Map<Long, Long> heldSeats = showtimeHeldSeats.get(showtimeId);
+        Set<Long> bSeats = showtimeBookedSeats.computeIfAbsent(showtimeId, k -> ConcurrentHashMap.newKeySet());
+
         for (Long seatId : seatIds) {
             if (heldSeats != null) {
-                heldSeats.remove(seatId);
+                heldSeats.remove(seatId); // Xóa khỏi giữ tạm để khi ngắt kết nối không nhả lại
             }
-            // Phát sóng: Ghế đã bán thành công BOOKED
+            bSeats.add(seatId); // Đánh dấu vào danh sách ghế đã tạo đơn
+
+            // Phát sóng: Ghế này đã chuyển sang trạng thái BOOKED
             broadcast(showtimeId, SeatSocketMessage.holdChanged(showtimeId, seatId, null, "BOOKED"));
         }
+    }
+
+    // Khi đơn booking bị HỦY hoặc HẾT HẠN (10 phút) -> nhả ghế tự động cho cả phòng
+    public void releaseBookedSeat(Long showtimeId, Long seatId) {
+        if (showtimeId == null || seatId == null) return;
+
+        Set<Long> bSeats = showtimeBookedSeats.get(showtimeId);
+        if (bSeats != null) {
+            bSeats.remove(seatId);
+        }
+        Map<Long, Long> heldSeats = showtimeHeldSeats.get(showtimeId);
+        if (heldSeats != null) {
+            heldSeats.remove(seatId);
+        }
+
+        // Phát sóng: Ghế này đã quay lại trạng thái AVAILABLE cho mọi người
+        broadcast(showtimeId, SeatSocketMessage.holdChanged(showtimeId, seatId, null, "AVAILABLE"));
     }
 
     // Phát sóng tin nhắn cho tất cả các client đang xem cùng 1 suất chiếu

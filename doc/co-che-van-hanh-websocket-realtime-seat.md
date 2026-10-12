@@ -130,14 +130,25 @@ Nếu **2 người dùng cùng click vào ghế H8 ở cùng một tích tắc (
 
 ---
 
-## 6. CƠ CHẾ TỰ ĐỘNG DỌN DẸP KHI MẤT MẠNG / ĐÓNG TAB (FAULT TOLERANCE)
+## 6. CƠ CHẾ VÒNG ĐỜI GHẾ & TỰ ĐỘNG DỌN DẸP (LIFECYCLE & FAULT TOLERANCE)
 
-1. **Khách hàng tắt trình duyệt hoặc mất mạng:**
-   - Server kích hoạt sự kiện `@OnClose`.
-   - `SeatSessionManager.leaveRoom(session)` tự động duyệt qua danh sách các ghế mà `userId` này đang giữ tạm thời.
-   - Server tự động **nhả tất cả ghế này về trạng thái `AVAILABLE`** và phát sóng cho phòng chiếu để người khác vào đặt.
-2. **Khách hàng bị chập chờn mạng (Frontend Auto-Reconnect):**
-   - Hook `useSeatWebSocket.js` ở Frontend tự động kích hoạt cơ chế kết nối lại sau 4 giây khi phát hiện mất kết nối socket.
+### 6.1. Phân biệt "Rời khỏi do Hủy/Tắt Tab" vs "Rời khỏi do Chuyển sang Đặt vé"
+* **Trường hợp A: Khách hàng chỉ chọn ghế rồi tắt tab hoặc bấm quay lại (Abandon):**
+  - Khi ngắt kết nối, Server kiểm tra các ghế này **chưa được tạo đơn**.
+  - Server tự động **nhả các ghế về trạng thái `AVAILABLE`** và phát sóng cho toàn phòng chiếu để người khác vào đặt.
+* **Trường hợp B: Khách hàng bấm "Tiếp tục (Đặt vé)" (Proceed to Booking):**
+  - API `POST /bookings` tạo đơn thành công, Server gọi `SeatSessionManager.markBooked(...)`.
+  - Các ghế này được chuyển từ danh sách giữ tạm sang danh sách **`showtimeBookedSeats`**.
+  - Server phát sóng `SEAT_STATE_CHANGED(seatId, "BOOKED")`.
+  - Khi Khách hàng chuyển sang trang đơn hàng `/booking/{id}` (kết nối socket chọn ghế đóng lại), Server **KHÔNG NHẢ GHẾ**, ghế tiếp tục được khóa an toàn trong 10 phút.
+
+### 6.2. Tự động nhả ghế thời gian thực khi Hủy vé (`CANCEL`) hoặc Quá hạn 10 phút (`EXPIRED`)
+* **Khách hàng chủ động hủy vé (`POST /bookings/{id}/cancel`):**
+  - CSDL cập nhật ghế về `AVAILABLE`.
+  - `BookingDAO` tự động kích hoạt `SeatSessionManager.releaseBookedSeat(...)`.
+  - Toàn bộ các khách hàng đang ở màn hình chọn ghế lập tức thấy ghế sáng trở lại (AVAILABLE) mà **không cần phải F5**.
+* **Đơn hàng quá hạn giữ 10 phút (`EXPIRED`):**
+  - Hệ thống tự động giải phóng ghế và phát sóng `AVAILABLE` tức thì qua WebSocket cho toàn bộ phòng chiếu.
 
 ---
 

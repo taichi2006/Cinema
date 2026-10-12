@@ -9,6 +9,7 @@ import com.cinema.product.ProductStatus;
 import com.cinema.showtime.Showtime;
 import com.cinema.showtime.ShowtimeSeat;
 import com.cinema.voucher.Voucher;
+import com.cinema.websocket.SeatSessionManager;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 
@@ -87,6 +88,14 @@ public class BookingDAO {
             }
 
             em.getTransaction().commit();
+
+            try {
+                SeatSessionManager.getInstance().markBooked(
+                        showTimeId.longValue(),
+                        seatIds.stream().map(Integer::longValue).toList()
+                );
+            } catch (Exception ignored) {}
+
             return new CreateBookingResponse(booking.getBookingId(), showTimeId, seatIds, grandTotal, holdExpiresAt.format(ISO_FORMATTER), "PENDING");
         } catch (ApiException e) {
             rollbackQuietly(em);
@@ -108,11 +117,22 @@ public class BookingDAO {
             if (userId != null && !booking.getUserId().equals(userId)) throw ApiException.forbidden("Bạn không có quyền truy cập đơn hàng này");
 
             if ("PENDING".equalsIgnoreCase(booking.getStatus()) && booking.getExpiredAt() != null && booking.getExpiredAt().isBefore(LocalDateTime.now())) {
+                List<Object[]> expiredSeats = em.createQuery(
+                        "SELECT s.showTimeId, s.seatId FROM ShowtimeSeat s WHERE s.bookingId = :bId AND s.status = 'SELECTED'", Object[].class)
+                        .setParameter("bId", bookingId).getResultList();
                 em.getTransaction().begin();
                 booking.setStatus("EXPIRED");
                 em.createQuery("UPDATE ShowtimeSeat s SET s.status = 'AVAILABLE', s.bookingId = null, s.holdExpirationAt = null WHERE s.bookingId = :bId AND s.status = 'SELECTED'")
                         .setParameter("bId", bookingId).executeUpdate();
                 em.getTransaction().commit();
+
+                try {
+                    for (Object[] r : expiredSeats) {
+                        Long stId = ((Number) r[0]).longValue();
+                        Long sId = ((Number) r[1]).longValue();
+                        SeatSessionManager.getInstance().releaseBookedSeat(stId, sId);
+                    }
+                } catch (Exception ignored) {}
             }
 
             List<Object[]> stRows = em.createQuery(
@@ -273,6 +293,10 @@ public class BookingDAO {
             if (!"PENDING".equalsIgnoreCase(booking.getStatus())) throw ApiException.conflict("Chỉ hủy được đơn chưa thanh toán hoặc đang chờ thanh toán");
 
             LocalDateTime now = LocalDateTime.now();
+            List<Object[]> cancelledSeats = em.createQuery(
+                    "SELECT s.showTimeId, s.seatId FROM ShowtimeSeat s WHERE s.bookingId = :bId AND s.status = 'SELECTED'", Object[].class)
+                    .setParameter("bId", bookingId).getResultList();
+
             em.createQuery("UPDATE ShowtimeSeat s SET s.status = 'AVAILABLE', s.bookingId = null, s.holdExpirationAt = null WHERE s.bookingId = :bId AND s.status = 'SELECTED'")
                     .setParameter("bId", bookingId).executeUpdate();
 
@@ -281,6 +305,15 @@ public class BookingDAO {
             booking.setCancelReason(reason != null ? reason : "Người dùng yêu cầu hủy");
             booking.setUpdatedAt(now);
             em.getTransaction().commit();
+
+            try {
+                for (Object[] r : cancelledSeats) {
+                    Long stId = ((Number) r[0]).longValue();
+                    Long sId = ((Number) r[1]).longValue();
+                    SeatSessionManager.getInstance().releaseBookedSeat(stId, sId);
+                }
+            } catch (Exception ignored) {}
+
             return new CancelBookingResponse(bookingId, "CANCELLED", now.format(ISO_FORMATTER));
         } catch (ApiException e) {
             rollbackQuietly(em);
