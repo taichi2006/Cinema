@@ -28,7 +28,16 @@ public class JwtUtil {
             secret = System.getenv("JWT_SECRET");
         }
         if (secret == null || secret.isBlank()) {
-            throw new IllegalStateException("Thiếu cấu hình JWT_SECRET trong .env hoặc biến môi trường!");
+            try (java.io.InputStream is = JwtUtil.class.getResourceAsStream("/.env")) {
+                if (is != null) {
+                    java.util.Properties props = new java.util.Properties();
+                    props.load(is);
+                    secret = props.getProperty("JWT_SECRET");
+                }
+            } catch (Exception ignored) {}
+        }
+        if (secret == null || secret.isBlank()) {
+            throw new IllegalStateException("Thiếu cấu hình JWT_SECRET trong file .env hoặc biến môi trường!");
         }
         KEY = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
