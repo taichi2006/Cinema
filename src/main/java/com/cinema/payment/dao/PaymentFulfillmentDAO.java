@@ -1,4 +1,4 @@
-package com.cinema.payment;
+package com.cinema.payment.dao;
 
 import com.cinema.booking.entity.Booking;
 import com.cinema.common.exception.ApiException;

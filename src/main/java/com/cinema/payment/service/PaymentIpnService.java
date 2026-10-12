@@ -1,8 +1,11 @@
-package com.cinema.payment;
+package com.cinema.payment.service;
 
 import com.cinema.booking.entity.Booking;
 import com.cinema.common.exception.ApiException;
 import com.cinema.common.util.JPAUtil;
+import com.cinema.email.TicketEmailService;
+import com.cinema.payment.dao.PaymentDAO;
+import com.cinema.payment.dao.PaymentFulfillmentDAO;
 import com.cinema.payment.entity.Payment;
 import com.cinema.payment.enums.PaymentMethod;
 import com.cinema.payment.enums.PaymentStatus;
@@ -10,7 +13,6 @@ import com.cinema.payment.enums.PaymentType;
 import com.cinema.payment.gateway.VnPayGateway;
 import com.cinema.payment.gateway.VnPayIpnResponse;
 import com.cinema.payment.gateway.VnPayIpnResult;
-import com.cinema.ticket.Email.TicketEmailService;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 
@@ -24,27 +26,10 @@ public class PaymentIpnService {
 
     private static final Logger LOGGER = Logger.getLogger(PaymentIpnService.class.getName());
 
-    private final PaymentDAO paymentDAO;
-    private final PaymentFulfillmentDAO fulfillmentDAO;
-    private final VnPayGateway vnPayGateway;
-    private final TicketEmailService ticketEmailService;
-
-    public PaymentIpnService() {
-        this(new PaymentDAO(), new PaymentFulfillmentDAO(), new VnPayGateway(), new TicketEmailService());
-    }
-
-    public PaymentIpnService(PaymentDAO paymentDAO, PaymentFulfillmentDAO fulfillmentDAO,
-                             VnPayGateway vnPayGateway) {
-        this(paymentDAO, fulfillmentDAO, vnPayGateway, new TicketEmailService());
-    }
-
-    public PaymentIpnService(PaymentDAO paymentDAO, PaymentFulfillmentDAO fulfillmentDAO,
-                             VnPayGateway vnPayGateway, TicketEmailService ticketEmailService) {
-        this.paymentDAO = paymentDAO;
-        this.fulfillmentDAO = fulfillmentDAO;
-        this.vnPayGateway = vnPayGateway;
-        this.ticketEmailService = ticketEmailService != null ? ticketEmailService : new TicketEmailService();
-    }
+    private final PaymentDAO paymentDAO = new PaymentDAO();
+    private final PaymentFulfillmentDAO fulfillmentDAO = new PaymentFulfillmentDAO();
+    private final VnPayGateway vnPayGateway = new VnPayGateway();
+    private final TicketEmailService ticketEmailService = new TicketEmailService();
 
     public VnPayIpnResponse handleVnPayIpn(Map<String, String[]> parameters) {
         VnPayIpnResult ipn;

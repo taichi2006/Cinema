@@ -4,7 +4,7 @@ import com.cinema.booking.dto.*;
 import com.cinema.common.exception.ApiException;
 import com.cinema.common.web.BaseServlet;
 import com.cinema.payment.dto.CreatePaymentRequest;
-import com.cinema.payment.PaymentService;
+import com.cinema.payment.service.PaymentService;
 import com.cinema.ticket.TicketService;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServletRequest;

@@ -1,25 +1,18 @@
-package com.cinema.payment;
+package com.cinema.payment.controller;
 
 import com.cinema.common.exception.ApiException;
 import com.cinema.common.web.BaseServlet;
+import com.cinema.payment.service.PaymentService;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 import java.io.IOException;
 
-@WebServlet(name = "PaymentController", urlPatterns = {"/payments", "/payments/*"})
+@WebServlet(urlPatterns = {"/payments", "/payments/*"})
 public class PaymentController extends BaseServlet {
 
-    private final PaymentService service;
-
-    public PaymentController() {
-        this(new PaymentService());
-    }
-
-    public PaymentController(PaymentService service) {
-        this.service = service;
-    }
+    private final PaymentService service = new PaymentService();
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {

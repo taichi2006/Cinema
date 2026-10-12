@@ -1,8 +1,11 @@
-package com.cinema.payment;
+package com.cinema.payment.service;
 
 import com.cinema.booking.entity.Booking;
 import com.cinema.common.exception.ApiException;
 import com.cinema.common.util.JPAUtil;
+import com.cinema.email.TicketEmailService;
+import com.cinema.payment.dao.PaymentDAO;
+import com.cinema.payment.dao.PaymentFulfillmentDAO;
 import com.cinema.payment.dto.CreatePaymentRequest;
 import com.cinema.payment.dto.CreatePaymentResponse;
 import com.cinema.payment.dto.PaymentResponse;
@@ -12,7 +15,6 @@ import com.cinema.payment.enums.PaymentStatus;
 import com.cinema.payment.enums.PaymentType;
 import com.cinema.payment.gateway.VnPayGateway;
 import com.cinema.payment.gateway.VnPayIpnResponse;
-import com.cinema.ticket.Email.TicketEmailService;
 import com.cinema.wallet.dao.WalletDAO;
 import com.cinema.wallet.dao.WalletTransactionDAO;
 import com.cinema.wallet.entity.Wallet;
@@ -35,51 +37,13 @@ public class PaymentService {
 
     private static final Logger LOGGER = Logger.getLogger(PaymentService.class.getName());
 
-    private final PaymentDAO paymentDAO;
-    private final WalletDAO walletDAO;
-    private final WalletTransactionDAO walletTransactionDAO;
-    private final PaymentFulfillmentDAO fulfillmentDAO;
-    private final VnPayGateway vnPayGateway;
-    private final PaymentIpnService ipnService;
-    private final TicketEmailService ticketEmailService;
-
-    public PaymentService() {
-        this(new PaymentDAO(), new WalletDAO(), new WalletTransactionDAO(),
-                new PaymentFulfillmentDAO(), new VnPayGateway());
-    }
-
-    public PaymentService(PaymentDAO paymentDAO) {
-        this(paymentDAO, new WalletDAO(), new WalletTransactionDAO(),
-                new PaymentFulfillmentDAO(), new VnPayGateway());
-    }
-
-    public PaymentService(PaymentDAO paymentDAO, WalletDAO walletDAO,
-                          WalletTransactionDAO walletTransactionDAO, PaymentFulfillmentDAO fulfillmentDAO,
-                          VnPayGateway vnPayGateway) {
-        this(paymentDAO, walletDAO, walletTransactionDAO, fulfillmentDAO, vnPayGateway,
-                new PaymentIpnService(paymentDAO, fulfillmentDAO, vnPayGateway),
-                new TicketEmailService());
-    }
-
-    PaymentService(PaymentDAO paymentDAO, WalletDAO walletDAO,
-                   WalletTransactionDAO walletTransactionDAO, PaymentFulfillmentDAO fulfillmentDAO,
-                   VnPayGateway vnPayGateway, PaymentIpnService ipnService) {
-        this(paymentDAO, walletDAO, walletTransactionDAO, fulfillmentDAO, vnPayGateway, ipnService,
-                new TicketEmailService());
-    }
-
-    PaymentService(PaymentDAO paymentDAO, WalletDAO walletDAO,
-                   WalletTransactionDAO walletTransactionDAO, PaymentFulfillmentDAO fulfillmentDAO,
-                   VnPayGateway vnPayGateway, PaymentIpnService ipnService,
-                   TicketEmailService ticketEmailService) {
-        this.paymentDAO = paymentDAO;
-        this.walletDAO = walletDAO;
-        this.walletTransactionDAO = walletTransactionDAO;
-        this.fulfillmentDAO = fulfillmentDAO;
-        this.vnPayGateway = vnPayGateway;
-        this.ipnService = ipnService;
-        this.ticketEmailService = ticketEmailService != null ? ticketEmailService : new TicketEmailService();
-    }
+    private final PaymentDAO paymentDAO = new PaymentDAO();
+    private final WalletDAO walletDAO = new WalletDAO();
+    private final WalletTransactionDAO walletTransactionDAO = new WalletTransactionDAO();
+    private final PaymentFulfillmentDAO fulfillmentDAO = new PaymentFulfillmentDAO();
+    private final VnPayGateway vnPayGateway = new VnPayGateway();
+    private final PaymentIpnService ipnService = new PaymentIpnService();
+    private final TicketEmailService ticketEmailService = new TicketEmailService();
 
     public List<PaymentResponse> getPaymentsByBooking(long currentUserId, long bookingId) {
         assertBookingOwnership(currentUserId, bookingId);
@@ -233,7 +197,7 @@ public class PaymentService {
         }
     }
 
-    static PaymentMethod requireSupportedMethod(CreatePaymentRequest request) {
+    public static PaymentMethod requireSupportedMethod(CreatePaymentRequest request) {
         if (request == null || request.getMethod() == null || request.getMethod().isBlank()) {
             throw ApiException.badRequest("Phương thức thanh toán không được để trống");
         }

@@ -1,8 +1,9 @@
-package com.cinema.payment;
+package com.cinema.payment.dao;
 
 import com.cinema.booking.entity.Booking;
 import com.cinema.common.util.JPAUtil;
 import com.cinema.payment.entity.Payment;
+import com.cinema.payment.enums.PaymentStatus;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 
@@ -56,7 +57,7 @@ public class PaymentDAO {
                         "SELECT count(p) FROM Payment p " +
                                 "WHERE p.bookingId = :bookingId AND p.status = :status", Long.class)
                 .setParameter("bookingId", bookingId)
-                .setParameter("status", com.cinema.payment.enums.PaymentStatus.SUCCESSFUL)
+                .setParameter("status", PaymentStatus.SUCCESSFUL)
                 .getSingleResult();
         return count > 0;
     }
@@ -67,7 +68,7 @@ public class PaymentDAO {
                                 "AND p.status = :status " +
                                 "AND (p.expiredAt IS NULL OR p.expiredAt > :now)", Long.class)
                 .setParameter("bookingId", bookingId)
-                .setParameter("status", com.cinema.payment.enums.PaymentStatus.PENDING)
+                .setParameter("status", PaymentStatus.PENDING)
                 .setParameter("now", now)
                 .getSingleResult();
         return count > 0;
@@ -77,17 +78,16 @@ public class PaymentDAO {
         List<Payment> pendingList = em.createQuery(
                         "SELECT p FROM Payment p WHERE p.bookingId = :bookingId AND p.status = :status", Payment.class)
                 .setParameter("bookingId", bookingId)
-                .setParameter("status", com.cinema.payment.enums.PaymentStatus.PENDING)
+                .setParameter("status", PaymentStatus.PENDING)
                 .getResultList();
         for (Payment p : pendingList) {
-            p.setStatus(com.cinema.payment.enums.PaymentStatus.FAILED);
+            p.setStatus(PaymentStatus.FAILED);
             p.setFailureReason(reason != null ? reason : "Hủy giao dịch chờ để tạo thanh toán mới");
         }
         if (!pendingList.isEmpty()) {
             em.flush();
         }
     }
-
 
     public Payment save(Payment payment, EntityManager em) {
         if (payment.getId() == null) {
