@@ -13,13 +13,16 @@ import java.time.LocalDate;
 import java.util.Objects;
 import java.util.Optional;
 
+import com.cinema.common.exception.ApiException;
+
 public class AuthDAO {
 
     public boolean existsByEmail(String email) {
+        if (email == null || email.isBlank()) return false;
         EntityManager em = JPAUtil.getEntityManager();
         try {
-            Long count = em.createQuery("SELECT count(u) FROM User u WHERE u.email = :email", Long.class)
-                    .setParameter("email", email)
+            Long count = em.createQuery("SELECT count(u) FROM User u WHERE LOWER(TRIM(u.email)) = LOWER(TRIM(:email))", Long.class)
+                    .setParameter("email", email.trim())
                     .getSingleResult();
             return count != null && count > 0;
         } finally {
@@ -37,7 +40,7 @@ public class AuthDAO {
             em.getTransaction().begin();
 
             User user = new User();
-            user.setEmail(email);
+            user.setEmail(email.trim().toLowerCase());
             user.setPasswordHash(passwordHash);
             user.setFullName(fullName);
             user.setPhone(phone);
@@ -55,6 +58,17 @@ public class AuthDAO {
         } catch (RuntimeException e) {
             if (em.getTransaction().isActive()) {
                 em.getTransaction().rollback();
+            }
+            String msg = e.getMessage() != null ? e.getMessage().toLowerCase() : "";
+            Throwable root = e;
+            while (root.getCause() != null && root.getCause() != root) {
+                root = root.getCause();
+            }
+            String rootMsg = root.getMessage() != null ? root.getMessage().toLowerCase() : "";
+            if (msg.contains("unique") || msg.contains("duplicate") || msg.contains("users_email_key")
+                    || rootMsg.contains("unique") || rootMsg.contains("duplicate") || rootMsg.contains("users_email_key")
+                    || rootMsg.contains("23505")) {
+                throw ApiException.conflict("Email đã được đăng ký");
             }
             throw e;
         } finally {

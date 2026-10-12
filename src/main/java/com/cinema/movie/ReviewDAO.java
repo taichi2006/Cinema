@@ -1,5 +1,6 @@
 package com.cinema.movie;
 
+import com.cinema.common.exception.ApiException;
 import com.cinema.common.util.JPAUtil;
 import com.cinema.movie.dto.response.ReviewResponse;
 import com.cinema.ticket.TicketStatus;
@@ -123,6 +124,19 @@ public class ReviewDAO {
             );
         } catch (Exception e) {
             if (em.getTransaction().isActive()) em.getTransaction().rollback();
+            String msg = e.getMessage() != null ? e.getMessage().toLowerCase() : "";
+            Throwable root = e;
+            while (root.getCause() != null && root.getCause() != root) {
+                root = root.getCause();
+            }
+            String rootMsg = root.getMessage() != null ? root.getMessage().toLowerCase() : "";
+            if (msg.contains("rating_check") || rootMsg.contains("rating_check")) {
+                throw ApiException.badRequest("Điểm đánh giá 'rating' phải là số nguyên từ 1 đến 5 sao.");
+            }
+            if (msg.contains("user_id_movie_id_key") || rootMsg.contains("user_id_movie_id_key")
+                    || (msg.contains("unique") && msg.contains("reviews")) || (rootMsg.contains("unique") && rootMsg.contains("reviews"))) {
+                throw ApiException.conflict("Bạn đã gửi đánh giá cho bộ phim này rồi.");
+            }
             throw e;
         } finally {
             em.close();
