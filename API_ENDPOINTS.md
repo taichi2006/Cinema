@@ -1,36 +1,34 @@
 # 🎬 CINEMA BACKEND - TÀI LIỆU TOÀN BỘ API ENDPOINTS
 
-Tài liệu chi tiết toàn bộ các API Endpoints của hệ thống Cinema Backend.
+Tài liệu chuẩn xác 100% theo mã nguồn thực tế của hệ thống Cinema Backend (Jakarta EE / Servlet + JPA).
 
 ---
 
-## 🌐 1. THÔNG TIN CHUNG & CẤU HÌNH BASE URL
+## 🌐 1. BASE URL
 
 * **Môi trường Cloud (Render)**:  
-  `https://be-cinema.onrender.com/api/v1`  
-  *(Hoặc gọi không cần `/api/v1`: `https://be-cinema.onrender.com`)*
+  `https://be-cinema.onrender.com`
 * **Môi trường Local (Tomcat / IntelliJ)**:  
-  `http://localhost:8080/cinema_war_exploded/api/v1`
+  `http://localhost:8080/cinema_war_exploded`
 
-> [!NOTE]
-> Hệ thống hỗ trợ cả 2 dạng đường dẫn:
-> * Dạng chuẩn REST: `/api/v1/<resource>` (hoặc `/api/<resource>`)
-> * Dạng gốc: `/<resource>`
+> [!TIP]
+> Tất cả API trong code được map trực tiếp theo các Servlet gốc: `/auth`, `/movies`, `/bookings`, `/wallet`, `/cinemas`...  
+> *(Hệ thống có bộ lọc `ApiPrefixFilter` hỗ trợ thêm nếu bạn muốn gọi qua prefix `/api/` hoặc `/api/v1/`)*.
 
 ---
 
 ## 🔐 2. CƠ CHẾ XÁC THỰC (AUTHENTICATION)
 
-Hệ thống sử dụng **JWT (JSON Web Token)** để bảo mật:
+Hệ thống sử dụng **JWT (JSON Web Token)**:
 * **Header**: `Authorization: Bearer <access_token>`
-* **Cookie**: Tự động nhận diện cookie `access_token` nếu không truyền header.
-* **Các route yêu cầu đăng nhập**: `/user/*`, `/wallet/*`, `/bookings/*`, `/tickets/*`, `/auth/change-password`, và đánh giá phim `POST /movies/{id}/reviews`.
+* **Cookie**: Nhận diện tự động qua cookie `access_token` nếu không truyền header.
+* **Các route yêu cầu đăng nhập (🔒)**: `/user`, `/user/*`, `/wallet`, `/wallet/*`, `/bookings`, `/bookings/*`, `/tickets`, `/tickets/*`, `/auth/logout`, `/auth/change-password`, `POST /movies/{id}/reviews`.
 
 ---
 
-## 📦 3. ĐỊNH DẠNG PHẢN HỒI CHUẨN (STANDARD RESPONSES)
+## 📦 3. ĐỊNH DẠNG PHẢN HỒI CHUẨN (RESPONSE FORMAT)
 
-### 3.1. Phản hồi thành công (ApiResponse)
+### 3.1. Phản hồi thành công (`ApiResponse`)
 ```json
 {
   "code": 200,
@@ -39,7 +37,7 @@ Hệ thống sử dụng **JWT (JSON Web Token)** để bảo mật:
 }
 ```
 
-### 3.2. Phản hồi phân trang (PageResponse)
+### 3.2. Phản hồi danh sách phân trang (`PageResponse`)
 ```json
 {
   "code": 200,
@@ -49,14 +47,14 @@ Hệ thống sử dụng **JWT (JSON Web Token)** để bảo mật:
     "meta": {
       "page": 0,
       "size": 20,
-      "totalElements": 150,
-      "totalPages": 8
+      "totalElements": 100,
+      "totalPages": 5
     }
   }
 }
 ```
 
-### 3.3. Phản hồi lỗi (ErrorResponse)
+### 3.3. Phản hồi lỗi (`ErrorResponse`)
 ```json
 {
   "code": 400,
@@ -66,7 +64,7 @@ Hệ thống sử dụng **JWT (JSON Web Token)** để bảo mật:
 
 ---
 
-## 📋 4. DANH SÁCH CHI TIẾT TẤT CẢ API ENDPOINTS
+## 📋 4. DANH SÁCH CHI TIẾT TẤT CẢ ENDPOINTS THEO CODE
 
 ---
 
@@ -74,14 +72,14 @@ Hệ thống sử dụng **JWT (JSON Web Token)** để bảo mật:
 
 | Method | Endpoint | Yêu cầu Auth | Mô tả |
 | :--- | :--- | :---: | :--- |
-| `POST` | `/api/v1/auth/register` | ❌ Không | Đăng ký tài khoản người dùng mới |
-| `POST` | `/api/v1/auth/login` | ❌ Không | Đăng nhập tài khoản (trả về Access & Refresh Token) |
-| `POST` | `/api/v1/auth/logout` | ❌ Không | Đăng xuất (xóa cookie và thu hồi token) |
-| `POST` | `/api/v1/auth/refresh` | ❌ Không | Cấp mới Access Token bằng Refresh Token |
-| `POST` | `/api/v1/auth/change-password` | 🔒 Có | Đổi mật khẩu người dùng đang đăng nhập |
+| `POST` | `/auth/register` | ❌ Không | Đăng ký tài khoản người dùng mới (Status `201 Created`) |
+| `POST` | `/auth/login` | ❌ Không | Đăng nhập tài khoản (trả về Access & Refresh Token, set Cookie) |
+| `POST` | `/auth/logout` | 🔒 Có / Optional | Đăng xuất (xóa cookie và thu hồi token) |
+| `POST` | `/auth/refresh` | ❌ Không | Cấp mới Access Token bằng Refresh Token (qua Cookie hoặc Body) |
+| `POST` | `/auth/change-password` | 🔒 Có | Đổi mật khẩu tài khoản đang đăng nhập |
 
-#### Chi tiết Request Body:
-* **POST `/api/v1/auth/register`**:
+#### Request Body mẫu:
+* **POST `/auth/register`**:
   ```json
   {
     "fullName": "Nguyễn Văn A",
@@ -91,23 +89,23 @@ Hệ thống sử dụng **JWT (JSON Web Token)** để bảo mật:
     "dob": "2000-01-15"
   }
   ```
-* **POST `/api/v1/auth/login`**:
+* **POST `/auth/login`**:
   ```json
   {
     "email": "user@example.com",
     "password": "Password123@"
   }
   ```
-* **POST `/api/v1/auth/refresh`**:
+* **POST `/auth/refresh`**:
   ```json
   {
     "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
   }
   ```
-* **POST `/api/v1/auth/change-password`**:
+* **POST `/auth/change-password`**:
   ```json
   {
-    "oldPassword": "OldPassword123@",
+    "oldPassword": "Password123@",
     "newPassword": "NewPassword456@"
   }
   ```
@@ -118,7 +116,7 @@ Hệ thống sử dụng **JWT (JSON Web Token)** để bảo mật:
 
 | Method | Endpoint | Yêu cầu Auth | Mô tả |
 | :--- | :--- | :---: | :--- |
-| `GET` | `/api/v1/home` | ❌ Không | Lấy dữ liệu trang chủ: Banners, phim đang chiếu, phim sắp chiếu, tin tức hot |
+| `GET` | `/home` | ❌ Không | Lấy dữ liệu trang chủ: banners, phim đang chiếu, phim sắp chiếu, tin tức hot |
 
 ---
 
@@ -126,29 +124,29 @@ Hệ thống sử dụng **JWT (JSON Web Token)** để bảo mật:
 
 | Method | Endpoint | Yêu cầu Auth | Mô tả |
 | :--- | :--- | :---: | :--- |
-| `GET` | `/api/v1/movies` | ❌ Không | Danh sách phim có tìm kiếm, lọc và phân trang |
-| `GET` | `/api/v1/movies/{id}` | ❌ Không | Chi tiết thông tin một bộ phim theo ID |
-| `GET` | `/api/v1/movies/{id}/showtimes` | ❌ Không | Danh sách suất chiếu của phim theo ngày |
-| `GET` | `/api/v1/movies/{id}/reviews` | ❌ Không | Danh sách đánh giá & bình luận của bộ phim |
-| `POST` | `/api/v1/movies/{id}/reviews` | 🔒 Có | Gửi đánh giá / bình luận mới cho bộ phim |
+| `GET` | `/movies` | ❌ Không | Danh sách phim (tìm kiếm, lọc thể loại, trạng thái, phân trang) |
+| `GET` | `/movies/{id}` | ❌ Không | Chi tiết thông tin phim theo ID |
+| `GET` | `/movies/{id}/showtimes` | ❌ Không | Lịch chiếu của phim theo ngày |
+| `GET` | `/movies/{id}/reviews` | ❌ Không | Danh sách đánh giá & bình luận của phim |
+| `POST` | `/movies/{id}/reviews` | 🔒 Có | Gửi đánh giá cho phim (1 - 5 sao) |
 
 #### Tham số Query:
-* **GET `/api/v1/movies`**:
+* **GET `/movies`**:
   * `q`: Từ khóa tìm kiếm tên phim
-  * `genre`: Mã thể loại (ví dụ: `ACTION`, `HORROR`)
+  * `genre`: Mã thể loại (ví dụ: `ACTION`, `COMEDY`)
   * `status`: Trạng thái (`NOW_SHOWING`, `COMING_SOON`)
   * `page`: Trang (bắt đầu từ 0)
   * `size`: Số bản ghi mỗi trang (mặc định 20)
   * `sort`: Sắp xếp (`releaseDate,desc`, `title,asc`, ...)
-* **GET `/api/v1/movies/{id}/showtimes`**:
+* **GET `/movies/{id}/showtimes`**:
   * `date` *(bắt buộc)*: Ngày chiếu (`YYYY-MM-DD`, ví dụ: `2026-10-15`)
   * `cinemaId` *(tùy chọn)*: Lọc theo rạp
   * `page`, `size`
-* **POST `/api/v1/movies/{id}/reviews`** (Body):
+* **POST `/movies/{id}/reviews`** (Body):
   ```json
   {
     "rating": 5,
-    "comment": "Phim cực kỳ xuất sắc, âm thanh sống động!"
+    "comment": "Phim hay, kỹ xảo đỉnh cao!"
   }
   ```
 
@@ -158,18 +156,18 @@ Hệ thống sử dụng **JWT (JSON Web Token)** để bảo mật:
 
 | Method | Endpoint | Yêu cầu Auth | Mô tả |
 | :--- | :--- | :---: | :--- |
-| `GET` | `/api/v1/cinemas` | ❌ Không | Danh sách rạp chiếu (lọc theo tỉnh/thành phố) |
-| `GET` | `/api/v1/cinemas/{id}` | ❌ Không | Chi tiết thông tin rạp chiếu theo ID |
-| `GET` | `/api/v1/cinemas/{id}/showtimes` | ❌ Không | Lịch chiếu các phim tại rạp theo ngày |
+| `GET` | `/cinemas` | ❌ Không | Danh sách rạp chiếu (lọc theo thành phố, tìm kiếm) |
+| `GET` | `/cinemas/{id}` | ❌ Không | Chi tiết thông tin rạp chiếu theo ID |
+| `GET` | `/cinemas/{id}/showtimes` | ❌ Không | Lịch chiếu phim tại rạp theo ngày |
 
 #### Tham số Query:
-* **GET `/api/v1/cinemas`**:
-  * `city`: Lọc theo tỉnh thành (ví dụ: `HANOI`, `HCM`)
+* **GET `/cinemas`**:
+  * `city`: Lọc theo thành phố (`HANOI`, `HCM`...)
   * `q`: Tìm kiếm tên rạp
   * `page`, `size`, `sort`
-* **GET `/api/v1/cinemas/{id}/showtimes`**:
+* **GET `/cinemas/{id}/showtimes`**:
   * `date` *(bắt buộc)*: Ngày chiếu (`YYYY-MM-DD`)
-  * `movieId` *(tùy chọn)*: Lọc theo phim cụ thể
+  * `movieId` *(tùy chọn)*: Lọc theo phim
   * `page`, `size`
 
 ---
@@ -178,26 +176,26 @@ Hệ thống sử dụng **JWT (JSON Web Token)** để bảo mật:
 
 | Method | Endpoint | Yêu cầu Auth | Mô tả |
 | :--- | :--- | :---: | :--- |
-| `GET` | `/api/v1/showtimes/{id}` | ❌ Không | Chi tiết suất chiếu (phòng chiếu, giờ chiếu, giá vé) |
-| `GET` | `/api/v1/showtimes/{id}/seats` | ❌ Không | Sơ đồ ghế (Seat Map) và trạng thái giữ ghế/đã đặt |
+| `GET` | `/showtimes/{id}` | ❌ Không | Chi tiết suất chiếu (phòng chiếu, giờ chiếu, định dạng) |
+| `GET` | `/showtimes/{id}/seats` | ❌ Không | Sơ đồ ghế (Seat Map) & trạng thái từng ghế |
 
-* **Trạng thái ghế trả về**:
-  * `AVAILABLE`: Ghế còn trống, có thể chọn
-  * `SELECTED`: Ghế đang được tạm giữ trong đơn đặt của khách khác
-  * `BOOKED`: Ghế đã thanh toán xong
-  * `UNAVAILABLE`: Ghế bị vô hiệu hóa/bảo trì
+* **Trạng thái ghế**:
+  * `AVAILABLE`: Ghế trống, có thể chọn
+  * `SELECTED`: Ghế đang được giữ trong đơn đặt vé của người khác
+  * `BOOKED`: Ghế đã thanh toán
+  * `UNAVAILABLE`: Ghế bảo trì/không sử dụng
 
 ---
 
-### 🟢 MODULE 6: BẮP NƯỚC & COMBO F&B (`/products`)
+### 🟢 MODULE 6: BẮP NƯỚC F&B (`/products`)
 
 | Method | Endpoint | Yêu cầu Auth | Mô tả |
 | :--- | :--- | :---: | :--- |
-| `GET` | `/api/v1/products` | ❌ Không | Danh sách bắp rang, nước ngọt, combo khuyến mãi |
+| `GET` | `/products` | ❌ Không | Danh sách sản phẩm bắp rang, nước ngọt, combo |
 
 #### Tham số Query:
-* `category`: Phân loại (ví dụ: `POPCORN`, `DRINK`, `COMBO`)
-* `status`: Trạng thái sản phẩm (`ACTIVE`, `INACTIVE`)
+* `category`: Thể loại (`POPCORN`, `DRINK`, `COMBO`)
+* `status`: Trạng thái (`ACTIVE`, `INACTIVE`)
 * `page`, `size`
 
 ---
@@ -206,23 +204,23 @@ Hệ thống sử dụng **JWT (JSON Web Token)** để bảo mật:
 
 | Method | Endpoint | Yêu cầu Auth | Mô tả |
 | :--- | :--- | :---: | :--- |
-| `POST` | `/api/v1/bookings` | 🔒 Có | Khởi tạo đơn đặt vé & giữ ghế tạm thời (10-15 phút) |
-| `GET` | `/api/v1/bookings/{id}` | 🔒 Có | Chi tiết đơn đặt vé |
-| `PUT` | `/api/v1/bookings/{id}/items` | 🔒 Có | Cập nhật số lượng bắp nước (F&B) trong đơn |
-| `PUT` | `/api/v1/bookings/{id}/voucher` | 🔒 Có | Áp dụng mã giảm giá (Voucher) vào đơn hàng |
-| `POST` | `/api/v1/bookings/{id}/payment` | 🔒 Có | Tạo thanh toán cho đơn hàng (`WALLET` hoặc `VNPAY`) |
-| `POST` | `/api/v1/bookings/{id}/cancel` | 🔒 Có | Hủy đơn đặt vé khi còn trong thời gian giữ ghế |
-| `POST` | `/api/v1/bookings/{id}/refund` | 🔒 Có | Yêu cầu hoàn tiền vé đã thanh toán |
-| `GET` | `/api/v1/bookings/{id}/payment` | 🔒 Có | Lịch sử / Chi tiết giao dịch thanh toán của đơn |
-| `GET` | `/api/v1/bookings/{id}/refund` | 🔒 Có | Xem tiến trình hoàn tiền của đơn hàng |
-| `GET` | `/api/v1/bookings/{id}/tickets` | 🔒 Có | Danh sách vé điện tử đã xuất thuộc về đơn này |
+| `POST` | `/bookings` | 🔒 Có | Tạo đơn đặt vé và giữ ghế tạm thời (Status `201 Created`) |
+| `GET` | `/bookings/{id}` | 🔒 Có | Xem chi tiết đơn đặt vé |
+| `PUT` | `/bookings/{id}/items` | 🔒 Có | Cập nhật số lượng bắp nước (F&B) trong đơn hàng |
+| `PUT` | `/bookings/{id}/voucher` | 🔒 Có | Áp dụng mã giảm giá (voucher) vào đơn hàng |
+| `POST` | `/bookings/{id}/payment` | 🔒 Có | Tạo giao dịch thanh toán cho đơn hàng (`WALLET` hoặc `VNPAY`) |
+| `POST` | `/bookings/{id}/cancel` | 🔒 Có | Hủy đơn đặt vé khi còn trong thời gian giữ ghế |
+| `POST` | `/bookings/{id}/refund` | 🔒 Có | Yêu cầu hoàn tiền vé đã thanh toán |
+| `GET` | `/bookings/{id}/payment` | 🔒 Có | Xem thông tin các giao dịch thanh toán của đơn |
+| `GET` | `/bookings/{id}/refund` | 🔒 Có | Xem trạng thái/tiến trình hoàn tiền của đơn |
+| `GET` | `/bookings/{id}/tickets` | 🔒 Có | Xem danh sách vé điện tử đã xuất của đơn hàng |
 
-#### Chi tiết Request Body:
-* **POST `/api/v1/bookings`** (Tạo đơn giữ ghế):
+#### Request Body mẫu:
+* **POST `/bookings`** (Tạo đơn giữ ghế):
   ```json
   {
     "showTimeId": 1,
-    "seatIds": [12, 13],
+    "seatIds": [10, 11],
     "productItems": [
       {
         "productId": 1,
@@ -231,7 +229,7 @@ Hệ thống sử dụng **JWT (JSON Web Token)** để bảo mật:
     ]
   }
   ```
-* **PUT `/api/v1/bookings/{id}/items`** (Cập nhật bắp nước):
+* **PUT `/bookings/{id}/items`** (Cập nhật bắp nước):
   ```json
   {
     "items": [
@@ -242,29 +240,29 @@ Hệ thống sử dụng **JWT (JSON Web Token)** để bảo mật:
     ]
   }
   ```
-* **PUT `/api/v1/bookings/{id}/voucher`** (Áp dụng voucher):
+* **PUT `/bookings/{id}/voucher`** (Áp dụng voucher):
   ```json
   {
-    "code": "CINEMA50K"
+    "code": "GIAM50K"
   }
   ```
-* **POST `/api/v1/bookings/{id}/payment`** (Thanh toán đơn):
+* **POST `/bookings/{id}/payment`** (Thanh toán đơn hàng):
   ```json
   {
     "method": "VNPAY"
   }
   ```
-  *(Hỗ trợ `"method": "VNPAY"` trả về `paymentUrl`, hoặc `"method": "WALLET"` trừ tiền trực tiếp từ ví)*.
-* **POST `/api/v1/bookings/{id}/cancel`** (Hủy đơn):
+  *(Truyền `"method": "VNPAY"` để nhận link `paymentUrl` thanh toán VNPAY, hoặc `"method": "WALLET"` để trừ tiền trực tiếp trong ví)*.
+* **POST `/bookings/{id}/cancel`** (Hủy đơn):
   ```json
   {
-    "reason": "Khách đổi kế hoạch"
+    "reason": "Khách muốn đổi sang suất chiếu khác"
   }
   ```
-* **POST `/api/v1/bookings/{id}/refund`** (Hoàn tiền):
+* **POST `/bookings/{id}/refund`** (Hoàn tiền):
   ```json
   {
-    "reason": "Bận việc đột xuất không thể đi xem"
+    "reason": "Bận việc đột xuất không thể tham dự"
   }
   ```
 
@@ -274,22 +272,22 @@ Hệ thống sử dụng **JWT (JSON Web Token)** để bảo mật:
 
 | Method | Endpoint | Yêu cầu Auth | Mô tả |
 | :--- | :--- | :---: | :--- |
-| `GET` | `/api/v1/wallet` | 🔒 Có | Xem số dư ví và trạng thái ví của người dùng |
-| `POST` | `/api/v1/wallet/top-up` | 🔒 Có | Tạo giao dịch nạp tiền vào ví qua VNPAY |
-| `GET` | `/api/v1/wallet/top-up/{id}` | 🔒 Có | Kiểm tra trạng thái giao dịch nạp tiền theo ID |
-| `GET` | `/api/v1/wallet/transactions` | 🔒 Có | Lịch sử biến động số dư và các giao dịch ví |
+| `GET` | `/wallet` | 🔒 Có | Xem số dư ví và trạng thái ví của user |
+| `POST` | `/wallet/top-up` | 🔒 Có | Tạo yêu cầu nạp tiền ví qua VNPAY (Status `201 Created`) |
+| `GET` | `/wallet/top-up/{id}` | 🔒 Có | Kiểm tra trạng thái giao dịch nạp tiền theo ID giao dịch |
+| `GET` | `/wallet/transactions` | 🔒 Có | Lịch sử biến động số dư và các giao dịch ví |
 
-#### Chi tiết Request Body & Params:
-* **POST `/api/v1/wallet/top-up`**:
+#### Request Body & Query:
+* **POST `/wallet/top-up`**:
   ```json
   {
-    "amount": 100000,
+    "amount": 50000,
     "method": "VNPAY"
   }
   ```
-  *(Response sẽ trả về `paymentUrl` để mở VNPAY sandbox)*.
-* **GET `/api/v1/wallet/transactions`**:
-  * `type`: Lọc theo loại (`ADD_MONEY`, `PAY_BOOKING`, `REFUND`)
+  *(Response trả về `paymentUrl` của VNPAY Sandbox để mở thanh toán)*.
+* **GET `/wallet/transactions`**:
+  * `type`: Lọc loại giao dịch (`ADD_MONEY`, `PAY_BOOKING`, `REFUND`)
   * `from`: Từ ngày (`YYYY-MM-DD`)
   * `to`: Đến ngày (`YYYY-MM-DD`)
   * `page`, `size`
@@ -300,9 +298,9 @@ Hệ thống sử dụng **JWT (JSON Web Token)** để bảo mật:
 
 | Method | Endpoint | Yêu cầu Auth | Mô tả |
 | :--- | :--- | :---: | :--- |
-| `GET` | `/api/v1/payments/{id}` | 🔒 Có | Xem chi tiết giao dịch thanh toán |
-| `GET` | `/api/v1/payments/webhook` | ❌ Không | VNPAY IPN Webhook (server-to-server callback) |
-| `GET` | `/api/v1/payments/vnpay-return` | ❌ Không | Callback trả về từ VNPAY dạng JSON API |
+| `GET` | `/payments/{id}` | 🔒 Có | Xem chi tiết giao dịch thanh toán theo ID |
+| `GET` | `/payments/webhook` | ❌ Không | VNPAY IPN Webhook (server-to-server callback) |
+| `GET` | `/payments/vnpay-return` | ❌ Không | Callback trả về từ VNPAY dạng JSON API |
 
 ---
 
@@ -310,55 +308,62 @@ Hệ thống sử dụng **JWT (JSON Web Token)** để bảo mật:
 
 | Method | Endpoint | Yêu cầu Auth | Mô tả |
 | :--- | :--- | :---: | :--- |
-| `GET` | `/api/v1/tickets/{id}` | 🔒 Có | Xem chi tiết vé điện tử (mã vé, QR code, phim, rạp, ghế) |
+| `GET` | `/tickets/{id}` | 🔒 Có | Chi tiết vé xem phim điện tử (mã vé, QR code, rạp, phòng, ghế) |
 
 ---
 
-### 🟢 MODULE 11: THÔNG TIN TÀI KHOẢN NGƯỜI DÙNG (`/user` - Yêu cầu Đăng nhập 🔒)
+### 🟢 MODULE 11: TÀI KHOẢN NGƯỜI DÙNG (`/user` - Yêu cầu Đăng nhập 🔒)
 
 | Method | Endpoint | Yêu cầu Auth | Mô tả |
 | :--- | :--- | :---: | :--- |
-| `GET` | `/api/v1/user` | 🔒 Có | Xem thông tin hồ sơ người dùng đang đăng nhập |
-| `PATCH` | `/api/v1/user` | 🔒 Có | Cập nhật thông tin cá nhân (họ tên, SĐT, ngày sinh) |
-| `GET` | `/api/v1/user/bookings` | 🔒 Có | Lịch sử tất cả các đơn đặt vé của người dùng |
-| `GET` | `/api/v1/user/vouchers` | 🔒 Có | Danh sách ví voucher / khuyến mãi của người dùng |
-| `POST` | `/api/v1/user/change-password` | 🔒 Có | Đổi mật khẩu |
+| `GET` | `/user` | 🔒 Có | Lấy thông tin hồ sơ tài khoản đang đăng nhập |
+| `PATCH` | `/user` | 🔒 Có | Cập nhật thông tin cá nhân (họ tên, SĐT, ngày sinh) |
+| `GET` | `/user/bookings` | 🔒 Có | Danh sách lịch sử đặt vé của user |
+| `GET` | `/user/vouchers` | 🔒 Có | Danh sách ví voucher khuyến mãi của user |
+| `POST` | `/user/change-password` | 🔒 Có | Đổi mật khẩu |
 
-#### Chi tiết Request Body & Params:
-* **PATCH `/api/v1/user`**:
+#### Request Body & Query:
+* **PATCH `/user`**:
   ```json
   {
-    "fullName": "Nguyễn Văn B",
-    "phone": "0912345678",
-    "dob": "1999-05-20"
+    "fullName": "Nguyễn Văn A",
+    "phone": "0987654321",
+    "dob": "2000-01-15"
   }
   ```
-* **GET `/api/v1/user/bookings`**:
+* **GET `/user/bookings`**:
   * `status`: Lọc theo trạng thái đơn (`PENDING`, `CONFIRMED`, `CANCELLED`, `REFUNDED`)
   * `from`, `to`, `page`, `size`, `sort`
-* **GET `/api/v1/user/vouchers`**:
-  * `status`: Lọc trạng thái voucher (`AVAILABLE`, `USED`, `EXPIRED`)
+* **GET `/user/vouchers`**:
+  * `status`: Trạng thái voucher (`AVAILABLE`, `USED`, `EXPIRED`)
   * `page`, `size`
+* **POST `/user/change-password`**:
+  ```json
+  {
+    "oldPassword": "Password123@",
+    "newPassword": "NewPassword456@"
+  }
+  ```
 
 ---
 
-### 🟢 MODULE 12: GIAO DIỆN WEB TRẢ VỀ (JSP)
+### 🟢 MODULE 12: GIAO DIỆN TRANG WEB (JSP)
 
-| Method | URL | Mô tả |
+| Method | Endpoint | Mô tả |
 | :--- | :--- | :--- |
 | `GET` | `/vn_return.jsp` | Trang hiển thị kết quả giao dịch thanh toán VNPAY (thành công/thất bại) |
 
 ---
 
-## 💡 5. MÃ LỖI THƯỜNG GẶP (HTTP STATUS CODES)
+## 💡 5. BẢNG MÃ LỖI THƯỜNG GẶP (HTTP STATUS CODES)
 
-* `200 OK`: Xử lý thành công.
+* `200 OK`: Thành công.
 * `201 Created`: Tạo mới thành công (Đăng ký, Đặt vé, Nạp tiền, Review).
-* `400 Bad Request`: Thiếu tham số, định dạng ngày giờ không hợp lệ, dữ liệu JSON sai.
-* `401 Unauthorized`: Chưa đăng nhập hoặc Access Token hết hạn / không hợp lệ.
-* `403 Forbidden`: Không có quyền truy cập tài nguyên của người khác, hoặc ví/tài khoản bị khóa.
-* `404 Not Found`: Không tìm thấy tài nguyên (phim, rạp, đơn hàng, người dùng...).
-* `409 Conflict`: Xung đột dữ liệu (Email đã tồn tại, ghế đã bị người khác chọn/đặt, đã review phim này rồi).
-* `410 Gone`: Đơn hàng đã quá hạn giữ ghế (hết thời gian thanh toán).
-* `422 Unprocessable Entity`: Số dư ví không đủ, hoặc dữ liệu không hợp lệ.
+* `400 Bad Request`: Dữ liệu gửi lên không hợp lệ, thiếu tham số.
+* `401 Unauthorized`: Chưa đăng nhập hoặc Token hết hạn / không hợp lệ.
+* `403 Forbidden`: Không có quyền truy cập, hoặc tài khoản/ví bị khóa (`SUSPENDED`).
+* `404 Not Found`: Không tìm thấy dữ liệu yêu cầu.
+* `409 Conflict`: Xung đột dữ liệu (Email đã đăng ký, ghế đã bị đặt/giữ, đã review phim rồi).
+* `410 Gone`: Hết thời gian giữ ghế của đơn hàng.
+* `422 Unprocessable Entity`: Số dư ví không đủ, hoặc trạng thái không hợp lệ.
 * `500 Internal Server Error`: Lỗi hệ thống server.
