@@ -10,6 +10,7 @@ import com.cinema.payment.enums.PaymentType;
 import com.cinema.payment.gateway.VnPayGateway;
 import com.cinema.payment.gateway.VnPayIpnResponse;
 import com.cinema.payment.gateway.VnPayIpnResult;
+import com.cinema.ticket.Email.TicketEmailService;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 
@@ -26,16 +27,23 @@ public class PaymentIpnService {
     private final PaymentDAO paymentDAO;
     private final PaymentFulfillmentDAO fulfillmentDAO;
     private final VnPayGateway vnPayGateway;
+    private final TicketEmailService ticketEmailService;
 
     public PaymentIpnService() {
-        this(new PaymentDAO(), new PaymentFulfillmentDAO(), new VnPayGateway());
+        this(new PaymentDAO(), new PaymentFulfillmentDAO(), new VnPayGateway(), new TicketEmailService());
     }
 
     public PaymentIpnService(PaymentDAO paymentDAO, PaymentFulfillmentDAO fulfillmentDAO,
                              VnPayGateway vnPayGateway) {
+        this(paymentDAO, fulfillmentDAO, vnPayGateway, new TicketEmailService());
+    }
+
+    public PaymentIpnService(PaymentDAO paymentDAO, PaymentFulfillmentDAO fulfillmentDAO,
+                             VnPayGateway vnPayGateway, TicketEmailService ticketEmailService) {
         this.paymentDAO = paymentDAO;
         this.fulfillmentDAO = fulfillmentDAO;
         this.vnPayGateway = vnPayGateway;
+        this.ticketEmailService = ticketEmailService != null ? ticketEmailService : new TicketEmailService();
     }
 
     public VnPayIpnResponse handleVnPayIpn(Map<String, String[]> parameters) {
@@ -142,6 +150,11 @@ public class PaymentIpnService {
             LOGGER.log(Level.INFO, "event={0} paymentId={1} bookingId={2} gatewayTransactionId={3}",
                     new Object[]{ipn.paymentSuccessful() ? "vnpay_ipn_fulfilled" : "vnpay_ipn_failed",
                             payment.getId(), booking.getBookingId(), ipn.transactionNo()});
+
+            if (ipn.paymentSuccessful()) {
+                ticketEmailService.sendTicketEmailByBookingAsync(booking.getBookingId(), booking.getUserId());
+            }
+
             return VnPayIpnResponse.of("00", "Confirm Success");
         } catch (Exception exception) {
             if (em.getTransaction().isActive()) {
