@@ -12,10 +12,6 @@ public record VnPayConfig(
         String returnUrl,
         ZoneId zoneId) {
 
-    private static final Dotenv DOTENV = Dotenv.configure()
-            .ignoreIfMissing()
-            .load();
-
     public static VnPayConfig fromEnvironment() {
         return new VnPayConfig(
                 required("VNPAY_TMN_CODE"),
@@ -41,9 +37,17 @@ public record VnPayConfig(
 
     private static String environmentValue(String name) {
         String value = System.getenv(name);
-        if (value == null || value.isBlank()) {
-            value = DOTENV.get(name);
+        if (value != null && !value.isBlank()) {
+            return value;
         }
-        return value;
+        value = System.getProperty(name);
+        if (value != null && !value.isBlank()) {
+            return value;
+        }
+        try {
+            return Dotenv.configure().ignoreIfMissing().load().get(name);
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 }

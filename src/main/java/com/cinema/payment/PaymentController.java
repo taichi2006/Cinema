@@ -32,6 +32,13 @@ public class PaymentController extends BaseServlet {
             return;
         }
 
+        // VNPAY Return URL: trình duyệt redirect về sau khi thanh toán
+        if (segments.length == 1 && "vnpay-return".equalsIgnoreCase(segments[0])) {
+            resp.setStatus(HttpServletResponse.SC_OK);
+            writeSuccess(resp, service.handleVnPayIpn(req.getParameterMap()));
+            return;
+        }
+
         long userId = getAuthenticatedUserId(req);
 
         if (segments.length == 1) {

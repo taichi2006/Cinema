@@ -3,6 +3,13 @@ package com.cinema.wallet.service;
 import com.cinema.common.dto.PageMeta;
 import com.cinema.common.dto.PageResponse;
 import com.cinema.common.exception.ApiException;
+import com.cinema.common.util.JPAUtil;
+import com.cinema.payment.entity.Payment;
+import com.cinema.payment.enums.PaymentMethod;
+import com.cinema.payment.enums.PaymentStatus;
+import com.cinema.payment.enums.PaymentType;
+import com.cinema.payment.gateway.VnPayGateway;
+import com.cinema.user.entity.User;
 import com.cinema.wallet.dao.WalletDAO;
 import com.cinema.wallet.dao.WalletTransactionDAO;
 import com.cinema.wallet.dto.request.TopUpRequest;
@@ -13,9 +20,13 @@ import com.cinema.wallet.entity.Wallet;
 import com.cinema.wallet.entity.WalletTransaction;
 import com.cinema.wallet.enums.TransactionStatus;
 import com.cinema.wallet.enums.TransactionType;
+import com.cinema.wallet.enums.WalletStatus;
+import jakarta.persistence.EntityManager;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 
@@ -35,8 +46,12 @@ public class WalletService {
         return new WalletResponse(wallet.getId(), wallet.getUser().getId(), wallet.getBalance(), wallet.getStatus());
     }
 
-    // 3. Nạp tiền vào ví
+    // 3. Nạp tiền vào ví qua VNPAY
     public TopUpResponse topUp(long userId, TopUpRequest req) {
+        return topUp(userId, req, null);
+    }
+
+    public TopUpResponse topUp(long userId, TopUpRequest req, String clientIp) {
         if (req == null || req.getAmount() == null) {
             throw ApiException.badRequest("Số tiền nạp không được để trống");
         }
@@ -44,9 +59,77 @@ public class WalletService {
             throw ApiException.badRequest("Số tiền nạp phải từ 10,000 đến 50,000,000 VND");
         }
 
-        WalletTransaction tx = walletDAO.topUp(userId, req.getAmount());
-        String method = (req.getMethod() != null && !req.getMethod().isBlank()) ? req.getMethod().trim() : "BANK_TRANSFER";
-        return new TopUpResponse(null, tx.getAmount(), method, tx.getStatus().name(), tx.getId(), Instant.now().toString());
+        EntityManager em = JPAUtil.getEntityManager();
+        try {
+            em.getTransaction().begin();
+
+            Wallet wallet = em.createQuery("SELECT w FROM Wallet w WHERE w.user.id = :userId", Wallet.class)
+                    .setParameter("userId", userId)
+                    .getResultStream().findFirst().orElse(null);
+
+            if (wallet == null) {
+                User user = em.find(User.class, userId);
+                if (user == null) {
+                    throw ApiException.notFound("Không tìm thấy người dùng #" + userId);
+                }
+                wallet = new Wallet(user);
+                wallet.setBalance(BigDecimal.ZERO);
+                wallet.setStatus(WalletStatus.ACTIVE);
+                em.persist(wallet);
+                em.flush();
+            }
+
+            if (wallet.getStatus() == WalletStatus.SUSPENDED) {
+                throw ApiException.forbidden("Ví của bạn đang bị tạm khóa (SUSPENDED)");
+            }
+
+            BigDecimal amountBd = BigDecimal.valueOf(req.getAmount());
+            LocalDateTime now = LocalDateTime.now();
+            LocalDateTime expiredAt = now.plusMinutes(15);
+
+            // 1. Tạo giao dịch ví ở trạng thái PENDING
+            WalletTransaction tx = new WalletTransaction();
+            tx.setWallet(wallet);
+            tx.setType(TransactionType.ADD_MONEY);
+            tx.setStatus(TransactionStatus.PENDING);
+            tx.setAmount(amountBd);
+            tx.setDescription("Nạp tiền vào ví qua VNPAY");
+            em.persist(tx);
+            em.flush();
+
+            // 2. Tạo bản ghi Payment liên kết
+            Payment payment = new Payment();
+            payment.setAmount(amountBd);
+            payment.setMethod(PaymentMethod.VNPAY);
+            payment.setStatus(PaymentStatus.PENDING);
+            payment.setPaymentType(PaymentType.TOPUP);
+            payment.setWalletTransactionId(tx.getId());
+            payment.setExpiredAt(expiredAt);
+            em.persist(payment);
+            em.flush();
+
+            // 3. Tạo link thanh toán VNPAY Sandbox thật
+            VnPayGateway gateway = new VnPayGateway();
+            String paymentUrl = gateway.createPaymentUrl(payment, clientIp, now);
+
+            em.getTransaction().commit();
+
+            TopUpResponse resp = new TopUpResponse(
+                    payment.getId(), amountBd, "VNPAY", "PENDING",
+                    tx.getId(), now.toString()
+            );
+            resp.setPaymentUrl(paymentUrl);
+            resp.setExpiredAt(expiredAt.toString());
+            return resp;
+        } catch (ApiException e) {
+            if (em.getTransaction().isActive()) em.getTransaction().rollback();
+            throw e;
+        } catch (Exception e) {
+            if (em.getTransaction().isActive()) em.getTransaction().rollback();
+            throw ApiException.internal("Lỗi tạo giao dịch nạp tiền VNPAY: " + e.getMessage());
+        } finally {
+            em.close();
+        }
     }
 
     // 4. Kiểm tra trạng thái giao dịch nạp tiền
@@ -59,7 +142,7 @@ public class WalletService {
         }
 
         String created = tx.getCreatedAt() != null ? tx.getCreatedAt().toString() : Instant.now().toString();
-        return new TopUpResponse(null, tx.getAmount(), "GATEWAY", tx.getStatus().name(), tx.getId(), created);
+        return new TopUpResponse(null, tx.getAmount(), "VNPAY", tx.getStatus().name(), tx.getId(), created);
     }
 
     // 5. Lịch sử giao dịch ví

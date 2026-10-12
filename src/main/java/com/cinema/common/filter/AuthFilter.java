@@ -34,8 +34,9 @@ public class AuthFilter implements Filter {
         HttpServletRequest req = (HttpServletRequest) request;
         HttpServletResponse resp = (HttpServletResponse) response;
 
-        // IPN là callback server-to-server của VNPAY và được xác thực bằng checksum.
-        if (req.getRequestURI().endsWith("/payments/webhook")) {
+        // IPN và Return URL là callback từ VNPAY và được xác thực bằng checksum.
+        String uri = req.getRequestURI();
+        if (uri.endsWith("/payments/webhook") || uri.contains("/payments/vnpay-return")) {
             chain.doFilter(request, response);
             return;
         }

@@ -2,6 +2,7 @@ package com.cinema.payment.gateway;
 
 import com.cinema.common.exception.ApiException;
 import com.cinema.payment.entity.Payment;
+import com.cinema.payment.enums.PaymentType;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -12,8 +13,12 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 import java.util.function.Supplier;
 
 public class VnPayGateway {
@@ -34,20 +39,26 @@ public class VnPayGateway {
     }
 
     public String createPaymentUrl(Payment payment, String clientIp, LocalDateTime createdAt) {
-        if (payment == null || payment.getId() == null || payment.getBookingId() == null
+        if (payment == null || payment.getId() == null
                 || payment.getAmount() == null || payment.getExpiredAt() == null) {
             throw ApiException.internal("Thiếu dữ liệu để tạo giao dịch VNPAY");
         }
+        if (payment.getPaymentType() == PaymentType.BOOKING_PAYMENT && payment.getBookingId() == null) {
+            throw ApiException.internal("Thiếu dữ liệu booking để tạo giao dịch VNPAY");
+        }
 
         VnPayConfig config = configSupplier.get();
-        TreeMap<String, String> parameters = new TreeMap<>();
+        Map<String, String> parameters = new HashMap<>();
         parameters.put("vnp_Version", "2.1.0");
         parameters.put("vnp_Command", "pay");
         parameters.put("vnp_TmnCode", config.tmnCode());
         parameters.put("vnp_Amount", toVnPayAmount(payment.getAmount()));
         parameters.put("vnp_CurrCode", "VND");
         parameters.put("vnp_TxnRef", payment.getId().toString());
-        parameters.put("vnp_OrderInfo", "Thanh toan booking #" + payment.getBookingId());
+        String orderInfo = (payment.getPaymentType() == com.cinema.payment.enums.PaymentType.TOPUP)
+                ? "Nap tien vi " + (payment.getWalletTransactionId() != null ? payment.getWalletTransactionId() : payment.getId())
+                : "Thanh toan don hang " + payment.getBookingId();
+        parameters.put("vnp_OrderInfo", orderInfo);
         parameters.put("vnp_OrderType", "other");
         parameters.put("vnp_Locale", "vn");
         parameters.put("vnp_ReturnUrl", config.returnUrl());
@@ -55,10 +66,25 @@ public class VnPayGateway {
         parameters.put("vnp_CreateDate", VNPAY_TIME.format(createdAt.atZone(config.zoneId())));
         parameters.put("vnp_ExpireDate", VNPAY_TIME.format(payment.getExpiredAt().atZone(config.zoneId())));
 
-        String query = canonicalQuery(parameters);
-        String secureHash = hmacSha512(config.hashSecret(), query);
-        return config.paymentUrl() + (config.paymentUrl().contains("?") ? "&" : "?")
-                + query + "&vnp_SecureHash=" + secureHash;
+        List<String> fieldNames = new ArrayList<>(parameters.keySet());
+        Collections.sort(fieldNames);
+        StringBuilder hashData = new StringBuilder();
+        StringBuilder query = new StringBuilder();
+        Iterator<String> itr = fieldNames.iterator();
+        while (itr.hasNext()) {
+            String fieldName = itr.next();
+            String fieldValue = parameters.get(fieldName);
+            if (fieldValue != null && !fieldValue.isEmpty()) {
+                hashData.append(fieldName).append('=').append(urlEncode(fieldValue));
+                query.append(urlEncode(fieldName)).append('=').append(urlEncode(fieldValue));
+                if (itr.hasNext()) {
+                    query.append('&');
+                    hashData.append('&');
+                }
+            }
+        }
+        String secureHash = hmacSha512(config.hashSecret(), hashData.toString());
+        return config.paymentUrl() + "?" + query + "&vnp_SecureHash=" + secureHash;
     }
 
     public VnPayIpnResult verifyIpn(Map<String, String[]> rawParameters) {
@@ -68,7 +94,7 @@ public class VnPayGateway {
             return VnPayIpnResult.invalidSignature();
         }
 
-        TreeMap<String, String> parameters = new TreeMap<>();
+        Map<String, String> parameters = new HashMap<>();
         for (Map.Entry<String, String[]> entry : rawParameters.entrySet()) {
             String key = entry.getKey();
             if (key == null || !key.startsWith("vnp_")
@@ -81,7 +107,22 @@ public class VnPayGateway {
             }
         }
 
-        String expectedHash = hmacSha512(config.hashSecret(), canonicalQuery(parameters));
+        List<String> fieldNames = new ArrayList<>(parameters.keySet());
+        Collections.sort(fieldNames);
+        StringBuilder hashData = new StringBuilder();
+        Iterator<String> itr = fieldNames.iterator();
+        while (itr.hasNext()) {
+            String fieldName = itr.next();
+            String fieldValue = parameters.get(fieldName);
+            if (fieldValue != null && !fieldValue.isEmpty()) {
+                hashData.append(fieldName).append('=').append(urlEncode(fieldValue));
+                if (itr.hasNext()) {
+                    hashData.append('&');
+                }
+            }
+        }
+
+        String expectedHash = hmacSha512(config.hashSecret(), hashData.toString());
         if (!MessageDigest.isEqual(expectedHash.getBytes(StandardCharsets.US_ASCII),
                 receivedHash.getBytes(StandardCharsets.US_ASCII))) {
             return VnPayIpnResult.invalidSignature();
@@ -102,7 +143,21 @@ public class VnPayGateway {
     }
 
     public String signParameters(Map<String, String> parameters) {
-        return hmacSha512(configSupplier.get().hashSecret(), canonicalQuery(new TreeMap<>(parameters)));
+        List<String> fieldNames = new ArrayList<>(parameters.keySet());
+        Collections.sort(fieldNames);
+        StringBuilder hashData = new StringBuilder();
+        Iterator<String> itr = fieldNames.iterator();
+        while (itr.hasNext()) {
+            String fieldName = itr.next();
+            String fieldValue = parameters.get(fieldName);
+            if (fieldValue != null && !fieldValue.isEmpty()) {
+                hashData.append(fieldName).append('=').append(urlEncode(fieldValue));
+                if (itr.hasNext()) {
+                    hashData.append('&');
+                }
+            }
+        }
+        return hmacSha512(configSupplier.get().hashSecret(), hashData.toString());
     }
 
     private static String toVnPayAmount(BigDecimal amount) {
@@ -114,7 +169,10 @@ public class VnPayGateway {
     }
 
     private static String normalizeIp(String clientIp) {
-        return clientIp == null || clientIp.isBlank() ? "127.0.0.1" : clientIp.trim();
+        if (clientIp == null || clientIp.isBlank() || clientIp.contains(":") || "0:0:0:0:0:0:0:1".equals(clientIp)) {
+            return "127.0.0.1";
+        }
+        return clientIp.trim();
     }
 
     private static String required(Map<String, String> parameters, String name) {
@@ -133,19 +191,12 @@ public class VnPayGateway {
         return values == null || values.length == 0 ? null : values[0];
     }
 
-    private static String canonicalQuery(Map<String, String> parameters) {
-        StringBuilder builder = new StringBuilder();
-        for (Map.Entry<String, String> entry : parameters.entrySet()) {
-            if (builder.length() > 0) {
-                builder.append('&');
-            }
-            builder.append(urlEncode(entry.getKey())).append('=').append(urlEncode(entry.getValue()));
-        }
-        return builder.toString();
-    }
-
     private static String urlEncode(String value) {
-        return URLEncoder.encode(value, StandardCharsets.UTF_8);
+        try {
+            return URLEncoder.encode(value, StandardCharsets.US_ASCII.toString());
+        } catch (Exception e) {
+            return URLEncoder.encode(value, StandardCharsets.UTF_8);
+        }
     }
 
     private static String hmacSha512(String secret, String data) {

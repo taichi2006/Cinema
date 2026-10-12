@@ -57,7 +57,7 @@ public class WalletController extends BaseServlet {
         if (segments.length == 1 && "top-up".equalsIgnoreCase(segments[0])) {
             TopUpRequest body = parseBody(req, TopUpRequest.class);
             resp.setStatus(HttpServletResponse.SC_CREATED);
-            writeSuccess(resp, service.topUp(userId, body));
+            writeSuccess(resp, service.topUp(userId, body, req.getRemoteAddr()));
             return;
         }
 

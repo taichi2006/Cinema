@@ -62,12 +62,13 @@ public class PaymentIpnService {
                 return VnPayIpnResponse.of("01", "Order not found");
             }
 
-            Booking booking = em.find(Booking.class, existingPayment.getBookingId(), LockModeType.PESSIMISTIC_WRITE);
+            Booking booking = (existingPayment.getBookingId() != null)
+                    ? em.find(Booking.class, existingPayment.getBookingId(), LockModeType.PESSIMISTIC_WRITE)
+                    : null;
             Payment payment = paymentDAO.findByIdForUpdate(ipn.paymentId(), em)
                     .orElseThrow(() -> ApiException.notFound("Không tìm thấy giao dịch thanh toán"));
 
-            if (payment.getMethod() != PaymentMethod.VNPAY
-                    || payment.getPaymentType() != PaymentType.BOOKING_PAYMENT) {
+            if (payment.getMethod() != PaymentMethod.VNPAY) {
                 em.getTransaction().commit();
                 return VnPayIpnResponse.of("01", "Order not found");
             }
@@ -77,8 +78,7 @@ public class PaymentIpnService {
             }
             if (payment.getStatus() == PaymentStatus.SUCCESSFUL) {
                 em.getTransaction().commit();
-                LOGGER.log(Level.INFO, "event=vnpay_ipn_duplicate paymentId={0} bookingId={1} gatewayTransactionId={2}",
-                        new Object[]{payment.getId(), payment.getBookingId(), ipn.transactionNo()});
+                LOGGER.log(Level.INFO, "event=vnpay_ipn_duplicate paymentId={0}", payment.getId());
                 return VnPayIpnResponse.of("02", "Order already confirmed");
             }
             if (payment.getStatus() == PaymentStatus.FAILED) {
@@ -87,6 +87,41 @@ public class PaymentIpnService {
             }
 
             LocalDateTime now = LocalDateTime.now();
+
+            if (payment.getPaymentType() == PaymentType.TOPUP) {
+                if (ipn.paymentSuccessful()) {
+                    payment.setStatus(PaymentStatus.SUCCESSFUL);
+                    payment.setGatewayTransactionId(ipn.transactionNo());
+                    payment.setPaymentDate(now);
+
+                    if (payment.getWalletTransactionId() != null) {
+                        com.cinema.wallet.entity.WalletTransaction tx =
+                                em.find(com.cinema.wallet.entity.WalletTransaction.class, payment.getWalletTransactionId());
+                        if (tx != null) {
+                            tx.setStatus(com.cinema.wallet.enums.TransactionStatus.SUCCESSFUL);
+                            tx.setDescription("Nạp tiền vào ví qua VNPAY thành công (GD: " + ipn.transactionNo() + ")");
+                            com.cinema.wallet.entity.Wallet wallet = tx.getWallet();
+                            wallet.setBalance(wallet.getBalance().add(payment.getAmount()));
+                            em.merge(wallet);
+                        }
+                    }
+                } else {
+                    payment.setStatus(PaymentStatus.FAILED);
+                    payment.setFailureReason("VNPAY response=" + ipn.responseCode());
+                    payment.setPaymentDate(now);
+                    if (payment.getWalletTransactionId() != null) {
+                        com.cinema.wallet.entity.WalletTransaction tx =
+                                em.find(com.cinema.wallet.entity.WalletTransaction.class, payment.getWalletTransactionId());
+                        if (tx != null) {
+                            tx.setStatus(com.cinema.wallet.enums.TransactionStatus.FAILED);
+                            tx.setDescription("Nạp tiền vào ví qua VNPAY thất bại");
+                        }
+                    }
+                }
+                em.getTransaction().commit();
+                return VnPayIpnResponse.of("00", "Confirm Success");
+            }
+
             if (ipn.paymentSuccessful()) {
                 validateBookingForVnPayIpn(booking, now);
                 List<Long> lockedSeatIds = fulfillmentDAO.lockHeldSeatIds(booking.getBookingId(), em);

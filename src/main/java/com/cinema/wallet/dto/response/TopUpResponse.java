@@ -16,6 +16,7 @@ public class TopUpResponse {
     private String gatewayTransactionId;
     private Long walletTransactionId;
     private String failureReason;
+    private String paymentUrl;
 
     public TopUpResponse() {}
 
@@ -115,6 +116,14 @@ public class TopUpResponse {
 
     public void setFailureReason(String failureReason) {
         this.failureReason = failureReason;
+    }
+
+    public String getPaymentUrl() {
+        return paymentUrl;
+    }
+
+    public void setPaymentUrl(String paymentUrl) {
+        this.paymentUrl = paymentUrl;
     }
 
     // Helper alias
