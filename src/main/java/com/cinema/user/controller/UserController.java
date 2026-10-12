@@ -1,6 +1,6 @@
 package com.cinema.user.controller;
 
-import com.cinema.auth.AuthService;
+import com.cinema.auth.service.AuthService;
 import com.cinema.auth.dto.request.ChangePasswordRequest;
 import com.cinema.common.exception.ApiException;
 import com.cinema.common.web.BaseServlet;

@@ -1,6 +1,6 @@
 package com.cinema.common.web;
 
-import com.cinema.auth.JwtUtil;
+import com.cinema.common.util.JwtUtil;
 import com.cinema.common.config.ObjectMapperConfig;
 import com.cinema.common.dto.ApiResponse;
 import com.cinema.common.exception.ApiException;
@@ -128,7 +128,7 @@ public abstract class BaseServlet extends HttpServlet {
                 Claims claims = JwtUtil.parseAccessToken(token);
                 long userId = Long.parseLong(claims.getSubject());
                 Integer tokenVer = claims.get("token_version", Integer.class);
-                if (tokenVer != null && new com.cinema.auth.AuthDAO().isTokenVersionValid(userId, tokenVer)) {
+                if (tokenVer != null && new com.cinema.auth.dao.AuthDAO().isTokenVersionValid(userId, tokenVer)) {
                     req.setAttribute("userId", userId);
                     return userId;
                 }

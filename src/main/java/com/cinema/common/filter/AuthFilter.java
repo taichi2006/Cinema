@@ -1,6 +1,7 @@
 package com.cinema.common.filter;
 
-import com.cinema.auth.JwtUtil;
+import com.cinema.auth.dao.AuthDAO;
+import com.cinema.common.util.JwtUtil;
 import com.cinema.common.config.ObjectMapperConfig;
 import com.cinema.common.dto.ErrorResponse;
 import com.cinema.common.exception.ApiException;
@@ -26,7 +27,7 @@ import java.io.IOException;
 public class AuthFilter implements Filter {
 
     private final ObjectMapper mapper = ObjectMapperConfig.getInstance();
-    private final com.cinema.auth.AuthDAO authDAO = new com.cinema.auth.AuthDAO();
+    private final AuthDAO authDAO = new AuthDAO();
 
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)

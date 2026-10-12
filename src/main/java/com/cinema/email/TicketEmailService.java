@@ -1,8 +1,8 @@
 package com.cinema.email;
 
 import com.cinema.common.util.JPAUtil;
-import com.cinema.ticket.Ticket;
-import com.cinema.ticket.TicketDAO;
+import com.cinema.ticket.entity.Ticket;
+import com.cinema.ticket.dao.TicketDAO;
 import com.cinema.user.entity.User;
 import io.github.cdimascio.dotenv.Dotenv;
 import jakarta.persistence.EntityManager;

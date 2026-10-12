@@ -14,29 +14,28 @@
         <provider>
             org.hibernate.jpa.HibernatePersistenceProvider
         </provider>
-        <class>com.cinema.movie.Movie</class>
-        <class>com.cinema.movie.Genre</class>
-        <class>com.cinema.movie.Review</class>
-        <class>com.cinema.cinema.Cinema</class>
-        <class>com.cinema.cinema.Room</class>
+        <class>com.cinema.movie.entity.Movie</class>
+        <class>com.cinema.movie.entity.Genre</class>
+        <class>com.cinema.movie.entity.Review</class>
+        <class>com.cinema.cinema.entity.Cinema</class>
+        <class>com.cinema.cinema.entity.Room</class>
         <class>com.cinema.user.entity.User</class>
         <!-- Module Wallet: Ví người dùng, nạp tiền và lịch sử bút toán giao dịch -->
         <class>com.cinema.wallet.entity.Wallet</class>
         <class>com.cinema.wallet.entity.WalletTransaction</class>
         <!-- Module Product: Danh mục sản phẩm F&B -->
-        <class>com.cinema.product.Product</class>
+        <class>com.cinema.product.entity.Product</class>
         <!-- Module Ticket: Vé xem phim điện tử -->
-        <class>com.cinema.ticket.Ticket</class>
+        <class>com.cinema.ticket.entity.Ticket</class>
         <!-- Module Showtime & Seat -->
-        <class>com.cinema.showtime.Showtime</class>
-        <class>com.cinema.showtime.Seat</class>
-        <class>com.cinema.showtime.ShowtimeSeat</class>
-        <!-- Module Voucher -->
-        <class>com.cinema.voucher.Voucher</class>
+        <class>com.cinema.showtime.entity.Showtime</class>
+        <class>com.cinema.showtime.entity.Seat</class>
+        <class>com.cinema.showtime.entity.ShowtimeSeat</class>
         <!-- Module Booking -->
         <class>com.cinema.booking.entity.Booking</class>
         <class>com.cinema.booking.entity.BookingItem</class>
         <class>com.cinema.booking.entity.Refund</class>
+        <class>com.cinema.booking.entity.Voucher</class>
         <!-- Module Payment -->
         <class>com.cinema.payment.entity.Payment</class>
 

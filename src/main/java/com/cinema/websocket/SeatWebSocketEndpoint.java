@@ -1,6 +1,6 @@
 package com.cinema.websocket;
 
-import com.cinema.auth.JwtUtil;
+import com.cinema.common.util.JwtUtil;
 import com.cinema.common.config.ObjectMapperConfig;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.Claims;
