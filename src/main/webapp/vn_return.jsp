@@ -3,9 +3,29 @@
 <%@ page import="com.cinema.payment.PaymentDAO" %>
 <%@ page import="com.cinema.payment.entity.Payment" %>
 <%@ page import="com.cinema.payment.enums.PaymentType" %>
+<%@ page import="com.cinema.payment.enums.PaymentStatus" %>
 <%@ page import="com.cinema.payment.gateway.VnPayIpnResponse" %>
 <%@ page import="java.text.NumberFormat" %>
 <%@ page import="java.util.Locale" %>
+<%!
+    private String getVnPayErrorMessage(String code) {
+        if (code == null) return "Giao dịch không thành công hoặc sai chữ ký";
+        switch (code) {
+            case "07": return "Trừ tiền thành công nhưng giao dịch bị nghi ngờ gian lận";
+            case "09": return "Thẻ/Tài khoản chưa đăng ký dịch vụ InternetBanking";
+            case "10": return "Xác thực thông tin thẻ/tài khoản không đúng quá 3 lần";
+            case "11": return "Đã hết hạn chờ thanh toán";
+            case "12": return "Thẻ/Tài khoản của khách hàng bị khóa";
+            case "13": return "Quý khách nhập sai mật khẩu xác thực OTP";
+            case "24": return "Khách hàng đã hủy giao dịch";
+            case "51": return "Tài khoản của quý khách không đủ số dư";
+            case "65": return "Tài khoản đã vượt quá hạn mức giao dịch trong ngày";
+            case "75": return "Ngân hàng thanh toán đang bảo trì";
+            case "79": return "Nhập sai mật khẩu thanh toán quá số lần quy định";
+            default: return "Giao dịch không thành công (Mã lỗi: " + code + ")";
+        }
+    }
+%>
 <%
     PaymentService paymentService = new PaymentService();
     VnPayIpnResponse ipnResult = null;
@@ -21,6 +41,7 @@
     String vnp_Amount = request.getParameter("vnp_Amount");
     String vnp_OrderInfo = request.getParameter("vnp_OrderInfo");
     String vnp_ResponseCode = request.getParameter("vnp_ResponseCode");
+    String vnp_TransactionStatus = request.getParameter("vnp_TransactionStatus");
     String vnp_TransactionNo = request.getParameter("vnp_TransactionNo");
     String vnp_BankCode = request.getParameter("vnp_BankCode");
     String vnp_PayDate = request.getParameter("vnp_PayDate");
@@ -31,9 +52,6 @@
             amountVal = Long.parseLong(vnp_Amount) / 100;
         } catch (Exception ignored) {}
     }
-
-    // 00: Cập nhật thành công, 02: Giao dịch đã được xác nhận thành công trước đó
-    boolean isSuccess = ipnResult != null && ("00".equals(ipnResult.rspCode()) || "02".equals(ipnResult.rspCode()));
 
     Payment paymentObj = null;
     if (vnp_TxnRef != null && !vnp_TxnRef.isBlank()) {
@@ -46,6 +64,11 @@
     // Phân biệt giao dịch Nạp tiền ví (TOPUP) hay Thanh toán vé xem phim (BOOKING)
     boolean isTopUp = (paymentObj != null && paymentObj.getPaymentType() == PaymentType.TOPUP)
             || (vnp_OrderInfo != null && vnp_OrderInfo.toLowerCase().contains("nap tien"));
+
+    // Phân định chính xác trạng thái giao dịch
+    boolean isVnPaySuccess = "00".equals(vnp_ResponseCode) && (vnp_TransactionStatus == null || "00".equals(vnp_TransactionStatus));
+    boolean isCancelled = "24".equals(vnp_ResponseCode);
+    boolean isSuccess = isVnPaySuccess && (paymentObj == null || paymentObj.getStatus() == PaymentStatus.SUCCESSFUL);
 
     String frontendTargetUrl;
     String actionBtnText;
@@ -72,7 +95,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kết quả thanh toán VNPAY - Cinema</title>
+    <title><%= isSuccess ? "Thanh toán thành công" : (isCancelled ? "Đã hủy thanh toán" : "Thanh toán không thành công") %> - Cinema</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
     <style>
@@ -112,6 +135,10 @@
             background: #e8f5e9;
             color: #2e7d32;
         }
+        .status-cancelled {
+            background: #fff3e0;
+            color: #e65100;
+        }
         .status-failed {
             background: #ffebee;
             color: #c62828;
@@ -119,8 +146,16 @@
         .amount-highlight {
             font-size: 28px;
             font-weight: 700;
-            color: #1a237e;
             margin: 8px 0;
+        }
+        .amount-success {
+            color: #1a237e;
+        }
+        .amount-cancelled {
+            color: #e65100;
+        }
+        .amount-failed {
+            color: #c62828;
         }
         .detail-table {
             margin: 0;
@@ -154,21 +189,32 @@
             <div class="status-icon status-success">
                 <i class="fa-solid fa-check"></i>
             </div>
-            <h3 class="fw-bold text-success mb-1">Thanh toán thành công!</h3>
-            <p class="text-muted mb-2">Giao dịch đã được ghi nhận và cập nhật vào hệ thống</p>
-            <div class="amount-highlight">
+            <h3 class="fw-bold text-success mb-1"><%= isTopUp ? "Nạp tiền thành công!" : "Thanh toán thành công!" %></h3>
+            <p class="text-muted mb-2"><%= isTopUp ? "Tiền đã được nạp vào ví của bạn thành công" : "Giao dịch đã được ghi nhận và cập nhật vào hệ thống" %></p>
+            <div class="amount-highlight amount-success">
                 <%= String.format(Locale.GERMANY, "%,d VNĐ", amountVal) %>
             </div>
+        <% } else if (isCancelled) { %>
+            <div class="status-icon status-cancelled">
+                <i class="fa-solid fa-ban"></i>
+            </div>
+            <h3 class="fw-bold mb-1" style="color: #e65100;"><%= isTopUp ? "Đã hủy nạp tiền" : "Đã hủy thanh toán" %></h3>
+            <p class="text-muted mb-2"><%= isTopUp ? "Bạn đã hủy giao dịch nạp tiền vào ví trên VNPAY" : "Bạn đã hủy giao dịch thanh toán trên VNPAY" %></p>
+            <% if (amountVal > 0) { %>
+                <div class="amount-highlight amount-cancelled">
+                    <%= String.format(Locale.GERMANY, "%,d VNĐ", amountVal) %>
+                </div>
+            <% } %>
         <% } else { %>
             <div class="status-icon status-failed">
                 <i class="fa-solid fa-xmark"></i>
             </div>
-            <h3 class="fw-bold text-danger mb-1">Thanh toán không thành công</h3>
+            <h3 class="fw-bold text-danger mb-1"><%= isTopUp ? "Nạp tiền không thành công" : "Thanh toán không thành công" %></h3>
             <p class="text-muted mb-2">
-                <%= ipnResult != null ? ipnResult.message() : (errorMsg != null ? errorMsg : "Giao dịch bị từ chối hoặc sai chữ ký") %>
+                <%= errorMsg != null ? errorMsg : getVnPayErrorMessage(vnp_ResponseCode) %>
             </p>
             <% if (amountVal > 0) { %>
-                <div class="amount-highlight text-danger">
+                <div class="amount-highlight amount-failed">
                     <%= String.format(Locale.GERMANY, "%,d VNĐ", amountVal) %>
                 </div>
             <% } %>
@@ -201,9 +247,11 @@
                 <th><i class="fa-solid fa-shield-halved me-2"></i>Trạng thái xử lý hệ thống</th>
                 <td>
                     <% if (isSuccess) { %>
-                        <span class="badge bg-success">Đã hoàn tất (SUCCESSFUL)</span>
+                        <span class="badge bg-success"><i class="fa-solid fa-check me-1"></i>Đã hoàn tất (SUCCESSFUL)</span>
+                    <% } else if (isCancelled) { %>
+                        <span class="badge bg-warning text-dark"><i class="fa-solid fa-ban me-1"></i>Đã hủy (FAILED)</span>
                     <% } else { %>
-                        <span class="badge bg-danger">Chưa hoàn tất (Rsp: <%= ipnResult != null ? ipnResult.rspCode() : "ERR" %>)</span>
+                        <span class="badge bg-danger"><i class="fa-solid fa-xmark me-1"></i>Thất bại (FAILED)</span>
                     <% } %>
                 </td>
             </tr>

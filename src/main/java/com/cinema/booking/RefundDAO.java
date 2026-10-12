@@ -8,6 +8,12 @@ import com.cinema.common.exception.ApiException;
 import com.cinema.common.util.JPAUtil;
 import com.cinema.showtime.Showtime;
 import com.cinema.ticket.TicketStatus;
+import com.cinema.user.entity.User;
+import com.cinema.wallet.entity.Wallet;
+import com.cinema.wallet.entity.WalletTransaction;
+import com.cinema.wallet.enums.TransactionStatus;
+import com.cinema.wallet.enums.TransactionType;
+import com.cinema.wallet.enums.WalletStatus;
 import jakarta.persistence.EntityManager;
 
 import java.math.BigDecimal;
@@ -33,7 +39,7 @@ public class RefundDAO {
                 throw ApiException.forbidden("Bạn không có quyền yêu cầu hoàn tiền cho đơn hàng này");
             }
             if (!"CONFIRMED".equalsIgnoreCase(booking.getStatus())) {
-                throw ApiException.unprocessable("Chỉ có thể yêu cầu hoàn tiền cho đơn hàng đã xác nhận/thanh toán thành công");
+                throw ApiException.unprocessable("Chỉ có thể hoàn tiền cho đơn hàng đã thanh toán thành công");
             }
 
             List<?> payList = em.createNativeQuery(
@@ -56,9 +62,11 @@ public class RefundDAO {
             ).setParameter("pId", paymentId).getResultList();
 
             if (!existingRefunds.isEmpty()) {
-                throw ApiException.conflict("Đơn hàng đã có yêu cầu hoàn tiền đang xử lý");
+                throw ApiException.conflict("Đơn hàng đã được hoàn tiền hoặc đang xử lý");
             }
 
+            // 1. Kiểm tra thời gian suất chiếu: Chỉ hoàn tiền trước giờ chiếu ít nhất 24 giờ
+            LocalDateTime showTimeDt = null;
             List<Showtime> showtimes = em.createQuery(
                     "SELECT st FROM ShowtimeSeat sts, Showtime st " +
                     "WHERE sts.showTimeId = st.showTimeId AND sts.bookingId = :bId",
@@ -67,24 +75,94 @@ public class RefundDAO {
 
             if (!showtimes.isEmpty()) {
                 Showtime st = showtimes.get(0);
-                LocalDateTime showTimeDt = LocalDateTime.of(st.getShowDate(), st.getStartTime());
-                if (LocalDateTime.now().plusMinutes(120).isAfter(showTimeDt)) {
-                    throw ApiException.unprocessable("Không thể hoàn tiền dưới 120 phút trước suất chiếu hoặc vé đã dùng");
+                showTimeDt = LocalDateTime.of(st.getShowDate(), st.getStartTime());
+            } else {
+                List<LocalDateTime> ticketShowtimes = em.createQuery(
+                        "SELECT t.showTimeStartTime FROM Ticket t WHERE t.bookingId = :bId AND t.showTimeStartTime IS NOT NULL",
+                        LocalDateTime.class
+                ).setParameter("bId", bookingId).setMaxResults(1).getResultList();
+                if (!ticketShowtimes.isEmpty()) {
+                    showTimeDt = ticketShowtimes.get(0);
                 }
             }
 
+            if (showTimeDt != null) {
+                if (LocalDateTime.now().plusHours(24).isAfter(showTimeDt)) {
+                    throw ApiException.unprocessable("Chỉ có thể yêu cầu hoàn tiền trước giờ chiếu ít nhất 24 giờ");
+                }
+            }
+
+            // 2. Kiểm tra xem vé đã được check-in / sử dụng chưa
             Long usedTickets = em.createQuery(
                     "SELECT COUNT(t) FROM Ticket t WHERE t.bookingId = :bId AND t.status = :status",
                     Long.class
             ).setParameter("bId", bookingId).setParameter("status", TicketStatus.USED).getSingleResult();
 
             if (usedTickets != null && usedTickets > 0) {
-                throw ApiException.unprocessable("Không thể hoàn tiền dưới 120 phút trước suất chiếu hoặc vé đã dùng");
+                throw ApiException.unprocessable("Vé đã được sử dụng, không thể hoàn tiền");
             }
 
             LocalDateTime now = LocalDateTime.now();
-            Refund refund = new Refund(paymentId, refundAmount, reason != null ? reason : "Yêu cầu hoàn tiền", "PENDING");
+
+            // 3. Hoàn tiền trực tiếp vào Ví (Wallet) của người dùng
+            Wallet wallet = em.createQuery(
+                    "SELECT w FROM Wallet w WHERE w.user.id = :uId", Wallet.class)
+                    .setParameter("uId", userId)
+                    .getResultStream()
+                    .findFirst()
+                    .orElse(null);
+
+            if (wallet == null) {
+                User user = em.find(User.class, userId);
+                wallet = new Wallet(user);
+                wallet.setBalance(BigDecimal.ZERO);
+                wallet.setStatus(WalletStatus.ACTIVE);
+                em.persist(wallet);
+                em.flush();
+            }
+
+            if (wallet.getStatus() != WalletStatus.ACTIVE) {
+                throw ApiException.forbidden("Ví của bạn đang bị khóa, không thể nhận tiền hoàn");
+            }
+
+            wallet.setBalance(wallet.getBalance().add(refundAmount));
+
+            WalletTransaction walletTransaction = new WalletTransaction();
+            walletTransaction.setWallet(wallet);
+            walletTransaction.setAmount(refundAmount);
+            walletTransaction.setType(TransactionType.REFUND);
+            walletTransaction.setStatus(TransactionStatus.SUCCESSFUL);
+            walletTransaction.setDescription("Hoàn tiền đơn đặt vé #" + bookingId + (reason != null && !reason.isBlank() ? " (" + reason.trim() + ")" : ""));
+            em.persist(walletTransaction);
+            em.flush();
+
+            // 4. Hủy vé của đơn hàng (chuyển sang REFUNDED)
+            em.createQuery("UPDATE Ticket t SET t.status = :status WHERE t.bookingId = :bId")
+                    .setParameter("status", TicketStatus.REFUNDED)
+                    .setParameter("bId", bookingId)
+                    .executeUpdate();
+
+            // 5. Nhả lại ghế trống (AVAILABLE) để khách khác có thể đặt
+            em.createQuery("UPDATE ShowtimeSeat s SET s.status = 'AVAILABLE', s.bookingId = null, s.holdExpirationAt = null WHERE s.bookingId = :bId")
+                    .setParameter("bId", bookingId)
+                    .executeUpdate();
+
+            // 6. Khôi phục voucher đã dùng (nếu có)
+            if (booking.getVoucherId() != null) {
+                em.createNativeQuery(
+                        "UPDATE cinema.user_vouchers SET status = 'UNUSED', used_at = NULL " +
+                        "WHERE user_id = :uId AND voucher_id = :vId AND status = 'USED'"
+                ).setParameter("uId", userId).setParameter("vId", booking.getVoucherId()).executeUpdate();
+            }
+
+            // 7. Cập nhật trạng thái đơn hàng thành REFUNDED
+            booking.setStatus("REFUNDED");
+            booking.setUpdatedAt(now);
+
+            // 8. Tạo bản ghi hoàn tiền với trạng thái COMPLETED
+            Refund refund = new Refund(paymentId, refundAmount, reason != null ? reason : "Hoàn tiền vé vào ví", "COMPLETED");
             refund.setRefundDate(now);
+            refund.setGatewayRefundId("WALLET_TX_" + walletTransaction.getId());
             em.persist(refund);
             em.flush();
 
@@ -94,7 +172,7 @@ public class RefundDAO {
                     refund.getRefundId(),
                     bookingId,
                     refundAmount,
-                    "PENDING",
+                    "COMPLETED",
                     now.format(ISO_FORMATTER)
             );
         } catch (ApiException e) {
@@ -102,7 +180,7 @@ public class RefundDAO {
             throw e;
         } catch (Exception e) {
             if (em.getTransaction().isActive()) em.getTransaction().rollback();
-            throw ApiException.internal("Lỗi tạo yêu cầu hoàn tiền: " + e.getMessage());
+            throw ApiException.internal("Lỗi hoàn tiền vé: " + e.getMessage());
         } finally {
             em.close();
         }

@@ -69,6 +69,9 @@ public class AuthService {
             throw AuthException.accountLocked();
         }
 
+        // Thu hồi toàn bộ refresh token cũ của user trên các thiết bị trước đó (chỉ cho phép 1 thiết bị đăng nhập)
+        authDAO.revokeAllUserTokens(user.getId());
+
         String access = JwtUtil.generateAccessToken(user.getId());
         String refresh = JwtUtil.generateRefreshToken(user.getId());
         Instant expiresAt = Instant.now().plusSeconds(JwtUtil.getRefreshTtlSeconds());

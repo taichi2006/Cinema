@@ -132,9 +132,9 @@ public class VnPayGateway {
             long paymentId = Long.parseLong(required(parameters, "vnp_TxnRef"));
             BigDecimal amount = new BigDecimal(required(parameters, "vnp_Amount")).movePointLeft(2);
             String responseCode = required(parameters, "vnp_ResponseCode");
-            String transactionStatus = required(parameters, "vnp_TransactionStatus");
+            String transactionStatus = parameters.get("vnp_TransactionStatus");
             String transactionNo = parameters.get("vnp_TransactionNo");
-            boolean successful = "00".equals(responseCode) && "00".equals(transactionStatus);
+            boolean successful = "00".equals(responseCode) && (transactionStatus == null || "00".equals(transactionStatus));
             return new VnPayIpnResult(true, paymentId, amount, successful,
                     transactionNo, responseCode, transactionStatus);
         } catch (IllegalArgumentException exception) {

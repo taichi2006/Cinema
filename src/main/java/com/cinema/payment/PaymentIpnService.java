@@ -115,14 +115,19 @@ public class PaymentIpnService {
                     }
                 } else {
                     payment.setStatus(PaymentStatus.FAILED);
-                    payment.setFailureReason("VNPAY response=" + ipn.responseCode());
+                    boolean isCancel = "24".equals(ipn.responseCode());
+                    payment.setFailureReason(isCancel
+                            ? "Khách hàng hủy nạp tiền trên VNPAY"
+                            : "VNPAY response=" + ipn.responseCode() + (ipn.transactionStatus() != null ? ", transactionStatus=" + ipn.transactionStatus() : ""));
                     payment.setPaymentDate(now);
                     if (payment.getWalletTransactionId() != null) {
                         com.cinema.wallet.entity.WalletTransaction tx =
                                 em.find(com.cinema.wallet.entity.WalletTransaction.class, payment.getWalletTransactionId());
                         if (tx != null) {
                             tx.setStatus(com.cinema.wallet.enums.TransactionStatus.FAILED);
-                            tx.setDescription("Nạp tiền vào ví qua VNPAY thất bại");
+                            tx.setDescription(isCancel
+                                    ? "Đã hủy nạp tiền vào ví qua VNPAY"
+                                    : "Nạp tiền vào ví qua VNPAY thất bại");
                         }
                     }
                 }
@@ -142,14 +147,18 @@ public class PaymentIpnService {
                 fulfillmentDAO.fulfillBooking(booking.getUserId(), booking, payment, ticketSnapshots, now, em);
             } else {
                 payment.setStatus(PaymentStatus.FAILED);
-                payment.setFailureReason("VNPAY response=" + ipn.responseCode()
-                        + ", transactionStatus=" + ipn.transactionStatus());
+                payment.setPaymentDate(now);
+                boolean isCancel = "24".equals(ipn.responseCode());
+                payment.setFailureReason(isCancel
+                        ? "Khách hàng hủy thanh toán trên VNPAY"
+                        : "VNPAY response=" + ipn.responseCode()
+                        + (ipn.transactionStatus() != null ? ", transactionStatus=" + ipn.transactionStatus() : ""));
             }
 
             em.getTransaction().commit();
             LOGGER.log(Level.INFO, "event={0} paymentId={1} bookingId={2} gatewayTransactionId={3}",
                     new Object[]{ipn.paymentSuccessful() ? "vnpay_ipn_fulfilled" : "vnpay_ipn_failed",
-                            payment.getId(), booking.getBookingId(), ipn.transactionNo()});
+                            payment.getId(), booking != null ? booking.getBookingId() : null, ipn.transactionNo()});
 
             if (ipn.paymentSuccessful()) {
                 ticketEmailService.sendTicketEmailByBookingAsync(booking.getBookingId(), booking.getUserId());
