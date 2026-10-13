@@ -17,7 +17,7 @@ public class Ticket {
     @Column(name = "booking_id", nullable = false)
     private Long bookingId;
 
-    @Column(name = "show_time_seat_id", nullable = false, unique = true)
+    @Column(name = "show_time_seat_id", nullable = false)
     private Long showTimeSeatId;
 
     @Column(name = "ticket_code", nullable = false, unique = true, length = 500)

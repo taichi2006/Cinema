@@ -19,7 +19,7 @@ public class WalletDAO {
 
     public Optional<Wallet> findByUserIdForUpdate(long userId, EntityManager em) {
         return em.createQuery(
-                        "SELECT w FROM Wallet w JOIN FETCH w.user WHERE w.user.id = :userId",
+                        "SELECT w FROM Wallet w WHERE w.user.id = :userId",
                         Wallet.class)
                 .setParameter("userId", userId)
                 .setLockMode(LockModeType.PESSIMISTIC_WRITE)

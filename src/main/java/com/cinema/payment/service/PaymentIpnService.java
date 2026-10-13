@@ -154,19 +154,50 @@ public class PaymentIpnService {
             if (em.getTransaction().isActive()) {
                 em.getTransaction().rollback();
             }
-            LOGGER.log(Level.WARNING, "event=vnpay_ipn_processing_failed paymentId={0}", ipn.paymentId());
+            LOGGER.log(Level.WARNING, "event=vnpay_ipn_processing_failed paymentId=" + ipn.paymentId() + " reason=" + exception.getMessage(), exception);
+            markPaymentProcessingFailed(ipn.paymentId(), ipn.transactionNo(), exception.getMessage());
             return VnPayIpnResponse.of("99", "Unknown error");
         } finally {
             em.close();
         }
     }
 
+    private void markPaymentProcessingFailed(Long paymentId, String gatewayTxnId, String reason) {
+        if (paymentId == null) return;
+        EntityManager em = JPAUtil.getEntityManager();
+        try {
+            em.getTransaction().begin();
+            Payment p = em.find(Payment.class, paymentId);
+            if (p != null && p.getStatus() != PaymentStatus.SUCCESSFUL) {
+                p.setStatus(PaymentStatus.FAILED);
+                if (gatewayTxnId != null && !gatewayTxnId.isBlank()) {
+                    p.setGatewayTransactionId(gatewayTxnId);
+                }
+                p.setFailureReason(reason != null ? reason : "Lỗi xử lý hoàn tất đơn hàng");
+                p.setPaymentDate(LocalDateTime.now());
+                em.merge(p);
+            }
+            em.getTransaction().commit();
+        } catch (Exception ex) {
+            if (em.getTransaction().isActive()) em.getTransaction().rollback();
+            LOGGER.log(Level.WARNING, "Không thể cập nhật trạng thái thất bại cho paymentId=" + paymentId, ex);
+        } finally {
+            em.close();
+        }
+    }
+
     private void validateBookingForVnPayIpn(Booking booking, LocalDateTime now) {
-        if (booking == null || !"PENDING".equalsIgnoreCase(booking.getStatus())) {
+        if (booking == null) {
+            throw ApiException.notFound("Không tìm thấy đơn đặt vé");
+        }
+        if (!"PENDING".equalsIgnoreCase(booking.getStatus())) {
             throw ApiException.conflict("Đơn hàng không ở trạng thái chờ thanh toán");
         }
-        if (booking.getExpiredAt() != null && !booking.getExpiredAt().isAfter(now)) {
-            throw ApiException.gone("Đã hết thời gian giữ ghế");
+        // Cho phép ân hạn (grace period) 15 phút cho giao dịch VNPAY do độ trễ xác thực OTP/ngân hàng.
+        // Tính toàn vẹn của ghế vẫn được đảm bảo tuyệt đối qua lockHeldSeatIds() bên dưới.
+        LocalDateTime graceDeadline = booking.getExpiredAt() != null ? booking.getExpiredAt().plusMinutes(15) : null;
+        if (graceDeadline != null && now.isAfter(graceDeadline)) {
+            throw ApiException.gone("Đã quá thời gian chờ thanh toán (vượt quá thời gian ân hạn)");
         }
     }
 }

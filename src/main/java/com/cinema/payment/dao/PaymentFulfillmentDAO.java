@@ -170,8 +170,32 @@ public class PaymentFulfillmentDAO {
     }
 
     private LocalDateTime toLocalDateTime(Object dateValue, Object timeValue) {
-        LocalDate date = dateValue instanceof Date sqlDate ? sqlDate.toLocalDate() : (LocalDate) dateValue;
-        LocalTime time = timeValue instanceof Time sqlTime ? sqlTime.toLocalTime() : (LocalTime) timeValue;
+        if (dateValue == null) {
+            return LocalDateTime.now();
+        }
+        LocalDate date;
+        if (dateValue instanceof Date sqlDate) {
+            date = sqlDate.toLocalDate();
+        } else if (dateValue instanceof LocalDate ld) {
+            date = ld;
+        } else if (dateValue instanceof java.sql.Timestamp ts) {
+            date = ts.toLocalDateTime().toLocalDate();
+        } else {
+            date = LocalDate.parse(dateValue.toString());
+        }
+
+        LocalTime time;
+        if (timeValue instanceof Time sqlTime) {
+            time = sqlTime.toLocalTime();
+        } else if (timeValue instanceof LocalTime lt) {
+            time = lt;
+        } else if (timeValue instanceof java.sql.Timestamp ts) {
+            time = ts.toLocalDateTime().toLocalTime();
+        } else if (timeValue != null) {
+            time = LocalTime.parse(timeValue.toString());
+        } else {
+            time = LocalTime.MIDNIGHT;
+        }
         return LocalDateTime.of(date, time);
     }
 

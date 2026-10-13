@@ -11,6 +11,7 @@
     private String getVnPayErrorMessage(String code) {
         if (code == null) return "Giao dịch không thành công hoặc sai chữ ký";
         switch (code) {
+            case "00": return "Giao dịch VNPAY thành công";
             case "07": return "Trừ tiền thành công nhưng giao dịch bị nghi ngờ gian lận";
             case "09": return "Thẻ/Tài khoản chưa đăng ký dịch vụ InternetBanking";
             case "10": return "Xác thực thông tin thẻ/tài khoản không đúng quá 3 lần";
@@ -69,6 +70,7 @@
     boolean isVnPaySuccess = "00".equals(vnp_ResponseCode) && (vnp_TransactionStatus == null || "00".equals(vnp_TransactionStatus));
     boolean isCancelled = "24".equals(vnp_ResponseCode);
     boolean isSuccess = isVnPaySuccess && (paymentObj == null || paymentObj.getStatus() == PaymentStatus.SUCCESSFUL);
+    boolean isVnPayPaidButFulfillFailed = isVnPaySuccess && !isSuccess;
 
     String frontendTargetUrl;
     String actionBtnText;
@@ -95,7 +97,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><%= isSuccess ? "Thanh toán thành công" : (isCancelled ? "Đã hủy thanh toán" : "Thanh toán không thành công") %> - Cinema</title>
+    <title><%= isSuccess ? "Thanh toán thành công" : (isVnPayPaidButFulfillFailed ? "Đã trừ tiền - Cần hỗ trợ xuất vé" : (isCancelled ? "Đã hủy thanh toán" : "Thanh toán không thành công")) %> - Cinema</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
     <style>
@@ -139,6 +141,10 @@
             background: #fff3e0;
             color: #e65100;
         }
+        .status-warning {
+            background: #fff8e1;
+            color: #f57f17;
+        }
         .status-failed {
             background: #ffebee;
             color: #c62828;
@@ -153,6 +159,9 @@
         }
         .amount-cancelled {
             color: #e65100;
+        }
+        .amount-warning {
+            color: #f57f17;
         }
         .amount-failed {
             color: #c62828;
@@ -194,6 +203,22 @@
             <div class="amount-highlight amount-success">
                 <%= String.format(Locale.GERMANY, "%,d VNĐ", amountVal) %>
             </div>
+        <% } else if (isVnPayPaidButFulfillFailed) { %>
+            <div class="status-icon status-warning">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <h3 class="fw-bold mb-1" style="color: #f57f17;"><%= isTopUp ? "Nạp tiền chưa hoàn tất" : "Đã trừ tiền - Cần hỗ trợ xuất vé" %></h3>
+            <p class="text-muted mb-2">
+                <%= (paymentObj != null && paymentObj.getFailureReason() != null && !paymentObj.getFailureReason().isBlank())
+                        ? paymentObj.getFailureReason() + ". "
+                        : "Giao dịch VNPAY thành công nhưng đơn hàng đã hết thời gian giữ ghế. " %>
+                Vui lòng liên hệ ban quản trị để được hỗ trợ hoàn tiền hoặc giữ vé.
+            </p>
+            <% if (amountVal > 0) { %>
+                <div class="amount-highlight amount-warning">
+                    <%= String.format(Locale.GERMANY, "%,d VNĐ", amountVal) %>
+                </div>
+            <% } %>
         <% } else if (isCancelled) { %>
             <div class="status-icon status-cancelled">
                 <i class="fa-solid fa-ban"></i>
@@ -248,6 +273,8 @@
                 <td>
                     <% if (isSuccess) { %>
                         <span class="badge bg-success"><i class="fa-solid fa-check me-1"></i>Đã hoàn tất (SUCCESSFUL)</span>
+                    <% } else if (isVnPayPaidButFulfillFailed) { %>
+                        <span class="badge bg-warning text-dark"><i class="fa-solid fa-triangle-exclamation me-1"></i>Cần hỗ trợ (Hết hạn giữ ghế)</span>
                     <% } else if (isCancelled) { %>
                         <span class="badge bg-warning text-dark"><i class="fa-solid fa-ban me-1"></i>Đã hủy (FAILED)</span>
                     <% } else { %>

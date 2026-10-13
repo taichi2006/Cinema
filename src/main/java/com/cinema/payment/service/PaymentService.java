@@ -15,6 +15,7 @@ import com.cinema.payment.enums.PaymentStatus;
 import com.cinema.payment.enums.PaymentType;
 import com.cinema.payment.gateway.VnPayGateway;
 import com.cinema.payment.gateway.VnPayIpnResponse;
+import com.cinema.user.entity.User;
 import com.cinema.wallet.dao.WalletDAO;
 import com.cinema.wallet.dao.WalletTransactionDAO;
 import com.cinema.wallet.entity.Wallet;
@@ -100,7 +101,18 @@ public class PaymentService {
             }
 
             Wallet wallet = walletDAO.findByUserIdForUpdate(currentUserId, em)
-                    .orElseThrow(() -> ApiException.notFound("Không tìm thấy ví của người dùng"));
+                    .orElseGet(() -> {
+                        User user = em.find(User.class, currentUserId);
+                        if (user == null) {
+                            throw ApiException.notFound("Không tìm thấy người dùng");
+                        }
+                        Wallet newWallet = new Wallet(user);
+                        newWallet.setBalance(BigDecimal.ZERO);
+                        newWallet.setStatus(WalletStatus.ACTIVE);
+                        em.persist(newWallet);
+                        em.flush();
+                        return newWallet;
+                    });
             if (wallet.getStatus() != WalletStatus.ACTIVE) {
                 throw ApiException.forbidden("Ví của bạn đang bị tạm khóa");
             }
@@ -144,7 +156,8 @@ public class PaymentService {
             throw exception;
         } catch (Exception exception) {
             rollbackIfNeeded(em);
-            throw ApiException.internal("Không thể xử lý thanh toán bằng ví");
+            LOGGER.log(Level.SEVERE, "Lỗi xử lý thanh toán ví cho booking #" + bookingId, exception);
+            throw ApiException.internal("Không thể xử lý thanh toán bằng ví: " + (exception.getMessage() != null ? exception.getMessage() : "Lỗi hệ thống"));
         } finally {
             em.close();
         }
