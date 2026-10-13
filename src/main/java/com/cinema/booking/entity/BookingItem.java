@@ -17,7 +17,7 @@ public class BookingItem {
     private Booking booking;
 
     @Column(name = "product_id", nullable = false)
-    private Integer productId;
+    private Long productId;
 
     @Column(name = "quantity", nullable = false)
     private Integer quantity;
@@ -30,12 +30,16 @@ public class BookingItem {
 
     public BookingItem() {}
 
-    public BookingItem(Booking booking, Integer productId, Integer quantity, BigDecimal price, BigDecimal subtotal) {
+    public BookingItem(Booking booking, Long productId, Integer quantity, BigDecimal price, BigDecimal subtotal) {
         this.booking = booking;
         this.productId = productId;
         this.quantity = quantity;
         this.price = price;
         this.subtotal = subtotal;
+    }
+
+    public BookingItem(Booking booking, Integer productId, Integer quantity, BigDecimal price, BigDecimal subtotal) {
+        this(booking, productId != null ? productId.longValue() : null, quantity, price, subtotal);
     }
 
     public Long getBookingItemId() { return bookingItemId; }
@@ -44,8 +48,9 @@ public class BookingItem {
     public Booking getBooking() { return booking; }
     public void setBooking(Booking booking) { this.booking = booking; }
 
-    public Integer getProductId() { return productId; }
-    public void setProductId(Integer productId) { this.productId = productId; }
+    public Long getProductId() { return productId; }
+    public void setProductId(Long productId) { this.productId = productId; }
+    public void setProductId(Integer productId) { this.productId = productId != null ? productId.longValue() : null; }
 
     public Integer getQuantity() { return quantity; }
     public void setQuantity(Integer quantity) { this.quantity = quantity; }

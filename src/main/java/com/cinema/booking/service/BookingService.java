@@ -13,8 +13,24 @@ public class BookingService {
 
     // 1. Tạo đơn đặt vé & giữ ghế
     public CreateBookingResponse createBooking(Long userId, CreateBookingRequest req) {
-        if (req == null || req.getShowTimeId() == null || req.getSeatIds() == null || req.getSeatIds().isEmpty()) {
+        if (req == null || req.getShowTimeId() == null || req.getShowTimeId() <= 0
+                || req.getSeatIds() == null || req.getSeatIds().isEmpty()) {
             throw ApiException.badRequest("Dữ liệu đặt vé không hợp lệ");
+        }
+        if (req.getSeatIds().size() > 10) {
+            throw ApiException.badRequest("Chỉ được đặt tối đa 10 ghế trong một đơn hàng");
+        }
+        for (Integer seatId : req.getSeatIds()) {
+            if (seatId == null || seatId <= 0) {
+                throw ApiException.badRequest("Mã ghế không hợp lệ: " + seatId);
+            }
+        }
+        if (req.getProductItems() != null) {
+            for (var item : req.getProductItems()) {
+                if (item != null && item.getQuantity() != null && item.getQuantity() > 50) {
+                    throw ApiException.badRequest("Số lượng mỗi sản phẩm bắp nước tối đa là 50");
+                }
+            }
         }
         return bookingDAO.createBooking(userId, req.getShowTimeId(), req.getSeatIds(), req.getProductItems());
     }
@@ -29,6 +45,11 @@ public class BookingService {
     public UpdateBookingItemsResponse updateBookingItems(Long bookingId, Long userId, UpdateBookingItemsRequest req) {
         validateBookingId(bookingId);
         if (req == null || req.getItems() == null) throw ApiException.badRequest("Dữ liệu bắp nước (F&B) không hợp lệ");
+        for (var item : req.getItems()) {
+            if (item != null && item.getQuantity() != null && item.getQuantity() > 50) {
+                throw ApiException.badRequest("Số lượng mỗi sản phẩm bắp nước tối đa là 50");
+            }
+        }
         return bookingDAO.updateBookingItems(bookingId, userId, req.getItems());
     }
 

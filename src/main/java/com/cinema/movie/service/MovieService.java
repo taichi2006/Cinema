@@ -68,7 +68,11 @@ public class MovieService {
         if (reviewDAO.hasUserReviewed(userId, movieId)) {
             throw ApiException.conflict("Bạn đã gửi đánh giá cho bộ phim này rồi.");
         }
-        return reviewDAO.createReview(userId, movieId, req.getRating(), req.getComment());
+        if (req.getComment() != null && req.getComment().trim().length() > 1000) {
+            throw ApiException.badRequest("Nội dung đánh giá không được vượt quá 1000 ký tự.");
+        }
+        String comment = (req.getComment() != null && !req.getComment().isBlank()) ? req.getComment().trim() : null;
+        return reviewDAO.createReview(userId, movieId, req.getRating(), comment);
     }
 
     // 6. Thể loại phim

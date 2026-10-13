@@ -22,16 +22,23 @@ public class AuthService {
 
     private final AuthDAO authDAO = new AuthDAO();
 
+    private static final String EMAIL_REGEX = "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$";
+    private static final String PHONE_REGEX = "^(\\+?[0-9]{9,15}|0[0-9]{9,10})$";
+
     // 1. Đăng ký tài khoản
     public AuthUserResponse register(RegisterRequest req) {
         if (req == null || req.email() == null || req.email().isBlank() || req.password() == null || req.password().isBlank()) {
             throw ApiException.badRequest("Email và mật khẩu không được để trống");
         }
-        if (req.password().trim().length() < 8) {
-            throw ApiException.badRequest("Mật khẩu phải có ít nhất 8 ký tự");
+        String password = req.password().trim();
+        if (password.length() < 8 || password.length() > 72) {
+            throw ApiException.badRequest("Mật khẩu phải từ 8 đến 72 ký tự");
         }
 
         String email = req.email().trim().toLowerCase();
+        if (email.length() > 255 || !email.matches(EMAIL_REGEX)) {
+            throw ApiException.badRequest("Định dạng email không hợp lệ");
+        }
         if (authDAO.existsByEmail(email)) {
             throw ApiException.conflict("Email đã được đăng ký");
         }
@@ -40,17 +47,33 @@ public class AuthService {
         if (req.dob() != null && !req.dob().isBlank()) {
             try {
                 dob = LocalDate.parse(req.dob().trim());
+                if (dob.isAfter(LocalDate.now())) {
+                    throw ApiException.badRequest("Ngày sinh không thể ở tương lai");
+                }
+                if (dob.isBefore(LocalDate.of(1900, 1, 1))) {
+                    throw ApiException.badRequest("Ngày sinh không hợp lệ");
+                }
             } catch (Exception e) {
                 throw ApiException.badRequest("Định dạng ngày sinh không hợp lệ (yyyy-MM-dd)");
             }
         }
 
-        String passwordHash = BCrypt.hashpw(req.password(), BCrypt.gensalt(12));
+        String phone = null;
+        if (req.phone() != null && !req.phone().isBlank()) {
+            phone = req.phone().trim();
+            if (phone.length() > 20 || !phone.matches(PHONE_REGEX)) {
+                throw ApiException.badRequest("Số điện thoại không hợp lệ");
+            }
+        }
+
         String fullName = (req.fullName() != null && !req.fullName().isBlank()) ? req.fullName().trim() : email.split("@")[0];
-        String phone = (req.phone() != null && !req.phone().isBlank()) ? req.phone().trim() : null;
+        if (fullName.length() > 100) {
+            fullName = fullName.substring(0, 100);
+        }
+
+        String passwordHash = BCrypt.hashpw(password, BCrypt.gensalt(12));
 
         User user = authDAO.createUser(email, passwordHash, fullName, phone, dob);
-        new WalletService().getOrCreateWallet(user.getId());
 
         return new AuthUserResponse(user.getId(), user.getFullName(), user.getEmail(), user.getStatus());
     }
@@ -59,6 +82,9 @@ public class AuthService {
     public LoginResponse login(LoginRequest req) {
         if (req == null || req.email() == null || req.email().isBlank() || req.password() == null || req.password().isBlank()) {
             throw ApiException.badRequest("Email và mật khẩu không được để trống");
+        }
+        if (req.password().trim().length() > 72) {
+            throw ApiException.unauthorized("Email hoặc mật khẩu không đúng");
         }
 
         String email = req.email().trim().toLowerCase();
@@ -147,8 +173,8 @@ public class AuthService {
                 || req.newPassword() == null || req.newPassword().isBlank()) {
             throw ApiException.badRequest("Mật khẩu hiện tại và mật khẩu mới không được để trống");
         }
-        if (req.newPassword().trim().length() < 8) {
-            throw ApiException.badRequest("Mật khẩu mới phải có ít nhất 8 ký tự");
+        if (req.newPassword().trim().length() < 8 || req.newPassword().trim().length() > 72) {
+            throw ApiException.badRequest("Mật khẩu mới phải từ 8 đến 72 ký tự");
         }
         if (req.confirmPassword() != null && !req.confirmPassword().equals(req.newPassword())) {
             throw ApiException.badRequest("Mật khẩu xác nhận không khớp");

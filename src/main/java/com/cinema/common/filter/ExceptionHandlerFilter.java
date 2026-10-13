@@ -49,6 +49,15 @@ public class ExceptionHandlerFilter implements Filter {
             } else if (fullMessage.contains("reviews_user_id_movie_id_key")) {
                 status = HttpServletResponse.SC_CONFLICT;
                 message = "Bạn đã gửi đánh giá cho bộ phim này rồi.";
+            } else if (fullMessage.contains("value too long") || fullMessage.contains("character varying") || fullMessage.contains("22001")) {
+                status = HttpServletResponse.SC_BAD_REQUEST;
+                message = "Dữ liệu nhập vào vượt quá độ dài quy định.";
+            } else if (fullMessage.contains("foreign key") || fullMessage.contains("violates foreign key constraint") || fullMessage.contains("23503")) {
+                status = HttpServletResponse.SC_BAD_REQUEST;
+                message = "Dữ liệu liên kết không tồn tại hoặc không hợp lệ.";
+            } else if (fullMessage.contains("23505") || fullMessage.contains("duplicate key")) {
+                status = HttpServletResponse.SC_CONFLICT;
+                message = "Dữ liệu đã tồn tại trong hệ thống.";
             } else if (findCause(ex, IllegalArgumentException.class) != null) {
                 IllegalArgumentException iae = findCause(ex, IllegalArgumentException.class);
                 status = HttpServletResponse.SC_BAD_REQUEST;

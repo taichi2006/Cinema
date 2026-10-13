@@ -22,7 +22,8 @@ import java.io.IOException;
         "/wallet", "/wallet/*",
         "/payments", "/payments/*",
         "/tickets", "/tickets/*",
-        "/auth/logout"
+        "/auth/logout",
+        "/auth/change-password"
 }, dispatcherTypes = {DispatcherType.REQUEST, DispatcherType.FORWARD})
 public class AuthFilter implements Filter {
 

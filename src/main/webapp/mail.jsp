@@ -25,6 +25,7 @@
     String totalAmountStr = "85.000 ₫";
 
     StringBuilder ticketRows = new StringBuilder();
+    StringBuilder snackRows = new StringBuilder();
 
     if (bookingIdParam != null && !bookingIdParam.isBlank()) {
         try {
@@ -79,6 +80,34 @@
                             idx++, sName, tCode, tPrice
                         ));
                     }
+
+                    // Truy vấn bắp nước nếu có
+                    try {
+                        var itemQuery = em.createNativeQuery(
+                            "SELECT p.product_name, bi.quantity, bi.price, bi.subtotal " +
+                            "FROM cinema.booking_items bi " +
+                            "JOIN cinema.products p ON p.product_id = bi.product_id " +
+                            "WHERE bi.booking_id = :bId"
+                        );
+                        itemQuery.setParameter("bId", bId);
+                        List<?> items = itemQuery.getResultList();
+                        for (Object obj : items) {
+                            Object[] row = (Object[]) obj;
+                            String pName = row[0] != null ? row[0].toString() : "Bắp nước";
+                            int qty = ((Number) row[1]).intValue();
+                            BigDecimal price = new BigDecimal(row[2].toString());
+                            BigDecimal subtotal = new BigDecimal(row[3].toString());
+                            snackRows.append(String.format(
+                                "<tr style='border-bottom: 1px solid #e5e7eb;'>" +
+                                "<td style='padding: 10px 8px; color: #111827; font-size: 13px;'>%s</td>" +
+                                "<td style='padding: 10px 8px; color: #6b7280; font-size: 13px; text-align: center;'>%d</td>" +
+                                "<td style='padding: 10px 8px; color: #6b7280; font-size: 13px; text-align: right;'>%s</td>" +
+                                "<td style='padding: 10px 8px; color: #111827; font-weight: 600; font-size: 13px; text-align: right;'>%s</td>" +
+                                "</tr>",
+                                pName, qty, currencyFormat.format(price) + " ₫", currencyFormat.format(subtotal) + " ₫"
+                            ));
+                        }
+                    } catch (Exception ignored) {}
                 }
             } finally {
                 em.close();
@@ -168,6 +197,27 @@
                                     </tr>
                                 </tfoot>
                             </table>
+<%
+                            if (snackRows.length() > 0) {
+%>
+                            <!-- Tiêu đề bắp nước -->
+                            <div style="font-size: 14px; font-weight: 600; color: #111827; margin: 18px 0 10px;">Bắp nước & Combo</div>
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border: 1px solid #e5e7eb; border-radius: 6px; border-collapse: collapse; overflow: hidden; margin-bottom: 10px;">
+                                <thead>
+                                    <tr style="background-color: #f9fafb; border-bottom: 1px solid #e5e7eb;">
+                                        <th style="padding: 9px 8px; font-size: 12px; font-weight: 600; color: #6b7280; text-align: left;">Sản phẩm</th>
+                                        <th style="padding: 9px 8px; font-size: 12px; font-weight: 600; color: #6b7280; text-align: center; width: 50px;">SL</th>
+                                        <th style="padding: 9px 8px; font-size: 12px; font-weight: 600; color: #6b7280; text-align: right;">Đơn giá</th>
+                                        <th style="padding: 9px 8px; font-size: 12px; font-weight: 600; color: #6b7280; text-align: right;">Thành tiền</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <%= snackRows.toString() %>
+                                </tbody>
+                            </table>
+<%
+                            }
+%>
 
                             <!-- Lưu ý -->
                             <div style="margin-top: 20px; padding: 12px 14px; background-color: #f9fafb; border-left: 3px solid #9ca3af; border-radius: 0 4px 4px 0;">
