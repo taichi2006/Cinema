@@ -19,14 +19,17 @@ public class SeatSessionManager {
     // 2. Quản lý trạng thái ghế đang giữ tạm thời: showtimeId -> (seatId -> userId)
     private final Map<Long, Map<Long, Long>> showtimeHeldSeats = new ConcurrentHashMap<>();
 
-    // 2.1 Quản lý trạng thái ghế đã tạo đơn đặt vé (PENDING hoặc BOOKED): showtimeId -> Set<seatId>
+    // 2.1 Quản lý trạng thái ghế đã tạo đơn đặt vé (PENDING hoặc BOOKED):
+    // showtimeId -> Set<seatId>
     private final Map<Long, Set<Long>> showtimeBookedSeats = new ConcurrentHashMap<>();
 
-    // 3. Mapping session -> userId và session -> showtimeId để dọn dẹp khi disconnect
+    // 3. Mapping session -> userId và session -> showtimeId để dọn dẹp khi
+    // disconnect
     private final Map<String, Long> sessionUserMap = new ConcurrentHashMap<>();
     private final Map<String, Long> sessionShowtimeMap = new ConcurrentHashMap<>();
 
-    private SeatSessionManager() {}
+    private SeatSessionManager() {
+    }
 
     public static SeatSessionManager getInstance() {
         return INSTANCE;
@@ -34,7 +37,8 @@ public class SeatSessionManager {
 
     // Client tham gia phòng theo dõi suất chiếu
     public void joinRoom(Long showtimeId, Session session, Long userId) {
-        if (showtimeId == null || session == null) return;
+        if (showtimeId == null || session == null)
+            return;
 
         showtimeRooms.computeIfAbsent(showtimeId, k -> ConcurrentHashMap.newKeySet()).add(session);
         sessionShowtimeMap.put(session.getId(), showtimeId);
@@ -45,12 +49,14 @@ public class SeatSessionManager {
         // Gửi ngay trạng thái các ghế đang bị giữ và đã tạo đơn cho người mới vào phòng
         Map<Long, Long> heldSeats = showtimeHeldSeats.getOrDefault(showtimeId, Collections.emptyMap());
         Set<Long> bSeats = showtimeBookedSeats.getOrDefault(showtimeId, Collections.emptySet());
-        sendDirect(session, SeatSocketMessage.initialState(showtimeId, new HashMap<>(heldSeats), new ArrayList<>(bSeats)));
+        sendDirect(session,
+                SeatSocketMessage.initialState(showtimeId, new HashMap<>(heldSeats), new ArrayList<>(bSeats)));
     }
 
     // Client rời phòng hoặc mất mạng
     public void leaveRoom(Session session) {
-        if (session == null) return;
+        if (session == null)
+            return;
 
         String sessionId = session.getId();
         Long showtimeId = sessionShowtimeMap.remove(sessionId);
@@ -65,7 +71,8 @@ public class SeatSessionManager {
                 }
             }
 
-            // Tự động nhả các ghế mà user này đang giữ tạm thời khi họ tắt tab (CHƯA tạo đơn booking)
+            // Tự động nhả các ghế mà user này đang giữ tạm thời khi họ tắt tab (CHƯA tạo
+            // đơn booking)
             if (userId != null) {
                 Map<Long, Long> heldSeats = showtimeHeldSeats.get(showtimeId);
                 Set<Long> bSeats = showtimeBookedSeats.get(showtimeId);
@@ -91,7 +98,8 @@ public class SeatSessionManager {
 
     // Client click chọn giữ ghế
     public boolean holdSeat(Long showtimeId, Long seatId, Long userId, Session session) {
-        if (showtimeId == null || seatId == null || userId == null) return false;
+        if (showtimeId == null || seatId == null || userId == null)
+            return false;
 
         // Kiểm tra xem ghế đã được tạo đơn đặt vé trước đó chưa
         Set<Long> bSeats = showtimeBookedSeats.get(showtimeId);
@@ -113,14 +121,16 @@ public class SeatSessionManager {
         // Khóa ghế cho user này
         heldSeats.put(seatId, userId);
 
-        // Phát sóng cho TẤT CẢ mọi người trong phòng: Ghế này chuyển sang trạng thái HOLDING
+        // Phát sóng cho TẤT CẢ mọi người trong phòng: Ghế này chuyển sang trạng thái
+        // HOLDING
         broadcast(showtimeId, SeatSocketMessage.holdChanged(showtimeId, seatId, userId, "HOLDING"));
         return true;
     }
 
     // Client click bỏ chọn ghế
     public boolean releaseSeat(Long showtimeId, Long seatId, Long userId) {
-        if (showtimeId == null || seatId == null || userId == null) return false;
+        if (showtimeId == null || seatId == null || userId == null)
+            return false;
 
         Map<Long, Long> heldSeats = showtimeHeldSeats.get(showtimeId);
         if (heldSeats != null) {
@@ -136,9 +146,11 @@ public class SeatSessionManager {
         return false;
     }
 
-    // Khi người dùng bấm TIẾP TỤC ĐẶT VÉ (tạo đơn PENDING) hoặc thanh toán thành công
+    // Khi người dùng bấm TIẾP TỤC ĐẶT VÉ (tạo đơn PENDING) hoặc thanh toán thành
+    // công
     public void markBooked(Long showtimeId, List<Long> seatIds) {
-        if (showtimeId == null || seatIds == null || seatIds.isEmpty()) return;
+        if (showtimeId == null || seatIds == null || seatIds.isEmpty())
+            return;
 
         Map<Long, Long> heldSeats = showtimeHeldSeats.get(showtimeId);
         Set<Long> bSeats = showtimeBookedSeats.computeIfAbsent(showtimeId, k -> ConcurrentHashMap.newKeySet());
@@ -156,7 +168,8 @@ public class SeatSessionManager {
 
     // Khi đơn booking bị HỦY hoặc HẾT HẠN (10 phút) -> nhả ghế tự động cho cả phòng
     public void releaseBookedSeat(Long showtimeId, Long seatId) {
-        if (showtimeId == null || seatId == null) return;
+        if (showtimeId == null || seatId == null)
+            return;
 
         Set<Long> bSeats = showtimeBookedSeats.get(showtimeId);
         if (bSeats != null) {
@@ -174,7 +187,8 @@ public class SeatSessionManager {
     // Phát sóng tin nhắn cho tất cả các client đang xem cùng 1 suất chiếu
     public void broadcast(Long showtimeId, SeatSocketMessage message) {
         Set<Session> room = showtimeRooms.get(showtimeId);
-        if (room == null || room.isEmpty()) return;
+        if (room == null || room.isEmpty())
+            return;
 
         String jsonText;
         try {
@@ -196,7 +210,8 @@ public class SeatSessionManager {
             try {
                 String jsonText = mapper.writeValueAsString(message);
                 session.getAsyncRemote().sendText(jsonText);
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+            }
         }
     }
 }

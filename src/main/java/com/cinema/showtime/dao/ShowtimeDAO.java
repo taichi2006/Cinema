@@ -8,6 +8,7 @@ import com.cinema.showtime.dto.response.SeatResponse;
 import com.cinema.showtime.entity.Seat;
 import com.cinema.showtime.entity.Showtime;
 import com.cinema.showtime.entity.ShowtimeSeat;
+import com.cinema.websocket.SeatSessionManager;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.TypedQuery;
 
@@ -27,15 +28,15 @@ public class ShowtimeDAO {
             Long showtimeId, Long movieId, String movieTitle, Long cinemaId, String cinemaName,
             Long roomId, String roomName, String screenPosition, Instant startsAtInstant,
             String startsAt, String endsAt, String format, String language, String status,
-            Long minTicketPrice, String currency, Integer availableSeatCount
-    ) {}
+            Long minTicketPrice, String currency, Integer availableSeatCount) {
+    }
 
     public Optional<ShowtimeInfo> findShowtimeInfo(Long showtimeId) {
-        if (showtimeId == null) return Optional.empty();
+        if (showtimeId == null)
+            return Optional.empty();
         EntityManager em = JPAUtil.getEntityManager();
         try {
-            String jpql =
-                    "SELECT s, m, r, c, " +
+            String jpql = "SELECT s, m, r, c, " +
                     "(SELECT COUNT(ss) FROM Seat ss WHERE ss.roomId = r.roomId AND ss.status = 'ACTIVE') " +
                     "FROM Showtime s, Room r, Cinema c, Movie m " +
                     "WHERE s.roomId = r.roomId AND r.cinemaId = c.cinemaId AND s.movieId = m.movieId " +
@@ -44,7 +45,8 @@ public class ShowtimeDAO {
             TypedQuery<Object[]> query = em.createQuery(jpql, Object[].class);
             query.setParameter("showtimeId", showtimeId.intValue());
             List<Object[]> results = query.getResultList();
-            if (results.isEmpty()) return Optional.empty();
+            if (results.isEmpty())
+                return Optional.empty();
 
             Object[] row = results.get(0);
             Showtime s = (Showtime) row[0];
@@ -54,9 +56,11 @@ public class ShowtimeDAO {
             Long availableSeats = (Long) row[4];
 
             Instant startsAt = (s.getShowDate() != null && s.getStartTime() != null)
-                    ? LocalDateTime.of(s.getShowDate(), s.getStartTime()).atZone(ZoneId.systemDefault()).toInstant() : null;
+                    ? LocalDateTime.of(s.getShowDate(), s.getStartTime()).atZone(ZoneId.systemDefault()).toInstant()
+                    : null;
             Instant endsAt = (s.getShowDate() != null && s.getEndTime() != null)
-                    ? LocalDateTime.of(s.getShowDate(), s.getEndTime()).atZone(ZoneId.systemDefault()).toInstant() : null;
+                    ? LocalDateTime.of(s.getShowDate(), s.getEndTime()).atZone(ZoneId.systemDefault()).toInstant()
+                    : null;
 
             return Optional.of(new ShowtimeInfo(
                     Long.valueOf(s.getShowTimeId()), Long.valueOf(s.getMovieId()), m.getTitle(),
@@ -65,8 +69,7 @@ public class ShowtimeDAO {
                     startsAt, startsAt != null ? startsAt.toString() : null, endsAt != null ? endsAt.toString() : null,
                     m.getFormat(), m.getLanguage(), s.getStatus(),
                     s.getBasePrice() != null ? s.getBasePrice().longValue() : 0L, "VND",
-                    availableSeats != null ? availableSeats.intValue() : 0
-            ));
+                    availableSeats != null ? availableSeats.intValue() : 0));
         } finally {
             em.close();
         }
@@ -75,20 +78,55 @@ public class ShowtimeDAO {
     public List<SeatResponse> findSeatsForShowtime(Long showtimeId, Long roomId, Long currentUserId) {
         EntityManager em = JPAUtil.getEntityManager();
         try {
+            // Tự động phục hồi các ghế bị kẹt BOOKED do hoàn tiền hoặc hủy đơn trong quá khứ
+            try {
+                em.getTransaction().begin();
+                List<?> staleSeats = em.createNativeQuery("""
+                        SELECT sts.seat_id
+                        FROM cinema.show_time_seats sts
+                        LEFT JOIN cinema.bookings b ON sts.booking_id = b.booking_id
+                        WHERE sts.show_time_id = :stId
+                          AND sts.status = 'BOOKED'
+                          AND (b.status IN ('REFUNDED', 'CANCELLED')
+                               OR (sts.booking_id IS NOT NULL AND b.booking_id IS NULL)
+                               OR sts.id IN (SELECT t.show_time_seat_id FROM cinema.tickets t WHERE t.status = 'REFUNDED'))
+                        """).setParameter("stId", showtimeId).getResultList();
+
+                if (!staleSeats.isEmpty()) {
+                    em.createNativeQuery("""
+                            UPDATE cinema.show_time_seats sts
+                            SET status = 'AVAILABLE', booking_id = NULL, hold_expiration_at = NULL, version = version + 1
+                            WHERE sts.show_time_id = :stId
+                              AND sts.status = 'BOOKED'
+                              AND (sts.booking_id IN (SELECT b.booking_id FROM cinema.bookings b WHERE b.status IN ('REFUNDED', 'CANCELLED'))
+                                   OR sts.id IN (SELECT t.show_time_seat_id FROM cinema.tickets t WHERE t.status = 'REFUNDED'))
+                            """).setParameter("stId", showtimeId).executeUpdate();
+                }
+                em.getTransaction().commit();
+
+                for (Object row : staleSeats) {
+                    if (row != null) {
+                        Long sId = ((Number) row).longValue();
+                        SeatSessionManager.getInstance().releaseBookedSeat(showtimeId, sId);
+                    }
+                }
+            } catch (Exception e) {
+                if (em.getTransaction().isActive()) em.getTransaction().rollback();
+            }
+
             Showtime showtime = em.find(Showtime.class, showtimeId.intValue());
 
             List<Seat> seats = em.createQuery(
                     "SELECT se FROM Seat se WHERE se.roomId = :roomId ORDER BY se.seatRow ASC, se.seatCol ASC, se.seatId ASC",
-                    Seat.class
-            ).setParameter("roomId", roomId.intValue()).getResultList();
+                    Seat.class).setParameter("roomId", roomId.intValue()).getResultList();
 
             List<ShowtimeSeat> showtimeSeats = em.createQuery(
                     "SELECT sts FROM ShowtimeSeat sts WHERE sts.showTimeId = :showtimeId",
-                    ShowtimeSeat.class
-            ).setParameter("showtimeId", showtimeId.intValue()).getResultList();
+                    ShowtimeSeat.class).setParameter("showtimeId", showtimeId.intValue()).getResultList();
 
             Map<Integer, ShowtimeSeat> stsMap = new HashMap<>();
-            for (ShowtimeSeat sts : showtimeSeats) stsMap.put(sts.getSeatId(), sts);
+            for (ShowtimeSeat sts : showtimeSeats)
+                stsMap.put(sts.getSeatId(), sts);
 
             LocalDateTime now = LocalDateTime.now();
             List<SeatResponse> responseList = new ArrayList<>();
@@ -97,7 +135,8 @@ public class ShowtimeDAO {
                 ShowtimeSeat sts = stsMap.get(se.getSeatId());
                 Long price = (sts != null && sts.getPrice() != null)
                         ? sts.getPrice().longValue()
-                        : (showtime != null && showtime.getBasePrice() != null ? showtime.getBasePrice().longValue() : 0L);
+                        : (showtime != null && showtime.getBasePrice() != null ? showtime.getBasePrice().longValue()
+                                : 0L);
 
                 String seatStatus = "AVAILABLE";
                 if (!"ACTIVE".equalsIgnoreCase(se.getStatus())) {
@@ -112,14 +151,15 @@ public class ShowtimeDAO {
                 }
 
                 int y = (se.getSeatRow() != null && !se.getSeatRow().isEmpty())
-                        ? (int) Character.toUpperCase(se.getSeatRow().charAt(0)) - 64 : 0;
+                        ? (int) Character.toUpperCase(se.getSeatRow().charAt(0)) - 64
+                        : 0;
                 String holdExpiresAt = (sts != null && sts.getHoldExpirationAt() != null)
-                        ? sts.getHoldExpirationAt().atZone(ZoneId.systemDefault()).toInstant().toString() : null;
+                        ? sts.getHoldExpirationAt().atZone(ZoneId.systemDefault()).toInstant().toString()
+                        : null;
 
                 responseList.add(new SeatResponse(
                         String.valueOf(se.getSeatId()), se.getSeatRow(), se.getSeatCol(), se.getSeatCol(),
-                        y, "REGULAR", price, seatStatus, false, holdExpiresAt
-                ));
+                        y, "REGULAR", price, seatStatus, false, holdExpiresAt));
             }
             return responseList;
         } finally {
